@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme");
+      document.documentElement.setAttribute(
+        "data-theme",
+        t === "light" || t === "dark" || t === "system" ? t : "system"
+      );
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "system");
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Site map for the Test Website demo site.">
+  <title>Site Map | Test Website</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">Test Website</a>
+      <div class="header-end">
+        <div class="theme-switcher" role="group" aria-label="Color theme">
+          <button type="button" class="theme-btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="theme-btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" class="theme-btn" data-theme-choice="system" aria-pressed="false">System</button>
+        </div>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="page-a.html">Page A</a></li>
+          <li><a href="page-b.html">Page B</a></li>
+          <li><a href="sitemap.html" aria-current="page">Site Map</a></li>
+        </ul>
+      </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="page-header">
+      <p class="eyebrow">Navigation</p>
+      <h1>Site Map</h1>
+      <p class="lead">
+        A complete list of pages in this placeholder demo site.
+      </p>
+    </section>
+
+    <section class="content-block">
+      <h2>All Pages</h2>
+      <ul class="sitemap-list">
+        <li>
+          <a href="index.html">Home</a>
+          <span>Main landing page with hero section and feature cards.</span>
+        </li>
+        <li>
+          <a href="about.html">About</a>
+          <span>Placeholder mission statement, team bios, and contact info.</span>
+        </li>
+        <li>
+          <a href="page-a.html">Page A</a>
+          <span>ASCII clock city artwork with skyscrapers, streets, and restaurants.</span>
+        </li>
+        <li>
+          <a href="page-b.html">Page B</a>
+          <span>Sudoku minigame with timer, notes, hints, undo, and live conflict checking.</span>
+        </li>
+        <li>
+          <a href="sitemap.html">Site Map</a>
+          <span>This page — an index of all site pages.</span>
+        </li>
+      </ul>
+    </section>
+
+    <section class="content-block">
+      <h2>Assets</h2>
+      <ul class="info-list">
+        <li><strong>Styles:</strong> <code>css/styles.css</code></li>
+        <li><strong>Scripts:</strong> <code>js/main.js</code></li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; 2026 Test Website. All rights reserved (placeholder).</p>
+      <p><a href="sitemap.html">Site Map</a> &middot; <a href="about.html">About</a></p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme");
+      document.documentElement.setAttribute(
+        "data-theme",
+        t === "light" || t === "dark" || t === "system" ? t : "system"
+      );
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "system");
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Play Sudoku on Page B of the Test Website demo site.">
+  <title>Sudoku | Page B | Test Website</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">Test Website</a>
+      <div class="header-end">
+        <div class="theme-switcher" role="group" aria-label="Color theme">
+          <button type="button" class="theme-btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="theme-btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" class="theme-btn" data-theme-choice="system" aria-pressed="false">System</button>
+        </div>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="page-a.html">Page A</a></li>
+          <li><a href="page-b.html" aria-current="page">Page B</a></li>
+          <li><a href="sitemap.html">Site Map</a></li>
+        </ul>
+      </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container container--wide">
+    <section class="content-block">
+      <div class="sudoku-game">
+        <div class="sudoku-toolbar">
+          <p class="sudoku-status" id="sudoku-status" role="status">Loading puzzle…</p>
+          <div class="sudoku-controls">
+            <label for="sudoku-difficulty">Difficulty</label>
+            <select class="sudoku-select" id="sudoku-difficulty">
+              <option value="easy">Easy</option>
+              <option value="medium" selected>Medium</option>
+              <option value="hard">Hard</option>
+            </select>
+            <button class="btn btn-primary" type="button" id="sudoku-new">New Game</button>
+          </div>
+        </div>
+
+        <div class="sudoku-stats" aria-label="Game statistics">
+          <div class="sudoku-stat">
+            <span class="sudoku-stat-label">Time</span>
+            <strong class="sudoku-stat-value" id="sudoku-timer">00:00</strong>
+          </div>
+          <div class="sudoku-stat">
+            <span class="sudoku-stat-label">Mistakes</span>
+            <strong class="sudoku-stat-value" id="sudoku-mistakes">0 / 3</strong>
+          </div>
+          <div class="sudoku-stat">
+            <span class="sudoku-stat-label">Remaining</span>
+            <strong class="sudoku-stat-value" id="sudoku-remaining">0</strong>
+          </div>
+          <div class="sudoku-stat">
+            <span class="sudoku-stat-label">Hints</span>
+            <strong class="sudoku-stat-value" id="sudoku-hints">3 left</strong>
+          </div>
+          <div class="sudoku-stat">
+            <span class="sudoku-stat-label">Mode</span>
+            <strong class="sudoku-stat-value" id="sudoku-mode-label">Pen</strong>
+          </div>
+        </div>
+
+        <div class="sudoku-main">
+          <div class="sudoku-board-area">
+            <div class="sudoku-col-labels" aria-hidden="true">
+              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+            </div>
+            <div class="sudoku-row-labels" aria-hidden="true">
+              <span>1</span><span>2</span><span>3</span><span>4</span><span>5</span><span>6</span><span>7</span><span>8</span><span>9</span>
+            </div>
+            <div id="sudoku-grid" class="sudoku-grid" role="grid" aria-label="Sudoku board"></div>
+          </div>
+
+          <aside class="sudoku-panel">
+            <div class="sudoku-mode-toggle" role="group" aria-label="Input mode">
+              <button type="button" class="sudoku-mode-btn is-active" id="sudoku-pen" aria-pressed="true">Pen</button>
+              <button type="button" class="sudoku-mode-btn" id="sudoku-notes" aria-pressed="false">Notes</button>
+            </div>
+
+            <div class="sudoku-numpad" id="sudoku-numpad" aria-label="Number pad"></div>
+
+            <div class="sudoku-actions">
+              <button class="btn btn-secondary" type="button" id="sudoku-undo">Undo</button>
+              <button class="btn btn-secondary" type="button" id="sudoku-hint-btn">Hint</button>
+              <button class="btn btn-secondary" type="button" id="sudoku-clear">Erase</button>
+              <button class="btn btn-secondary" type="button" id="sudoku-check">Check</button>
+            </div>
+
+            <dl class="sudoku-shortcuts">
+              <div><dt>1–9</dt><dd>Enter number</dd></div>
+              <div><dt>N</dt><dd>Toggle notes</dd></div>
+              <div><dt>H</dt><dd>Hint</dd></div>
+              <div><dt>Z / Backspace</dt><dd>Undo / erase</dd></div>
+              <div><dt>Arrows</dt><dd>Move selection</dd></div>
+            </dl>
+          </aside>
+        </div>
+
+        <div class="sudoku-win" id="sudoku-win" hidden>
+          <p class="sudoku-win-title">Puzzle solved!</p>
+          <p class="sudoku-win-detail" id="sudoku-win-detail"></p>
+          <button class="btn btn-primary" type="button" id="sudoku-win-new">Play Again</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; 2026 Test Website. All rights reserved (placeholder).</p>
+      <p><a href="sitemap.html">Site Map</a> &middot; <a href="about.html">About</a></p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script src="js/sudoku.js"></script>
+</body>
+</html>

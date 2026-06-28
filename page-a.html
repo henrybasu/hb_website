@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme");
+      document.documentElement.setAttribute(
+        "data-theme",
+        t === "light" || t === "dark" || t === "system" ? t : "system"
+      );
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "system");
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="ASCII clock city artwork on Page A of the Test Website demo site.">
+  <title>Page A | Test Website</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body class="ascii-page">
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">Test Website</a>
+      <div class="header-end">
+        <div class="theme-switcher" role="group" aria-label="Color theme">
+          <button type="button" class="theme-btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="theme-btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" class="theme-btn" data-theme-choice="system" aria-pressed="false">System</button>
+        </div>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="page-a.html" aria-current="page">Page A</a></li>
+          <li><a href="page-b.html">Page B</a></li>
+          <li><a href="sitemap.html">Site Map</a></li>
+        </ul>
+      </nav>
+      </div>
+    </div>
+  </header>
+
+  <div class="ascii-stage">
+  <pre class="ascii-art ascii-art--fullscreen" aria-label="ASCII art of an orderly clock city grid with houses, skyscrapers, restaurants, streets, staircases, and a clock tower">                         *  .   *   .   *
+              .    *              .        *    .
+        .                                              .
+
+ |+||#||+| |+||#||+| |+||#||+| |+||#||+| |+||#||+| |+||#||+| |+||#||+| |+||#||+|
+ |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#|
+ |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#|
+ |#| |#| | |#| |#| | |#| |#| | |#| |#| | |#| |#| | |#| |#| | |#| |#| | |#| |#| |
+ |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#| |#|#|#|#|
+ |#|____#| |#|____#| |#|____#| |#|____#| |#|____#| |#|____#| |#|____#| |#|____#|
+ |######| |######| |######| |######| |######| |######| |######| |######|
+  /      \ /      \ /      \ /      \ /      \ /      \ /      \ /      \
+
+   /\       /\       /\       /\       /\       /\       /\       /\
+  /  \     /  \     /  \     /  \     /  \     /  \     /  \     /  \
+ |"##"|   |"##"|   |"##"|   |"##"|   |"##"|   |"##"|   |"##"|   |"##"|
+ |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|
+ |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|
+ |____|   |____|   |____|   |____|   |____|   |____|   |____|   |____|
+   |~|     |~|     |~|     |~|     |~|     |~|     |~|     |~|
+
+ /\/\/\/\ /\/\/\/\ /\/\/\/\ /\/\/\/\ /\/\/\/\ /\/\/\/\ /\/\/\/\ /\/\/\/\
+ |o::::o| |o::::o| |o::::o| |o::::o| |o::::o| |o::::o| |o::::o| |o::::o|
+ | |"##"| | |"##"| | |"##"| | |"##"| | |"##"| | |"##"| | |"##"| | |"##"|
+ | | ####| | | ####| | | ####| | | ####| | | ####| | | ####| | | ####| | | ####|
+ |_|'##'|_| |_|'##'|_| |_|'##'|_| |_|'##'|_| |_|'##'|_| |_|'##'|_| |_|'##'|_| |_|'##'|_|
+    |~~|    |~~|    |~~|    |~~|    |~~|    |~~|    |~~|    |~~|
+
+o |================================================================================| o
+  | -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   -   |
+o |================================================================================| o
+
+ |######| |######| |######| |######| |######| |######| |######| |######|
+ | ##  ##| | ##  ##| | ##  ##| | ##  ##| | ##  ##| | ##  ##| | ##  ##| | ##  ##|
+ | ##/\##| | ##/\##| | ##/\##| | ##/\##| | ##/\##| | ##/\##| | ##/\##| | ##/\##|
+ | ##  ##| | ##  ##| | ##  ##| | ##  ##| | ##  ##| | ##  ##| | ##  ##| | ##  ##|
+ |'#####'| |'#####'| |'#####'| |'#####'| |'#####'| |'#####'| |'#####'| |'#####'|
+ |______| |______| |______| |______| |______| |______| |______| |______|
+  /______\ /______\ /______\ /______\ /______\ /______\ /______\ /______\
+
+   /\       /\       /\     .------.     /\       /\       /\       /\
+  /  \     /  \     /  \   / . . . \   /  \     /  \     /  \     /  \
+ |"##"|   |"##"|   |"##"| | --+-- |   |"##"|   |"##"|   |"##"|   |"##"|
+ |'##'|   |'##'|   |'##'| |  /|\  |   |'##'|   |'##'|   |'##'|   |'##'|
+ |'##'|   |'##'|   |'##'| | '--+' |   |'##'|   |'##'|   |'##'|   |'##'|
+ |____|   |____|   |____|  /|##|\  |   |____|   |____|   |____|   |____|
+   |~|     |~|     |~|    | |##| |     |~|     |~|     |~|     |~|
+                          | |##| |
+                          /__||__\
+                           /'  '\
+                          /______\
+
+   /\       /\       /\       /\       /\       /\       /\       /\
+  /  \     /  \     /  \     /  \     /  \     /  \     /  \     /  \
+ |"##"|   |"##"|   |"##"|   |"##"|   |"##"|   |"##"|   |"##"|   |"##"|
+ |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|
+ |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|   |'##'|
+ |____|   |____|   |____|   |____|   |____|   |____|   |____|   |____|
+   |~|     |~|     |~|     |~|     |~|     |~|     |~|     |~| </pre>
+
+  <canvas id="snow-canvas" class="snow-canvas" aria-hidden="true"></canvas>
+  </div>
+
+  <script src="js/main.js"></script>
+  <script src="js/ascii-fit.js"></script>
+  <script src="js/snow.js"></script>
+</body>
+</html>

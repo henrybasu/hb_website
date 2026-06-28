@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme");
+      document.documentElement.setAttribute(
+        "data-theme",
+        t === "light" || t === "dark" || t === "system" ? t : "system"
+      );
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "system");
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Placeholder about page for the Test Website demo site.">
+  <title>About | Test Website</title>
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">Test Website</a>
+      <div class="header-end">
+        <div class="theme-switcher" role="group" aria-label="Color theme">
+          <button type="button" class="theme-btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="theme-btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" class="theme-btn" data-theme-choice="system" aria-pressed="false">System</button>
+        </div>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html" aria-current="page">About</a></li>
+          <li><a href="page-a.html">Page A</a></li>
+          <li><a href="page-b.html">Page B</a></li>
+          <li><a href="sitemap.html">Site Map</a></li>
+        </ul>
+      </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <section class="page-header">
+      <p class="eyebrow">About This Site</p>
+      <h1>About Test Website</h1>
+      <p class="lead">
+        This page contains placeholder information about the demo site and its purpose.
+      </p>
+    </section>
+
+    <section class="content-block">
+      <h2>Our Placeholder Mission</h2>
+      <p>
+        Test Website exists as a minimal static site template for publishing on GitHub Pages.
+        Every paragraph, name, and statistic on this page is filler content meant to be replaced
+        with real copy when you are ready.
+      </p>
+      <p>
+        Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat
+        nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui
+        officia deserunt mollit anim id est laborum.
+      </p>
+    </section>
+
+    <section class="content-block">
+      <h2>Placeholder Team</h2>
+      <div class="card-grid">
+        <article class="card">
+          <h3>Jane Placeholder</h3>
+          <p class="role">Chief Example Officer</p>
+          <p>Responsible for placeholder strategy and demo content oversight.</p>
+        </article>
+        <article class="card">
+          <h3>John Sample</h3>
+          <p class="role">Lead Filler Writer</p>
+          <p>Writes lorem ipsum and ensures all bios remain convincingly generic.</p>
+        </article>
+        <article class="card">
+          <h3>Alex Demo</h3>
+          <p class="role">Site Maintainer</p>
+          <p>Keeps the HTML, CSS, and JavaScript working across all pages.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="content-block">
+      <h2>Contact (Placeholder)</h2>
+      <ul class="info-list">
+        <li><strong>Email:</strong> hello@example-placeholder.com</li>
+        <li><strong>Phone:</strong> (555) 123-4567</li>
+        <li><strong>Address:</strong> 123 Placeholder Lane, Demo City, ST 00000</li>
+      </ul>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; 2026 Test Website. All rights reserved (placeholder).</p>
+      <p><a href="sitemap.html">Site Map</a> &middot; <a href="about.html">About</a></p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>
