@@ -737,19 +737,31 @@
           <input type="text" class="wide" data-relay value="${escapeHtml(options.relayUrl || DEFAULT_RELAY)}">
         </div>
         <div class="strame-web-row">
-          <label>Map</label>
-          <select data-map>
-            <option value="STANDARD_5X10">Standard 5×10</option>
-            <option value="RIVER_5X10">5×10 River</option>
-          </select>
           <label>Your name</label>
           <input type="text" data-name maxlength="32" placeholder="Player">
         </div>
-        <div class="strame-web-row">
-          <button type="button" class="primary" data-host>Host game</button>
-          <label>Room code</label>
-          <input type="text" data-code maxlength="12" placeholder="ABCDEF">
-          <button type="button" data-join>Join game</button>
+        <div class="strame-web-lobby-split">
+          <div class="strame-web-lobby-card">
+            <h3>Host a game</h3>
+            <div class="strame-web-row">
+              <label>Map</label>
+              <select data-map>
+                <option value="STANDARD_5X10">Standard 5×10</option>
+                <option value="RIVER_5X10">5×10 River</option>
+              </select>
+            </div>
+            <button type="button" class="primary block" data-host>Host game</button>
+            <p class="strame-web-hint">Creates a room code to share with your opponent.</p>
+          </div>
+          <div class="strame-web-lobby-card strame-web-lobby-card--guest">
+            <h3>Join as guest</h3>
+            <div class="strame-web-row">
+              <label>Room code</label>
+              <input type="text" data-code maxlength="12" placeholder="ABCDEF">
+            </div>
+            <button type="button" class="primary block" data-join>Join game</button>
+            <p class="strame-web-hint">Enter the code from the host, then join.</p>
+          </div>
         </div>
       </div>
       <div class="strame-web-banner strame-web-hidden" data-banner></div>
