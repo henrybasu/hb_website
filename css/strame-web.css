@@ -1,0 +1,252 @@
+/* Scoped styles for embedding Strame as a subpage. */
+.strame-web-root {
+  --sw-bg: #f6f7fb;
+  --sw-panel: #ffffff;
+  --sw-border: #e1e4ec;
+  --sw-text: #1a1f28;
+  --sw-muted: #6b7280;
+  --sw-p1: #3861f0;
+  --sw-p2: #e04545;
+  --sw-accent: #3861f0;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: var(--sw-text);
+  background: var(--sw-bg);
+  border-radius: 12px;
+  border: 1px solid var(--sw-border);
+  padding: 16px;
+  max-width: 980px;
+  margin: 0 auto;
+  box-sizing: border-box;
+}
+
+.strame-web-root *,
+.strame-web-root *::before,
+.strame-web-root *::after {
+  box-sizing: inherit;
+}
+
+.strame-web-header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.strame-web-header h1 {
+  font-size: 1.35rem;
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+.strame-web-status {
+  font-size: 0.9rem;
+  color: var(--sw-muted);
+  min-height: 1.2em;
+}
+
+.strame-web-panel {
+  background: var(--sw-panel);
+  border: 1px solid var(--sw-border);
+  border-radius: 10px;
+  padding: 14px;
+  margin-bottom: 12px;
+}
+
+.strame-web-panel h2 {
+  font-size: 0.95rem;
+  margin: 0 0 10px;
+  font-weight: 600;
+}
+
+.strame-web-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.strame-web-row:last-child {
+  margin-bottom: 0;
+}
+
+.strame-web-root label {
+  font-size: 0.85rem;
+  color: var(--sw-muted);
+}
+
+.strame-web-root input[type="text"],
+.strame-web-root select {
+  font: inherit;
+  padding: 6px 10px;
+  border: 1px solid var(--sw-border);
+  border-radius: 6px;
+  min-width: 0;
+}
+
+.strame-web-root input[type="text"].wide {
+  flex: 1 1 220px;
+  min-width: 180px;
+}
+
+.strame-web-root button {
+  font: inherit;
+  padding: 8px 14px;
+  border-radius: 8px;
+  border: 1px solid var(--sw-border);
+  background: #fff;
+  cursor: pointer;
+}
+
+.strame-web-root button.primary {
+  background: var(--sw-accent);
+  border-color: var(--sw-accent);
+  color: #fff;
+  font-weight: 600;
+}
+
+.strame-web-root button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.strame-web-root button.active {
+  outline: 2px solid var(--sw-accent);
+  outline-offset: 1px;
+}
+
+.strame-web-game {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 12px;
+  align-items: start;
+}
+
+@media (max-width: 760px) {
+  .strame-web-game {
+    grid-template-columns: 1fr;
+  }
+}
+
+.strame-web-board-wrap {
+  display: flex;
+  justify-content: center;
+  background: #eef0f5;
+  border-radius: 10px;
+  padding: 10px;
+  border: 1px solid var(--sw-border);
+}
+
+.strame-web-board-wrap canvas {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  cursor: pointer;
+  border-radius: 4px;
+}
+
+.strame-web-sidebar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.strame-web-stat {
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.strame-web-stat strong {
+  color: var(--sw-text);
+}
+
+.strame-web-log {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  line-height: 1.35;
+  max-height: 160px;
+  overflow: auto;
+  background: #f8f9fc;
+  border: 1px solid var(--sw-border);
+  border-radius: 8px;
+  padding: 8px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
+
+.strame-web-hidden {
+  display: none !important;
+}
+
+.strame-web-note {
+  font-size: 0.82rem;
+  color: var(--sw-muted);
+  margin: 0;
+}
+
+.strame-web-banner {
+  padding: 10px 12px;
+  border-radius: 8px;
+  background: #eef3ff;
+  border: 1px solid #c8d6ff;
+  font-size: 0.88rem;
+  margin-bottom: 12px;
+}
+
+.strame-web-banner.error {
+  background: #fff0f0;
+  border-color: #ffc9c9;
+  color: #8b1a1a;
+}
+
+.strame-web-banner.win {
+  background: #edfbf3;
+  border-color: #b8e6cc;
+}
+
+.strame-web-help {
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  max-width: 980px;
+  margin: 0 auto 16px;
+  padding: 16px 18px;
+  background: #fff;
+  border: 1px solid #e1e4ec;
+  border-radius: 12px;
+  color: #1a1f28;
+  line-height: 1.55;
+}
+
+.strame-web-help h2 {
+  font-size: 1.15rem;
+  margin: 0 0 10px;
+}
+
+.strame-web-help h3 {
+  font-size: 0.95rem;
+  margin: 14px 0 8px;
+}
+
+.strame-web-help-steps,
+.strame-web-help-tips {
+  margin: 0 0 8px;
+  padding-left: 1.25rem;
+}
+
+.strame-web-help-steps li,
+.strame-web-help-tips li {
+  margin-bottom: 8px;
+}
+
+.strame-web-help code {
+  font-size: 0.88em;
+  background: #f0f2f5;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+}
+
+.strame-web-help-note {
+  font-size: 0.85rem;
+  color: #6b7280;
+  margin: 12px 0 0;
+}

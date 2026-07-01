@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme");
+      document.documentElement.setAttribute(
+        "data-theme",
+        t === "light" || t === "dark" || t === "system" ? t : "system"
+      );
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "system");
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Play Strame Standard Online in the browser on Page C of the Test Website demo site.">
+  <title>Strame Online | Page C | Test Website</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/strame-web.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">Test Website</a>
+      <div class="header-end">
+        <div class="theme-switcher" role="group" aria-label="Color theme">
+          <button type="button" class="theme-btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="theme-btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" class="theme-btn" data-theme-choice="system" aria-pressed="false">System</button>
+        </div>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="page-a.html">Page A</a></li>
+          <li><a href="page-b.html">Page B</a></li>
+          <li><a href="page-c.html" aria-current="page">Page C</a></li>
+          <li><a href="sitemap.html">Site Map</a></li>
+        </ul>
+      </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container container--wide">
+    <section class="content-block">
+      <section class="strame-web-help" aria-labelledby="strame-how-to-play">
+        <h2 id="strame-how-to-play">How to play (two players)</h2>
+        <ol class="strame-web-help-steps">
+          <li><strong>Two players, two browsers.</strong> Each player opens this page on their own computer or phone (or use two different browsers). You cannot play both sides in one tab.</li>
+          <li><strong>Same relay URL.</strong> Leave the relay URL as shown unless the host gave you a different one (e.g. a Render link like <code>wss://your-relay.onrender.com/ws</code>). Both players must use the exact same URL.</li>
+          <li><strong>Host creates the room.</strong> Player 1 chooses a map and name, then clicks <strong>Host game</strong>. Copy the room code that appears and send it to Player 2 (text, chat, etc.).</li>
+          <li><strong>Guest joins.</strong> Player 2 enters that room code, the same relay URL, and their name, then clicks <strong>Join game</strong>. The match starts when both are connected.</li>
+        </ol>
+        <h3>In the match</h3>
+        <ul class="strame-web-help-tips">
+          <li><strong>Blue (P1)</strong> recruits on the <strong>left</strong> column; <strong>red (P2)</strong> on the <strong>right</strong>.</li>
+          <li>On your turn: click <strong>Recruit</strong>, pick Soldier or Gollem, then click an empty home-column square; or click your piece, then <strong>Move</strong> or <strong>Attack</strong>, then click a highlighted square.</li>
+          <li><strong>Pass</strong> skips the rest of a selected piece’s actions. <strong>End turn</strong> when you are done (including skipping recruit if you do not want another unit).</li>
+          <li>Win by reducing the opponent to <strong>0 gold and 0 HP</strong> on the board.</li>
+        </ul>
+        <p class="strame-web-help-note">This page is the browser version (Soldier &amp; Gollem, preset maps). The full desktop game has more units and modes.</p>
+      </section>
+      <div id="strame-web-root"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; 2026 Test Website. All rights reserved (placeholder).</p>
+      <p><a href="sitemap.html">Site Map</a> &middot; <a href="about.html">About</a></p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script src="js/strame-web.js"></script>
+  <script>
+    StrameWeb.mount("#strame-web-root", {
+      relayUrl: new URLSearchParams(location.search).get("relay") || undefined,
+    });
+  </script>
+</body>
+</html>
