@@ -451,7 +451,15 @@
 .strame-web-actions.is-locked button {
   cursor: not-allowed;
   filter: saturate(0.75);
+  pointer-events: auto;
 }
+
+.strame-web-banner.info {
+  background: #eef3ff;
+  border-color: #b8c9f7;
+  color: #1e3a8a;
+}
+
 
 .strame-web-actions-hint {
   margin: 0 0 10px;

@@ -218,8 +218,9 @@
     }
 
     endTurnEarly() {
-      if (this.countPieces(this.current) === 0) return;
+      if (this.countPieces(this.current) === 0) return false;
       this.finishTurn();
+      return true;
     }
 
     checkGameOver() {
@@ -237,7 +238,7 @@
     }
 
     recruit(unitKey, r, c) {
-      if (!this.canRecruitAt(r, c)) return;
+      if (!this.canRecruitAt(r, c)) return false;
       const id = this.nextId++;
       const pc = this.createPiece(this.current, unitKey, id);
       this.gold[this.current] -= RECRUIT_COST;
@@ -245,8 +246,10 @@
       this.placed.add(id);
       this.mayPlaceThisTurn = false;
       this.clearSelection();
+      this.uiMode = "idle";
       this.emit(shortP(this.current) + "·" + pc.unit + "#" + id + ":new @" + rc(r, c));
       this.afterLocalAction();
+      return true;
     }
 
     legalMoveTargets(fromR, fromC) {
@@ -367,7 +370,6 @@
 
     afterLocalAction() {
       this.checkGameOver();
-      this.tryAutoEndTurn();
       if (this.onLocalAction) this.onLocalAction();
     }
 
@@ -924,6 +926,11 @@
       turnPill: root.querySelector("[data-turn-pill]"),
       actionsHint: root.querySelector("[data-actions-hint]"),
       actions: root.querySelector("[data-actions]"),
+      recruitBtn: root.querySelector("[data-mode-recruit]"),
+      moveBtn: root.querySelector("[data-move]"),
+      attackBtn: root.querySelector("[data-attack]"),
+      passBtn: root.querySelector("[data-pass]"),
+      endBtn: root.querySelector("[data-end]"),
       relay: root.querySelector("[data-relay]"),
       map: root.querySelector("[data-map]"),
       name: root.querySelector("[data-name]"),
@@ -1057,12 +1064,33 @@
       return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     }
 
-    function guardTurn() {
-      if (!myTurn()) {
-        el.actionsHint.textContent = "Not your turn — wait for the opponent.";
-        return false;
+    let actionFlashTimer = null;
+
+    function actionFlash(msg, kind) {
+      if (!el.actionsHint) return;
+      el.actionsHint.textContent = msg;
+      if (el.banner) {
+        el.banner.classList.remove("strame-web-hidden", "error", "win", "info");
+        if (kind === "warn") el.banner.classList.add("error");
+        else if (kind === "ok") el.banner.classList.add("info");
+        el.banner.textContent = msg;
       }
-      return true;
+      if (actionFlashTimer) clearTimeout(actionFlashTimer);
+      actionFlashTimer = setTimeout(() => {
+        if (el.banner && model.outcome === "ongoing") {
+          el.banner.classList.add("strame-web-hidden");
+          el.banner.classList.remove("error", "info");
+        }
+        refresh();
+      }, kind === "ok" ? 1800 : 2600);
+    }
+
+    function guardTurn(showFeedback) {
+      if (myTurn()) return true;
+      if (showFeedback !== false) {
+        actionFlash("Not your turn — wait for the opponent.", "warn");
+      }
+      return false;
     }
 
     function myTurn() {
@@ -1130,7 +1158,9 @@
             "Piece selected — choose Move, Attack, or Pass, or click End turn when finished.";
         } else if (model.canStillRecruit()) {
           el.actionsHint.textContent =
-            "Your turn — click Recruit, select a piece, or End turn when you are done.";
+            "Your turn — click Recruit, then click a green square in your home column.";
+        } else if (model.activationsPending() === 0) {
+          el.actionsHint.textContent = "Your turn — click End turn when you are finished.";
         } else {
           el.actionsHint.textContent = "Your turn — select one of your pieces, or click End turn.";
         }
@@ -1141,12 +1171,13 @@
       el.actions.classList.toggle("is-active", turnMine);
       el.actions.classList.toggle("is-locked", !turnMine);
 
-      root.querySelector("[data-mode-recruit]").classList.toggle(
-        "active",
-        turnMine && model.uiMode === "recruit"
-      );
-      root.querySelector("[data-move]").classList.toggle("active", turnMine && model.uiMode === "move");
-      root.querySelector("[data-attack]").classList.toggle("active", turnMine && model.uiMode === "attack");
+      if (el.recruitBtn) {
+        el.recruitBtn.classList.toggle("active", turnMine && model.uiMode === "recruit");
+      }
+      if (el.moveBtn) el.moveBtn.classList.toggle("active", turnMine && model.uiMode === "move");
+      if (el.attackBtn) {
+        el.attackBtn.classList.toggle("active", turnMine && model.uiMode === "attack");
+      }
       if (el.unit) el.unit.disabled = !turnMine;
 
       if (model.outcome !== "ongoing") {
@@ -1206,13 +1237,13 @@
         return;
       }
       if (msg.startsWith("ACTION ")) {
-        const parts = msg.split(/\s+/);
+        const parts = msg.split(/\s+/, 4);
+        if (parts.length < 4 || seat === null) return;
         const actor = parts[2];
         const myActor = seat === 0 ? "P1" : "P2";
         if (actor === myActor) return;
-        const rest = parts.slice(3).join(" ");
-        model.applyRemoteLine(rest);
-        log("← " + rest);
+        model.applyRemoteLine(parts[3]);
+        log("← " + parts[3]);
         refresh();
         return;
       }
@@ -1305,68 +1336,78 @@
       }
     }
 
+    function handleActionClick(ev) {
+      const btn = ev.target.closest("button");
+      if (!btn || !el.actions || !el.actions.contains(btn)) return;
+
+      if (btn === el.recruitBtn) {
+        if (!guardTurn()) return;
+        model.recruitUnit = el.unit ? el.unit.value : "S";
+        model.uiMode = model.uiMode === "recruit" ? "idle" : "recruit";
+        model.clearSelection();
+        actionFlash(
+          model.uiMode === "recruit"
+            ? "Recruit mode ON — click a green square in your home column."
+            : "Recruit mode off.",
+          model.uiMode === "recruit" ? "ok" : "info"
+        );
+        refresh();
+        return;
+      }
+
+      if (btn === el.moveBtn) {
+        if (!guardTurn()) return;
+        if (!model.selected) {
+          actionFlash("Select one of your pieces on the board first.", "warn");
+          return;
+        }
+        model.uiMode = "move";
+        actionFlash("Move mode — click a highlighted blue square.", "ok");
+        refresh();
+        return;
+      }
+
+      if (btn === el.attackBtn) {
+        if (!guardTurn()) return;
+        if (!model.selected) {
+          actionFlash("Select one of your pieces on the board first.", "warn");
+          return;
+        }
+        model.uiMode = "attack";
+        actionFlash("Attack mode — click a highlighted red square.", "ok");
+        refresh();
+        return;
+      }
+
+      if (btn === el.passBtn) {
+        if (!guardTurn()) return;
+        if (!model.selected) {
+          actionFlash("Select one of your pieces on the board first.", "warn");
+          return;
+        }
+        model.passSelected();
+        actionFlash("Passed with selected piece.", "ok");
+        refresh();
+        return;
+      }
+
+      if (btn === el.endBtn) {
+        if (!guardTurn()) return;
+        if (!model.endTurnEarly()) {
+          actionFlash("Recruit at least one piece before ending your turn.", "warn");
+          return;
+        }
+        actionFlash("Turn ended — waiting for your opponent.", "ok");
+        refresh();
+      }
+    }
+
+    if (el.actions) {
+      el.actions.addEventListener("click", handleActionClick);
+    }
+
     root.querySelector("[data-host]").addEventListener("click", () => connectOnline(true));
     root.querySelector("[data-join]").addEventListener("click", () => connectOnline(false));
-
-    root.querySelector("[data-mode-recruit]").addEventListener("click", () => {
-      if (!guardTurn()) return;
-      model.recruitUnit = el.unit ? el.unit.value : "S";
-      model.uiMode = model.uiMode === "recruit" ? "idle" : "recruit";
-      model.clearSelection();
-      el.actionsHint.textContent =
-        model.uiMode === "recruit"
-          ? "Recruit mode ON — click an empty square in your home column (highlighted green)."
-          : "Recruit mode off.";
-      refresh();
-    });
-
-    root.querySelector("[data-move]").addEventListener("click", () => {
-      if (!guardTurn()) return;
-      if (!model.selected) {
-        el.actionsHint.textContent = "Select one of your pieces on the board first.";
-        refresh();
-        return;
-      }
-      model.uiMode = "move";
-      el.actionsHint.textContent = "Move mode — click a highlighted blue square.";
-      refresh();
-    });
-
-    root.querySelector("[data-attack]").addEventListener("click", () => {
-      if (!guardTurn()) return;
-      if (!model.selected) {
-        el.actionsHint.textContent = "Select one of your pieces on the board first.";
-        refresh();
-        return;
-      }
-      model.uiMode = "attack";
-      el.actionsHint.textContent = "Attack mode — click a highlighted red square.";
-      refresh();
-    });
-
-    root.querySelector("[data-pass]").addEventListener("click", () => {
-      if (!guardTurn()) return;
-      if (!model.selected) {
-        el.actionsHint.textContent = "Select one of your pieces on the board first.";
-        refresh();
-        return;
-      }
-      model.passSelected();
-      el.actionsHint.textContent = "Passed with selected piece.";
-      refresh();
-    });
-
-    root.querySelector("[data-end]").addEventListener("click", () => {
-      if (!guardTurn()) return;
-      if (model.countPieces(model.current) === 0) {
-        el.actionsHint.textContent = "Recruit at least one piece before ending your turn.";
-        refresh();
-        return;
-      }
-      model.endTurnEarly();
-      el.actionsHint.textContent = "Turn ended.";
-      refresh();
-    });
 
     if (el.unit) {
       el.unit.addEventListener("change", () => {
@@ -1388,27 +1429,43 @@
 
       if (model.uiMode === "recruit") {
         if (!model.canRecruitAt(r, c)) {
-          el.actionsHint.textContent = "Recruit only on empty squares in your home column.";
-          refresh();
+          const home = model.homeCol(seat) + 1;
+          actionFlash(
+            "Recruit only on empty green squares in your home column (column " + home + ").",
+            "warn"
+          );
           return;
         }
-        model.recruit(model.recruitUnit, r, c);
-        model.uiMode = "idle";
-        el.actionsHint.textContent = "Recruited — select the piece to move or attack, or End turn.";
+        const unitKey = el.unit ? el.unit.value : model.recruitUnit;
+        if (model.recruit(unitKey, r, c)) {
+          const unitName = UNITS[unitKey] ? UNITS[unitKey].name : unitKey;
+          actionFlash(
+            "Recruited " + unitName + " at row " + (r + 1) + ". Click End turn when you are done.",
+            "ok"
+          );
+        }
         refresh();
         return;
       }
       if (model.uiMode === "move" && model.selected) {
+        const before = model.selected.r + "," + model.selected.c;
         model.moveTo(model.selected.r, model.selected.c, r, c);
+        if (model.selected && model.selected.r + "," + model.selected.c !== before) {
+          actionFlash("Moved piece.", "ok");
+        }
         refresh();
         return;
       }
       if (model.uiMode === "attack" && model.selected) {
         model.attack(model.selected.r, model.selected.c, r, c);
+        actionFlash("Attack resolved.", "ok");
         refresh();
         return;
       }
       model.select(r, c);
+      if (model.selected) {
+        actionFlash("Piece selected — choose Move, Attack, or Pass.", "ok");
+      }
       refresh();
     });
 
