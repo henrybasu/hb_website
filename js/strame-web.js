@@ -679,6 +679,16 @@
     });
   }
 
+  function resolveAssetBase(options) {
+    const raw = (options && options.assetBase) || "assets/strame/";
+    try {
+      const url = new URL(raw, document.location.href);
+      return url.href.endsWith("/") ? url.href : url.href + "/";
+    } catch (_) {
+      return raw.endsWith("/") ? raw : raw + "/";
+    }
+  }
+
   async function loadAssets(base) {
     const root = base.endsWith("/") ? base : base + "/";
     const [tile, soldier, gollem] = await Promise.all([
@@ -686,24 +696,20 @@
       loadImage(root + "soldier1.png"),
       loadImage(root + "gollem1.png"),
     ]);
-    return { tile, soldier, gollem };
+    if (!soldier || !gollem) {
+      console.warn("StrameWeb: character sprites failed to load from", root);
+    }
+    return { tile, soldier, gollem, ready: !!(soldier && gollem) };
   }
 
   function drawTintedSprite(ctx, img, x, y, w, h, owner) {
     ctx.save();
     ctx.imageSmoothingEnabled = false;
-    const pad = Math.max(2, Math.floor(Math.min(w, h) * 0.08));
+    const pad = Math.max(2, Math.floor(Math.min(w, h) * 0.06));
     const dx = x + pad;
     const dy = y + pad;
     const dw = w - pad * 2;
     const dh = h - pad * 2;
-    if (owner === 0) {
-      ctx.fillStyle = "rgba(56,97,240,0.22)";
-      ctx.fillRect(x, y, w, h);
-    } else {
-      ctx.fillStyle = "rgba(224,69,69,0.22)";
-      ctx.fillRect(x, y, w, h);
-    }
     ctx.drawImage(img, dx, dy, dw, dh);
     ctx.strokeStyle = owner === 0 ? "#3861f0" : "#e04545";
     ctx.lineWidth = 2;
@@ -796,15 +802,15 @@
           ctx.fillText(pc.unit, cx, cy - 1);
         }
         const cx = c * cell + cell / 2;
-        const cy = r * cell + cell / 2;
+        const hpY = (r + 1) * cell - Math.max(4, Math.floor(cell * 0.12));
         ctx.fillStyle = "#fff";
         ctx.strokeStyle = "#1a1f28";
         ctx.lineWidth = 2;
-        ctx.font = `bold ${Math.max(10, Math.floor(cell * 0.24))}px system-ui,sans-serif`;
+        ctx.font = `bold ${Math.max(10, Math.floor(cell * 0.22))}px system-ui,sans-serif`;
         ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.strokeText(String(pc.hp), cx, cy + cell * 0.32);
-        ctx.fillText(String(pc.hp), cx, cy + cell * 0.32);
+        ctx.textBaseline = "bottom";
+        ctx.strokeText(String(pc.hp), cx, hpY);
+        ctx.fillText(String(pc.hp), cx, hpY);
       }
     }
   }
@@ -935,7 +941,7 @@
     let matchStarted = false;
     let keepaliveTimer = null;
     let sprites = null;
-    const assetBase = options.assetBase || "assets/strame/";
+    const assetBase = resolveAssetBase(options);
 
     loadAssets(assetBase).then((loaded) => {
       sprites = loaded;
