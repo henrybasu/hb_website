@@ -56,7 +56,7 @@
         <h2 id="strame-how-to-play">How to play (two players)</h2>
         <ol class="strame-web-help-steps">
           <li><strong>Two players, two browsers.</strong> Each player opens this page on their own computer or phone (or use two different browsers). You cannot play both sides in one tab.</li>
-          <li><strong>Same relay URL.</strong> Leave the relay URL as shown unless the host gave you a different one (e.g. a Render link like <code>wss://your-relay.onrender.com/ws</code>). Both players must use the exact same URL.</li>
+          <li><strong>Same relay URL.</strong> Both players must enter your Render relay (e.g. <code>wss://your-relay.onrender.com/ws</code>). The GitHub Pages site does not host a relay — leave the field empty only if you use a <code>?relay=…</code> link.</li>
           <li><strong>Host creates the room.</strong> Player 1 chooses a map and name, then clicks <strong>Host game</strong>. Copy the room code that appears and send it to Player 2 (text, chat, etc.).</li>
           <li><strong>Guest joins.</strong> Player 2 enters that room code, the same relay URL, and their name, then clicks <strong>Join game</strong>. The match starts when both are connected.</li>
         </ol>
@@ -85,6 +85,7 @@
   <script>
     StrameWeb.mount("#strame-web-root", {
       relayUrl: new URLSearchParams(location.search).get("relay") || undefined,
+      assetBase: "assets/strame/",
     });
   </script>
 </body>

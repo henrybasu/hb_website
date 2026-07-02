@@ -670,7 +670,48 @@
     }
   }
 
-  function renderBoard(canvas, model, seat, highlights) {
+  function loadImage(url) {
+    return new Promise((resolve) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => resolve(null);
+      img.src = url;
+    });
+  }
+
+  async function loadAssets(base) {
+    const root = base.endsWith("/") ? base : base + "/";
+    const [tile, soldier, gollem] = await Promise.all([
+      loadImage(root + "tile.png"),
+      loadImage(root + "soldier1.png"),
+      loadImage(root + "gollem1.png"),
+    ]);
+    return { tile, soldier, gollem };
+  }
+
+  function drawTintedSprite(ctx, img, x, y, w, h, owner) {
+    ctx.save();
+    ctx.imageSmoothingEnabled = false;
+    const pad = Math.max(2, Math.floor(Math.min(w, h) * 0.08));
+    const dx = x + pad;
+    const dy = y + pad;
+    const dw = w - pad * 2;
+    const dh = h - pad * 2;
+    if (owner === 0) {
+      ctx.fillStyle = "rgba(56,97,240,0.22)";
+      ctx.fillRect(x, y, w, h);
+    } else {
+      ctx.fillStyle = "rgba(224,69,69,0.22)";
+      ctx.fillRect(x, y, w, h);
+    }
+    ctx.drawImage(img, dx, dy, dw, dh);
+    ctx.strokeStyle = owner === 0 ? "#3861f0" : "#e04545";
+    ctx.lineWidth = 2;
+    ctx.strokeRect(x + 1, y + 1, w - 2, h - 2);
+    ctx.restore();
+  }
+
+  function renderBoard(canvas, model, seat, highlights, assets) {
     const ctx = canvas.getContext("2d");
     const cell = Math.min(
       Math.floor((canvas.clientWidth || 640) / model.cols),
@@ -685,14 +726,22 @@
     for (let r = 0; r < model.rows; r++) {
       for (let c = 0; c < model.cols; c++) {
         const x = c * cell, y = r * cell;
-        ctx.fillStyle = model.water[r][c] ? "#7eb6e6" : (r + c) % 2 ? "#e8ebf2" : "#dfe3ec";
-        ctx.fillRect(x, y, cell, cell);
+        if (assets && assets.tile) {
+          ctx.drawImage(assets.tile, x, y, cell, cell);
+        } else {
+          ctx.fillStyle = (r + c) % 2 ? "#e8ebf2" : "#dfe3ec";
+          ctx.fillRect(x, y, cell, cell);
+        }
+        if (model.water[r][c]) {
+          ctx.fillStyle = "rgba(126,182,230,0.72)";
+          ctx.fillRect(x, y, cell, cell);
+        }
         if (c === model.homeCol(0)) {
-          ctx.fillStyle = "rgba(56,97,240,0.08)";
+          ctx.fillStyle = "rgba(56,97,240,0.12)";
           ctx.fillRect(x, y, cell, cell);
         }
         if (c === model.homeCol(1)) {
-          ctx.fillStyle = "rgba(224,69,69,0.08)";
+          ctx.fillStyle = "rgba(224,69,69,0.12)";
           ctx.fillRect(x, y, cell, cell);
         }
       }
@@ -718,23 +767,39 @@
       for (let c = 0; c < model.cols; c++) {
         const pc = model.grid[r][c];
         if (!pc) continue;
+        const x = c * cell;
+        const y = r * cell;
+        const sprite =
+          assets && (pc.unit === "G" ? assets.gollem : assets.soldier);
+        if (sprite) {
+          drawTintedSprite(ctx, sprite, x, y, cell, cell, pc.owner);
+        } else {
+          const cx = c * cell + cell / 2;
+          const cy = r * cell + cell / 2;
+          const rad = cell * 0.34;
+          ctx.beginPath();
+          ctx.arc(cx, cy, rad, 0, Math.PI * 2);
+          ctx.fillStyle = pc.owner === 0 ? "#3861f0" : "#e04545";
+          ctx.fill();
+          ctx.strokeStyle = "#fff";
+          ctx.lineWidth = 2;
+          ctx.stroke();
+          ctx.fillStyle = "#fff";
+          ctx.font = `bold ${Math.floor(cell * 0.34)}px system-ui,sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(pc.unit, cx, cy - 1);
+        }
         const cx = c * cell + cell / 2;
         const cy = r * cell + cell / 2;
-        const rad = cell * 0.34;
-        ctx.beginPath();
-        ctx.arc(cx, cy, rad, 0, Math.PI * 2);
-        ctx.fillStyle = pc.owner === 0 ? "#3861f0" : "#e04545";
-        ctx.fill();
-        ctx.strokeStyle = "#fff";
-        ctx.lineWidth = 2;
-        ctx.stroke();
         ctx.fillStyle = "#fff";
-        ctx.font = `bold ${Math.floor(cell * 0.34)}px system-ui,sans-serif`;
+        ctx.strokeStyle = "#1a1f28";
+        ctx.lineWidth = 2;
+        ctx.font = `bold ${Math.max(10, Math.floor(cell * 0.24))}px system-ui,sans-serif`;
         ctx.textAlign = "center";
         ctx.textBaseline = "middle";
-        ctx.fillText(pc.unit, cx, cy - 1);
-        ctx.font = `${Math.floor(cell * 0.22)}px system-ui,sans-serif`;
-        ctx.fillText(String(pc.hp), cx, cy + cell * 0.22);
+        ctx.strokeText(String(pc.hp), cx, cy + cell * 0.32);
+        ctx.fillText(String(pc.hp), cx, cy + cell * 0.32);
       }
     }
   }
@@ -791,26 +856,44 @@
       </div>
       <div class="strame-web-banner strame-web-hidden" data-banner></div>
       <div class="strame-web-game strame-web-hidden" data-game>
+        <div class="strame-web-match-bar">
+          <div class="strame-web-player-card strame-web-player-you" data-you-card>
+            <span class="strame-web-player-label">You</span>
+            <strong class="strame-web-player-role" data-you-role>—</strong>
+            <span class="strame-web-player-side" data-you-side>—</span>
+            <span class="strame-web-player-gold" data-your-gold>Gold: —</span>
+          </div>
+          <div class="strame-web-turn-pill" data-turn-pill>Connecting…</div>
+          <div class="strame-web-player-card strame-web-player-opp" data-opp-card>
+            <span class="strame-web-player-label">Opponent</span>
+            <strong class="strame-web-player-role" data-opp-role>—</strong>
+            <span class="strame-web-player-side" data-opp-side>—</span>
+            <span class="strame-web-player-gold" data-opp-gold>Gold: —</span>
+          </div>
+        </div>
         <div class="strame-web-board-wrap">
           <canvas data-canvas width="600" height="300" aria-label="Strame board"></canvas>
         </div>
-        <div class="strame-web-sidebar">
-          <div class="strame-web-stat" data-stats></div>
-          <div class="strame-web-row">
-            <button type="button" data-mode-recruit>Recruit</button>
-            <select data-unit>
+        <div class="strame-web-actions" data-actions>
+          <p class="strame-web-actions-hint" data-actions-hint></p>
+          <div class="strame-web-actions-row">
+            <button type="button" class="action-btn" data-mode-recruit>Recruit</button>
+            <select data-unit aria-label="Unit to recruit">
               <option value="S">Soldier</option>
               <option value="G">Gollem</option>
             </select>
           </div>
-          <div class="strame-web-row">
-            <button type="button" data-move>Move</button>
-            <button type="button" data-attack>Attack</button>
-            <button type="button" data-pass>Pass</button>
-            <button type="button" data-end>End turn</button>
+          <div class="strame-web-actions-row">
+            <button type="button" class="action-btn" data-move>Move</button>
+            <button type="button" class="action-btn" data-attack>Attack</button>
+            <button type="button" class="action-btn" data-pass>Pass</button>
           </div>
-          <div class="strame-web-log" data-log></div>
+          <button type="button" class="end-turn-btn block" data-end>End turn</button>
         </div>
+        <details class="strame-web-log-panel" open>
+          <summary>Battle log</summary>
+          <div class="strame-web-log" data-log></div>
+        </details>
       </div>
     `;
 
@@ -820,8 +903,16 @@
       game: root.querySelector("[data-game]"),
       banner: root.querySelector("[data-banner]"),
       canvas: root.querySelector("[data-canvas]"),
-      stats: root.querySelector("[data-stats]"),
       log: root.querySelector("[data-log]"),
+      youRole: root.querySelector("[data-you-role]"),
+      youSide: root.querySelector("[data-you-side]"),
+      yourGold: root.querySelector("[data-your-gold]"),
+      oppRole: root.querySelector("[data-opp-role]"),
+      oppSide: root.querySelector("[data-opp-side]"),
+      oppGold: root.querySelector("[data-opp-gold]"),
+      turnPill: root.querySelector("[data-turn-pill]"),
+      actionsHint: root.querySelector("[data-actions-hint]"),
+      actions: root.querySelector("[data-actions]"),
       relay: root.querySelector("[data-relay]"),
       map: root.querySelector("[data-map]"),
       name: root.querySelector("[data-name]"),
@@ -838,6 +929,13 @@
     let matchMap = "STANDARD_5X10";
     let matchStarted = false;
     let keepaliveTimer = null;
+    let sprites = null;
+    const assetBase = options.assetBase || "assets/strame/";
+
+    loadAssets(assetBase).then((loaded) => {
+      sprites = loaded;
+      if (matchStarted) refresh();
+    });
 
     function stopKeepalive() {
       if (keepaliveTimer) {
@@ -973,17 +1071,64 @@
     }
 
     function refresh() {
-      renderBoard(el.canvas, model, seat, highlights());
-      const names = ["You (P1)", "Opponent (P2)"];
-      if (seat === 1) names.reverse();
-      el.stats.innerHTML =
-        `<strong>Room:</strong> ${online ? online.roomCode : "—"}<br>` +
-        `<strong>You:</strong> ${seat === 0 ? "P1 (host)" : "P2 (guest)"}<br>` +
-        `<strong>Turn:</strong> ${model.turnNumber} · ${model.current === 0 ? "P1" : "P2"}<br>` +
-        `<strong>Gold:</strong> P1 ${model.gold[0]} · P2 ${model.gold[1]}<br>` +
-        `<strong>Map:</strong> ${MAPS[matchMap]?.label || matchMap}`;
-      const buttons = root.querySelectorAll("[data-move],[data-attack],[data-pass],[data-end],[data-mode-recruit]");
-      buttons.forEach((b) => (b.disabled = !myTurn()));
+      renderBoard(el.canvas, model, seat, highlights(), sprites);
+      if (seat === null) return;
+
+      const you = seat;
+      const opp = seat === 0 ? 1 : 0;
+      const youLabel = you === 0 ? "P1 · Blue · Host" : "P2 · Red · Guest";
+      const oppLabel = opp === 0 ? "P1 · Blue · Host" : "P2 · Red · Guest";
+      const youHome = you === 0 ? "Recruit on the left column" : "Recruit on the right column";
+      const oppHome = opp === 0 ? "Left column" : "Right column";
+
+      el.youRole.textContent = youLabel;
+      el.youSide.textContent = youHome;
+      el.yourGold.textContent = "Your gold: " + model.gold[you];
+      el.oppRole.textContent = oppLabel;
+      el.oppSide.textContent = oppHome;
+      el.oppGold.textContent = "Opponent gold: " + model.gold[opp];
+
+      const turnMine = myTurn();
+      el.turnPill.textContent = turnMine
+        ? "Your turn"
+        : "Opponent's turn — " + (model.current === 0 ? "Blue (P1)" : "Red (P2)");
+      el.turnPill.classList.toggle("is-yours", turnMine);
+      el.turnPill.classList.toggle("is-waiting", !turnMine);
+
+      if (turnMine) {
+        if (model.uiMode === "recruit") {
+          el.actionsHint.textContent =
+            "Recruit mode: pick Soldier or Gollem, then click an empty square in your home column.";
+        } else if (model.uiMode === "move" && model.selected) {
+          el.actionsHint.textContent = "Move mode: click a highlighted blue square.";
+        } else if (model.uiMode === "attack" && model.selected) {
+          el.actionsHint.textContent = "Attack mode: click a highlighted red square.";
+        } else if (model.selected) {
+          el.actionsHint.textContent =
+            "Piece selected — choose Move, Attack, or Pass, or click End turn when finished.";
+        } else if (model.canStillRecruit()) {
+          el.actionsHint.textContent =
+            "Your turn — click Recruit, select a piece, or End turn when you are done.";
+        } else {
+          el.actionsHint.textContent = "Your turn — select one of your pieces, or click End turn.";
+        }
+      } else {
+        el.actionsHint.textContent = "Wait for your opponent. Controls unlock on your turn.";
+      }
+
+      el.actions.classList.toggle("is-active", turnMine);
+
+      root.querySelectorAll("[data-move],[data-attack],[data-pass],[data-end],[data-mode-recruit]").forEach((b) => {
+        b.disabled = !turnMine;
+      });
+      root.querySelector("[data-mode-recruit]").classList.toggle(
+        "active",
+        turnMine && model.uiMode === "recruit"
+      );
+      root.querySelector("[data-move]").classList.toggle("active", turnMine && model.uiMode === "move");
+      root.querySelector("[data-attack]").classList.toggle("active", turnMine && model.uiMode === "attack");
+      el.unit.disabled = !turnMine;
+
       if (model.outcome !== "ongoing") {
         el.banner.classList.remove("strame-web-hidden");
         el.banner.classList.add("win");
