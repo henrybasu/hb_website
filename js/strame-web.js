@@ -172,9 +172,9 @@
       return false;
     }
 
-    clearSelection() {
+    clearSelection(resetMode) {
       this.selected = null;
-      this.uiMode = "idle";
+      if (resetMode !== false) this.uiMode = "idle";
     }
 
     select(r, c) {
@@ -246,7 +246,6 @@
       this.placed.add(id);
       this.mayPlaceThisTurn = false;
       this.clearSelection();
-      this.uiMode = "idle";
       this.emit(shortP(this.current) + "·" + pc.unit + "#" + id + ":new @" + rc(r, c));
       this.afterLocalAction();
       return true;
@@ -1148,7 +1147,7 @@
       if (turnMine) {
         if (model.uiMode === "recruit") {
           el.actionsHint.textContent =
-            "Recruit mode: pick Soldier or Gollem, then click an empty square in your home column.";
+            "Recruit mode: choose Soldier or Gollem, then click a green square in your home column.";
         } else if (model.uiMode === "move" && model.selected) {
           el.actionsHint.textContent = "Move mode: click a highlighted blue square.";
         } else if (model.uiMode === "attack" && model.selected) {
@@ -1344,7 +1343,7 @@
         if (!guardTurn()) return;
         model.recruitUnit = el.unit ? el.unit.value : "S";
         model.uiMode = model.uiMode === "recruit" ? "idle" : "recruit";
-        model.clearSelection();
+        model.clearSelection(false);
         actionFlash(
           model.uiMode === "recruit"
             ? "Recruit mode ON — click a green square in your home column."
@@ -1436,6 +1435,18 @@
           );
           return;
         }
+        const unitKey = el.unit ? el.unit.value : model.recruitUnit;
+        if (model.recruit(unitKey, r, c)) {
+          const unitName = UNITS[unitKey] ? UNITS[unitKey].name : unitKey;
+          actionFlash(
+            "Recruited " + unitName + " at row " + (r + 1) + ". Click End turn when you are done.",
+            "ok"
+          );
+        }
+        refresh();
+        return;
+      }
+      if (model.canStillRecruit() && model.canRecruitAt(r, c)) {
         const unitKey = el.unit ? el.unit.value : model.recruitUnit;
         if (model.recruit(unitKey, r, c)) {
           const unitName = UNITS[unitKey] ? UNITS[unitKey].name : unitKey;
