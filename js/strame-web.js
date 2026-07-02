@@ -773,7 +773,7 @@
               </select>
             </div>
             <button type="button" class="primary block" data-host>Host game</button>
-            <p class="strame-web-hint">Creates a room code to share with your opponent.</p>
+            <p class="strame-web-hint">Creates a room code to share with your opponent. If the relay times out while you wait, click Host game again for a new code.</p>
           </div>
           <div class="strame-web-lobby-card strame-web-lobby-card--guest">
             <h3>Join as guest</h3>
@@ -853,8 +853,83 @@
     }
 
     function onRelayFatal(msg) {
+      handleRelayDisconnect(msg);
+    }
+
+    function resetToLobby(options) {
+      options = options || {};
+      el.lobby.classList.remove("strame-web-hidden");
+      el.game.classList.add("strame-web-hidden");
+      el.banner.classList.remove("win");
+      if (options.clearRoomCode) {
+        el.code.value = "";
+      }
+      if (options.clearLog) {
+        el.log.textContent = "";
+      }
+    }
+
+    function handleRelayDisconnect(msg) {
       stopKeepalive();
-      showError(msg);
+      const wasSeat = seat;
+      const wasInMatch = matchStarted;
+      const oldRoom = online ? online.roomCode : el.code.value.trim();
+
+      if (online) {
+        online.closed = true;
+        online = null;
+      }
+      seat = null;
+      matchStarted = false;
+
+      resetToLobby({ clearRoomCode: wasSeat === 0 && !wasInMatch, clearLog: wasInMatch });
+
+      el.banner.classList.remove("strame-web-hidden");
+      el.banner.classList.add("error");
+
+      if (wasSeat === 0 && !wasInMatch) {
+        el.banner.textContent =
+          "Connection to the relay was lost while waiting for a guest" +
+          (oldRoom ? " (room " + oldRoom + ")" : "") +
+          ". The room has been cleared on the server. Click Host game again to create a new room and share a fresh code.";
+        setStatus("Not connected — click Host game");
+        return;
+      }
+
+      if (wasSeat === 1 && !wasInMatch) {
+        el.banner.textContent =
+          "Connection to the relay was lost before the match started. " +
+          "Ask the host for a new room code, then click Join game again.";
+        setStatus("Not connected — click Join game");
+        return;
+      }
+
+      el.banner.textContent =
+        "Disconnected from relay. The match has ended — use Host game or Join game to play again.";
+      setStatus("Not connected");
+    }
+
+    function handleOpponentDisconnected() {
+      if (!matchStarted && seat === 0 && online) {
+        setStatus("Guest left — still hosting room " + online.roomCode);
+        el.banner.classList.add("strame-web-hidden");
+        return;
+      }
+      stopKeepalive();
+      const wasInMatch = matchStarted;
+      if (online) {
+        online.close();
+        online = null;
+      }
+      seat = null;
+      matchStarted = false;
+      resetToLobby({ clearLog: wasInMatch });
+      el.banner.classList.remove("strame-web-hidden");
+      el.banner.classList.add("error");
+      el.banner.textContent = wasInMatch
+        ? "Opponent disconnected. The match has ended — use Host game or Join game to play again."
+        : "Opponent disconnected before the match started. Click Join game again when the host is ready.";
+      setStatus("Not connected");
     }
 
     function setStatus(t) {
@@ -981,7 +1056,7 @@
         return;
       }
       if (msg === "PEER_DISCONNECTED") {
-        showError("Opponent disconnected.");
+        handleOpponentDisconnected();
         return;
       }
       if (msg.startsWith("WAITING_")) setStatus(msg);
