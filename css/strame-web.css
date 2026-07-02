@@ -2,12 +2,15 @@
 .strame-web-root {
   --sw-bg: #f6f7fb;
   --sw-panel: #ffffff;
-  --sw-border: #e1e4ec;
+  --sw-border: #cbd5e1;
+  --sw-input-bg: #ffffff;
+  --sw-input-text: #0f172a;
   --sw-text: #1a1f28;
-  --sw-muted: #6b7280;
+  --sw-muted: #475569;
   --sw-p1: #3861f0;
   --sw-p2: #e04545;
   --sw-accent: #3861f0;
+  color-scheme: light;
   font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
   color: var(--sw-text);
   background: var(--sw-bg);
@@ -138,16 +141,27 @@
 .strame-web-field input[type="text"],
 .strame-web-field select {
   width: 100%;
+  color: var(--sw-input-text);
+  background-color: var(--sw-input-bg);
+  border: 2px solid #64748b;
+  border-radius: 8px;
 }
 
 .strame-web-lobby-card--guest .strame-web-field input[type="text"] {
   font-size: 1.05rem;
-  font-weight: 600;
+  font-weight: 700;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   padding: 10px 12px;
-  border: 2px solid #e08080;
-  background: #fff;
+  color: #7f1d1d;
+  background-color: #fff;
+  border: 2px solid #dc2626;
+  box-shadow: inset 0 0 0 1px rgba(220, 38, 38, 0.15);
+}
+
+.strame-web-lobby-card--guest .strame-web-field input[type="text"]::placeholder {
+  color: #b91c1c;
+  opacity: 0.55;
 }
 
 .strame-web-hint {
@@ -208,23 +222,32 @@
 .strame-web-root input[type="text"],
 .strame-web-root select {
   font: inherit;
-  padding: 6px 10px;
-  border: 1px solid var(--sw-border);
-  border-radius: 6px;
+  padding: 8px 10px;
+  border: 2px solid #64748b;
+  border-radius: 8px;
   min-width: 0;
+  color: var(--sw-input-text);
+  background-color: var(--sw-input-bg);
+}
+
+.strame-web-root input[type="text"]::placeholder {
+  color: #64748b;
+  opacity: 1;
 }
 
 .strame-web-root input[type="text"].wide {
   flex: 1 1 220px;
   min-width: 180px;
+  border-color: #475569;
 }
 
 .strame-web-root button {
   font: inherit;
   padding: 8px 14px;
   border-radius: 8px;
-  border: 1px solid var(--sw-border);
-  background: #fff;
+  border: 2px solid #64748b;
+  background: #f1f5f9;
+  color: #0f172a;
   cursor: pointer;
 }
 
@@ -348,26 +371,86 @@
 }
 
 .strame-web-actions {
-  background: #fff;
-  border: 1px solid var(--sw-border);
+  background: #f8fafc;
+  border: 2px solid #94a3b8;
   border-radius: 12px;
   padding: 14px;
-  opacity: 0.72;
-  transition: opacity 0.15s ease;
+  opacity: 0.92;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+
+.strame-web-actions select {
+  color: var(--sw-input-text);
+  background-color: var(--sw-input-bg);
+  border: 2px solid #475569;
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-weight: 600;
+}
+
+.strame-web-root button.action-btn {
+  background: #e2e8f0;
+  border: 2px solid #475569;
+  color: #0f172a;
+  font-weight: 700;
+  min-width: 5.5rem;
+}
+
+.strame-web-root button.action-btn[data-mode-recruit] {
+  background: #bbf7d0;
+  border-color: #15803d;
+  color: #14532d;
+}
+
+.strame-web-root button.action-btn[data-move] {
+  background: #bfdbfe;
+  border-color: #1d4ed8;
+  color: #1e3a8a;
+}
+
+.strame-web-root button.action-btn[data-attack] {
+  background: #fecaca;
+  border-color: #b91c1c;
+  color: #7f1d1d;
+}
+
+.strame-web-root button.action-btn[data-pass] {
+  background: #e2e8f0;
+  border-color: #334155;
+  color: #1e293b;
+}
+
+.strame-web-root button.action-btn:hover {
+  filter: brightness(0.96);
+}
+
+.strame-web-root button.action-btn.active {
+  border-color: var(--sw-p1);
+  background: #dbeafe;
+  color: #1e3a8a;
+  box-shadow: inset 0 0 0 2px var(--sw-p1);
+}
+
+.strame-web-root button.action-btn[data-mode-recruit].active {
+  border-color: #14532d;
+  background: #86efac;
+  color: #052e16;
+  box-shadow: inset 0 0 0 2px #16a34a;
 }
 
 .strame-web-actions.is-active {
   opacity: 1;
-  border-color: #b8c9f7;
-  box-shadow: 0 0 0 2px rgba(56, 97, 240, 0.12);
+  border-color: #2563eb;
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.18);
 }
 
 .strame-web-actions.is-locked {
-  opacity: 0.85;
+  opacity: 0.88;
 }
 
 .strame-web-actions.is-locked button {
   cursor: not-allowed;
+  filter: saturate(0.75);
 }
 
 .strame-web-actions-hint {
@@ -384,28 +467,6 @@
   gap: 8px;
   align-items: center;
   margin-bottom: 8px;
-}
-
-.strame-web-root button.action-btn {
-  background: #fff;
-  border: 2px solid var(--sw-border);
-  color: var(--sw-text);
-  font-weight: 600;
-  min-width: 5.5rem;
-}
-
-.strame-web-root button.action-btn.active {
-  border-color: var(--sw-p1);
-  background: #eef3ff;
-  color: #1e3a8a;
-  box-shadow: inset 0 0 0 1px var(--sw-p1);
-}
-
-.strame-web-root button.action-btn[data-mode-recruit].active {
-  border-color: #15803d;
-  background: #dcfce7;
-  color: #166534;
-  box-shadow: inset 0 0 0 2px #16a34a;
 }
 
 .strame-web-root button.end-turn-btn {
