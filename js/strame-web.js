@@ -19,10 +19,17 @@
     RIVER_5X10: { rows: 5, cols: 10, river: true, label: "5×10 River" },
   };
 
-  const DEFAULT_RELAY =
-    location.protocol === "https:"
-      ? "wss://" + location.host + "/ws"
-      : "ws://127.0.0.1:8080/ws";
+  function defaultRelayUrl() {
+    const fromQuery = new URLSearchParams(location.search).get("relay");
+    if (fromQuery) return fromQuery;
+    if (location.protocol === "http:" && (location.hostname === "localhost" || location.hostname === "127.0.0.1")) {
+      return "ws://127.0.0.1:8080/ws";
+    }
+    return "";
+  }
+
+  const DEFAULT_RELAY = defaultRelayUrl();
+  const RELAY_PLACEHOLDER = "wss://your-relay.onrender.com/ws";
 
   function rc(r, c) {
     return r + 1 + "," + (c + 1);
@@ -553,8 +560,12 @@
       return new Promise((resolve, reject) => {
         this.ws = new WebSocket(url);
         this.ws.onerror = () => reject(new Error("WebSocket connection failed"));
-        this.ws.onclose = () => {
-          if (!this.closed) this.onFatal("Disconnected from relay.");
+        this.ws.onclose = (ev) => {
+          if (this.closed) return;
+          this.closed = true;
+          const code = ev && typeof ev.code === "number" ? ev.code : 0;
+          const detail = code ? " (code " + code + ")" : "";
+          this.onFatal("Disconnected from relay." + detail);
         };
         this.ws.onmessage = (ev) => this.dispatch(String(ev.data).trim());
         this.recv(/^HELLO/)
@@ -625,9 +636,16 @@
     }
 
     parseRoom(line) {
-      const parts = line.split(/\s+/);
-      this.roomCode = parts[1];
-      this.role = line.includes("host") ? "host" : "guest";
+      const parts = line.trim().split(/\s+/);
+      this.roomCode = parts[1] || "";
+      let roleStr = "guest";
+      for (let i = 2; i + 1 < parts.length; i++) {
+        if (parts[i].toUpperCase() === "ROLE") {
+          roleStr = parts[i + 1];
+          break;
+        }
+      }
+      this.role = /^host$/i.test(roleStr) ? "host" : "guest";
     }
 
     pump() {
@@ -635,7 +653,11 @@
         while (this.inbox.length) {
           const msg = this.inbox.shift();
           if (msg.startsWith("HELLO")) continue;
-          this.onMessage(msg);
+          try {
+            this.onMessage(msg);
+          } catch (err) {
+            console.error("Strame message handler error:", err);
+          }
         }
       };
       this._drain = drain;
@@ -734,7 +756,7 @@
         <h2>Connect</h2>
         <div class="strame-web-row">
           <label>Relay URL</label>
-          <input type="text" class="wide" data-relay value="${escapeHtml(options.relayUrl || DEFAULT_RELAY)}">
+          <input type="text" class="wide" data-relay value="${escapeHtml(options.relayUrl || DEFAULT_RELAY)}" placeholder="${RELAY_PLACEHOLDER}">
         </div>
         <div class="strame-web-row">
           <label>Your name</label>
@@ -811,6 +833,29 @@
     let pendingHash = 0;
     let matchSeed = 0;
     let matchMap = "STANDARD_5X10";
+    let matchStarted = false;
+    let keepaliveTimer = null;
+
+    function stopKeepalive() {
+      if (keepaliveTimer) {
+        clearInterval(keepaliveTimer);
+        keepaliveTimer = null;
+      }
+    }
+
+    function startKeepalive() {
+      stopKeepalive();
+      keepaliveTimer = setInterval(() => {
+        if (online && !online.closed) {
+          online.send("PING");
+        }
+      }, 15000);
+    }
+
+    function onRelayFatal(msg) {
+      stopKeepalive();
+      showError(msg);
+    }
 
     function setStatus(t) {
       el.status.textContent = t;
@@ -891,7 +936,7 @@
     function handleNetwork(msg) {
       if (msg === "READY") {
         setStatus("Both players connected");
-        if (seat === 0) {
+        if (seat === 0 && !matchStarted) {
           const seed = Date.now();
           const mapId = matchMap;
           online.send("START " + seed + " " + mapId);
@@ -900,9 +945,17 @@
         return;
       }
       if (msg.startsWith("START ")) {
-        const parts = msg.split(/\s+/);
+        if (matchStarted) return;
+        const parts = msg.trim().split(/\s+/);
         const seed = +parts[1];
-        let mapId = parts[2] || "STANDARD_5X10";
+        let mapId = "STANDARD_5X10";
+        if (parts.length >= 3) {
+          const end = parts.length;
+          let mapEnd = end;
+          if (parts[end - 1] === "R1") mapEnd--;
+          if (mapEnd > 2 && /^S\d+$/i.test(parts[mapEnd - 1])) mapEnd--;
+          mapId = parts.slice(2, mapEnd).join(" ") || "STANDARD_5X10";
+        }
         startMatch(seed, mapId, 0, msg.includes("R1"));
         return;
       }
@@ -943,6 +996,7 @@
     }
 
     function startMatch(seed, mapId, gold, rematch) {
+      matchStarted = true;
       matchSeed = seed;
       matchMap = mapId in MAPS ? mapId : "STANDARD_5X10";
       model.startOnline(seed, matchMap, gold);
@@ -963,27 +1017,44 @@
     async function connectOnline(asHost) {
       try {
         const url = el.relay.value.trim();
+        if (!url) {
+          throw new Error("Enter a relay URL (e.g. " + RELAY_PLACEHOLDER + ")");
+        }
+        if (!/^wss?:\/\//i.test(url)) {
+          throw new Error("Relay URL must start with ws:// or wss://");
+        }
+        if (online) {
+          online.close();
+          online = null;
+        }
+        stopKeepalive();
+        matchStarted = false;
         matchMap = el.map.value;
-        online = new RelaySession(handleNetwork, showError);
+        online = new RelaySession(handleNetwork, onRelayFatal);
         await online.connect(url);
         setStatus("Connected to relay");
-        seat = asHost ? 0 : 1;
         if (asHost) {
           await online.host();
+          seat = online.role === "host" ? 0 : 1;
+          if (seat !== 0) throw new Error("Relay did not assign host role");
           el.code.value = online.roomCode;
           setStatus("Room " + online.roomCode + " — share code with opponent");
         } else {
           const code = el.code.value.trim();
           if (!code) throw new Error("Enter a room code");
           await online.join(code);
+          seat = online.role === "host" ? 0 : 1;
+          if (seat !== 1) throw new Error("Relay did not assign guest role");
           setStatus("Joined room " + online.roomCode);
         }
         online.pump();
+        startKeepalive();
         const name = el.name.value.trim();
         if (name) {
           online.send("PEERNAME " + btoa(unescape(encodeURIComponent(name))));
         }
       } catch (e) {
+        stopKeepalive();
         showError(e.message || String(e));
         if (online) online.close();
         online = null;
