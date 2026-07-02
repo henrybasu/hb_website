@@ -394,6 +394,12 @@
   color: #0f172a;
   font-weight: 700;
   min-width: 5.5rem;
+  transition:
+    background 0.15s ease,
+    border-color 0.15s ease,
+    box-shadow 0.15s ease,
+    transform 0.15s ease,
+    filter 0.15s ease;
 }
 
 .strame-web-root button.action-btn[data-mode-recruit] {
@@ -420,22 +426,68 @@
   color: #1e293b;
 }
 
-.strame-web-root button.action-btn:hover {
+.strame-web-root button.action-btn:hover:not(.active) {
   filter: brightness(0.96);
 }
 
+.strame-web-actions.has-action-mode .strame-web-root button.action-btn:not(.active) {
+  opacity: 0.78;
+  filter: saturate(0.85);
+}
+
 .strame-web-root button.action-btn.active {
-  border-color: var(--sw-p1);
-  background: #dbeafe;
-  color: #1e3a8a;
-  box-shadow: inset 0 0 0 2px var(--sw-p1);
+  opacity: 1;
+  filter: none;
+  transform: translateY(-1px);
+  font-weight: 800;
 }
 
 .strame-web-root button.action-btn[data-mode-recruit].active {
   border-color: #14532d;
-  background: #86efac;
+  background: #4ade80;
   color: #052e16;
-  box-shadow: inset 0 0 0 2px #16a34a;
+  box-shadow:
+    inset 0 0 0 2px #16a34a,
+    0 0 0 3px rgba(22, 163, 74, 0.45),
+    0 4px 14px rgba(22, 163, 74, 0.35);
+}
+
+.strame-web-root button.action-btn[data-move].active {
+  border-color: #1d4ed8;
+  background: #60a5fa;
+  color: #1e3a8a;
+  box-shadow:
+    inset 0 0 0 2px #2563eb,
+    0 0 0 3px rgba(37, 99, 235, 0.45),
+    0 4px 14px rgba(37, 99, 235, 0.35);
+}
+
+.strame-web-root button.action-btn[data-attack].active {
+  border-color: #b91c1c;
+  background: #f87171;
+  color: #7f1d1d;
+  box-shadow:
+    inset 0 0 0 2px #dc2626,
+    0 0 0 3px rgba(220, 38, 38, 0.45),
+    0 4px 14px rgba(220, 38, 38, 0.35);
+}
+
+.strame-web-root button.action-btn[data-pass].active {
+  border-color: #334155;
+  background: #cbd5e1;
+  color: #0f172a;
+  box-shadow:
+    inset 0 0 0 2px #475569,
+    0 0 0 3px rgba(71, 85, 105, 0.4),
+    0 4px 14px rgba(71, 85, 105, 0.25);
+}
+
+.strame-web-actions select.is-recruit-picker {
+  border-color: #16a34a;
+  background: #f0fdf4;
+  box-shadow:
+    inset 0 0 0 1px #86efac,
+    0 0 0 3px rgba(22, 163, 74, 0.35);
 }
 
 .strame-web-actions.is-active {

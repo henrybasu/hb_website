@@ -1169,15 +1169,34 @@
 
       el.actions.classList.toggle("is-active", turnMine);
       el.actions.classList.toggle("is-locked", !turnMine);
+      el.actions.classList.toggle(
+        "has-action-mode",
+        turnMine && model.uiMode !== "idle"
+      );
 
       if (el.recruitBtn) {
-        el.recruitBtn.classList.toggle("active", turnMine && model.uiMode === "recruit");
+        const on = turnMine && model.uiMode === "recruit";
+        el.recruitBtn.classList.toggle("active", on);
+        el.recruitBtn.setAttribute("aria-pressed", on ? "true" : "false");
       }
-      if (el.moveBtn) el.moveBtn.classList.toggle("active", turnMine && model.uiMode === "move");
+      if (el.moveBtn) {
+        const on = turnMine && model.uiMode === "move";
+        el.moveBtn.classList.toggle("active", on);
+        el.moveBtn.setAttribute("aria-pressed", on ? "true" : "false");
+      }
       if (el.attackBtn) {
-        el.attackBtn.classList.toggle("active", turnMine && model.uiMode === "attack");
+        const on = turnMine && model.uiMode === "attack";
+        el.attackBtn.classList.toggle("active", on);
+        el.attackBtn.setAttribute("aria-pressed", on ? "true" : "false");
       }
-      if (el.unit) el.unit.disabled = !turnMine;
+      if (el.passBtn) {
+        el.passBtn.classList.remove("active");
+        el.passBtn.setAttribute("aria-pressed", "false");
+      }
+      if (el.unit) {
+        el.unit.disabled = !turnMine;
+        el.unit.classList.toggle("is-recruit-picker", turnMine && model.uiMode === "recruit");
+      }
 
       if (model.outcome !== "ongoing") {
         el.banner.classList.remove("strame-web-hidden");
