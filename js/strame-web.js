@@ -1069,7 +1069,7 @@
       if (model.uiMode === "recruit") {
         for (let r = 0; r < model.rows; r++) {
           const c = model.homeCol(seat);
-          if (model.canRecruitAt(r, c)) out.push({ r, c, kind: "move" });
+          if (model.canRecruitAt(r, c)) out.push({ r, c, kind: "recruit" });
         }
         return out;
       }
@@ -1081,11 +1081,6 @@
       } else if (model.uiMode === "attack") {
         for (const t of model.legalAttackTargets(model.selected.r, model.selected.c)) {
           out.push({ r: t.r, c: t.c, kind: "attack" });
-        }
-      } else if (model.uiMode === "recruit") {
-        for (let r = 0; r < model.rows; r++) {
-          const c = model.homeCol(seat);
-          if (model.canRecruitAt(r, c)) out.push({ r, c, kind: "move" });
         }
       }
       return out;
