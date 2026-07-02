@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme");
+      document.documentElement.setAttribute(
+        "data-theme",
+        t === "light" || t === "dark" || t === "system" ? t : "system"
+      );
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "system");
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="How to play Strame Standard Online in the browser — setup, recruiting, combat, and winning.">
+  <title>How to Play Strame | Test Website</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/strame-web.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">Test Website</a>
+      <div class="header-end">
+        <div class="theme-switcher" role="group" aria-label="Color theme">
+          <button type="button" class="theme-btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="theme-btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" class="theme-btn" data-theme-choice="system" aria-pressed="false">System</button>
+        </div>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="page-a.html">Page A</a></li>
+          <li><a href="page-b.html">Page B</a></li>
+          <li><a href="page-c.html">Page C</a></li>
+          <li><a href="strame-how-to-play.html" aria-current="page">Strame Guide</a></li>
+          <li><a href="sitemap.html">Site Map</a></li>
+        </ul>
+      </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container container--wide">
+    <section class="page-header">
+      <p class="eyebrow">Strame Standard Online</p>
+      <h1>How to play</h1>
+      <p class="lead">
+        Rules and setup for the browser version (two players, Soldier &amp; Gollem, preset maps).
+        Link to this page from anywhere on the site — e.g. <code>strame-how-to-play.html</code>.
+      </p>
+      <p class="strame-guide-cta-row">
+        <a class="btn btn-primary" href="page-c.html">Play now on Page C</a>
+        <a class="btn btn-secondary" href="page-c.html?relay=wss://your-relay.onrender.com/ws">Play with relay URL in link</a>
+      </p>
+    </section>
+
+    <article class="strame-web-help strame-guide" aria-labelledby="strame-guide-setup">
+      <h2 id="strame-guide-setup">1. Getting connected</h2>
+      <ol class="strame-web-help-steps">
+        <li><strong>Two players, two browsers.</strong> Each player opens the game on their own device (or use two different browsers). One tab cannot control both sides.</li>
+        <li><strong>Same relay URL.</strong> Both players must use the exact same WebSocket relay (e.g. a Render service at <code>wss://your-relay.onrender.com/ws</code>). The GitHub Pages site does not host a relay unless you pass one in the URL: <code>page-c.html?relay=wss://…</code></li>
+        <li><strong>Host creates the room.</strong> Player 1 (Blue) picks a map, optional name, then clicks <strong>Host game</strong>. Copy the room code and send it to Player 2.</li>
+        <li><strong>Guest joins.</strong> Player 2 (Red) enters the room code, the same relay URL, optional name, then clicks <strong>Join game</strong>. The match starts when both are connected.</li>
+      </ol>
+
+      <h2 id="strame-guide-board">2. The board</h2>
+      <ul class="strame-web-help-tips">
+        <li><strong>Blue (Player 1 / Host)</strong> recruits on the <strong>left</strong> column.</li>
+        <li><strong>Red (Player 2 / Guest)</strong> recruits on the <strong>right</strong> column.</li>
+        <li>River maps have water tiles in the middle — you cannot recruit or move onto water.</li>
+        <li>Each player starts with <strong>5 gold</strong>. Recruiting costs <strong>1 gold</strong> per unit.</li>
+      </ul>
+
+      <h2 id="strame-guide-units">3. Units (browser version)</h2>
+      <div class="strame-unit-grid">
+        <section class="strame-unit-card strame-unit-card--soldier">
+          <h3>Soldier</h3>
+          <p>3 HP · 1 attack · moves 1 square (orthogonal)</p>
+          <p>Can attack orthogonally <em>and</em> diagonally adjacent enemies.</p>
+        </section>
+        <section class="strame-unit-card strame-unit-card--gollem">
+          <h3>Gollem</h3>
+          <p>5 HP · 2 attack · moves 1 square (orthogonal)</p>
+          <p>Attacks only orthogonally adjacent enemies (not diagonals).</p>
+        </section>
+      </div>
+
+      <h2 id="strame-guide-turn">4. Your turn</h2>
+      <ol class="strame-web-help-steps">
+        <li>Wait for the green <strong>Your turn</strong> pill. If it says the opponent’s turn, you cannot act yet.</li>
+        <li><strong>Recruit (optional, once per turn):</strong> Choose Soldier or Gollem, then click a <strong>green square</strong> in your home column. You can click <strong>Recruit</strong> first or click the green square directly.</li>
+        <li><strong>Use your pieces:</strong> Click one of your units, then <strong>Move</strong> or <strong>Attack</strong> and click a highlighted square. Each piece can move once and attack once per turn (unless it just recruited — new units skip acting that turn).</li>
+        <li><strong>Pass</strong> skips further actions for the selected piece.</li>
+        <li><strong>End turn</strong> when you are finished. You must recruit at least one unit before ending your <em>first</em> turn (you cannot end with zero pieces on the board).</li>
+      </ol>
+
+      <h2 id="strame-guide-combat">5. Combat &amp; gold</h2>
+      <ul class="strame-web-help-tips">
+        <li>Attacking reduces enemy HP. When a unit reaches 0 HP, it is removed.</li>
+        <li>Killing an enemy unit grants <strong>1 gold</strong> to the attacker’s player.</li>
+        <li>HP is shown on each piece on the board.</li>
+      </ul>
+
+      <h2 id="strame-guide-win">6. Winning</h2>
+      <p>You win when the opponent has <strong>0 gold and 0 HP</strong> on the board (no living units and no money left to recruit).</p>
+
+      <h2 id="strame-guide-tips">7. Tips &amp; troubleshooting</h2>
+      <ul class="strame-web-help-tips">
+        <li>Hard refresh the game page (<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> on Mac) if buttons or sprites look wrong after an update.</li>
+        <li>Check the note under <strong>Strame Online</strong> for the client version (e.g. <code>v20260702-recruit2</code>).</li>
+        <li>If you disconnect, use <strong>Host game</strong> or <strong>Join game</strong> again to start a new room.</li>
+        <li>The full desktop Strame app has many more units, maps, and modes — this page covers the thin browser client only.</li>
+      </ul>
+
+      <p class="strame-web-help-note">
+        Embed or link this guide from any page: <code>&lt;a href="strame-how-to-play.html"&gt;How to play Strame&lt;/a&gt;</code>
+      </p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; 2026 Test Website. All rights reserved (placeholder).</p>
+      <p><a href="page-c.html">Play Strame</a> &middot; <a href="sitemap.html">Site Map</a> &middot; <a href="about.html">About</a></p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

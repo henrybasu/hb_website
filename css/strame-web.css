@@ -650,3 +650,72 @@
   color: #6b7280;
   margin: 12px 0 0;
 }
+
+/* Standalone guide page (strame-how-to-play.html) */
+.strame-guide h2 {
+  font-size: 1.05rem;
+  margin: 22px 0 10px;
+  padding-top: 4px;
+  border-top: 1px solid #e1e4ec;
+}
+
+.strame-guide h2:first-of-type {
+  margin-top: 0;
+  border-top: none;
+  padding-top: 0;
+}
+
+.strame-guide-cta-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin: 16px 0 0;
+}
+
+.strame-unit-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+  margin: 8px 0 4px;
+}
+
+.strame-unit-card {
+  border-radius: 10px;
+  padding: 12px 14px;
+  border: 1px solid #e1e4ec;
+}
+
+.strame-unit-card h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.strame-unit-card p {
+  margin: 0 0 6px;
+  font-size: 0.9rem;
+}
+
+.strame-unit-card p:last-child {
+  margin-bottom: 0;
+}
+
+.strame-unit-card--soldier {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  box-shadow: inset 3px 0 0 #3861f0;
+}
+
+.strame-unit-card--gollem {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  box-shadow: inset 3px 0 0 #16a34a;
+}
+
+.strame-guide kbd {
+  font-family: ui-monospace, monospace;
+  font-size: 0.85em;
+  padding: 0.1em 0.35em;
+  border-radius: 4px;
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+}
