@@ -762,28 +762,31 @@
           <label>Your name</label>
           <input type="text" data-name maxlength="32" placeholder="Player">
         </div>
-        <div class="strame-web-lobby-split">
-          <div class="strame-web-lobby-card">
+        <div class="strame-web-lobby-actions">
+          <section class="strame-web-lobby-card strame-web-lobby-card--host">
             <h3>Host a game</h3>
-            <div class="strame-web-row">
-              <label>Map</label>
-              <select data-map>
+            <p class="strame-web-lobby-lead">Create a room and share the code with your opponent.</p>
+            <div class="strame-web-field">
+              <label for="strame-map-select">Map</label>
+              <select id="strame-map-select" data-map>
                 <option value="STANDARD_5X10">Standard 5×10</option>
                 <option value="RIVER_5X10">5×10 River</option>
               </select>
             </div>
-            <button type="button" class="primary block" data-host>Host game</button>
-            <p class="strame-web-hint">Creates a room code to share with your opponent. If the relay times out while you wait, click Host game again for a new code.</p>
-          </div>
-          <div class="strame-web-lobby-card strame-web-lobby-card--guest">
+            <button type="button" class="primary-host block" data-host>Host game</button>
+            <p class="strame-web-hint">If the relay times out while you wait, click Host game again for a new code.</p>
+          </section>
+          <p class="strame-web-lobby-or" aria-hidden="true">or</p>
+          <section class="strame-web-lobby-card strame-web-lobby-card--guest">
             <h3>Join as guest</h3>
-            <div class="strame-web-row">
-              <label>Room code</label>
-              <input type="text" data-code maxlength="12" placeholder="ABCDEF">
+            <p class="strame-web-lobby-lead">Enter the room code from the host to play as Player 2.</p>
+            <div class="strame-web-field">
+              <label for="strame-room-code">Room code</label>
+              <input id="strame-room-code" type="text" data-code maxlength="12" placeholder="ABCDEF" autocomplete="off" spellcheck="false">
             </div>
-            <button type="button" class="primary block" data-join>Join game</button>
-            <p class="strame-web-hint">Enter the code from the host, then join.</p>
-          </div>
+            <button type="button" class="primary-guest block" data-join>Join game</button>
+            <p class="strame-web-hint">Use the same relay URL as the host.</p>
+          </section>
         </div>
       </div>
       <div class="strame-web-banner strame-web-hidden" data-banner></div>

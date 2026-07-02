@@ -65,36 +65,127 @@
   font-weight: 600;
 }
 
-.strame-web-lobby-split {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+.strame-web-lobby-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin-top: 10px;
+}
+
+.strame-web-lobby-or {
+  display: flex;
+  align-items: center;
   gap: 12px;
-  margin-top: 4px;
+  margin: 14px 0;
+  font-size: 0.82rem;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sw-muted);
+}
+
+.strame-web-lobby-or::before,
+.strame-web-lobby-or::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--sw-border);
 }
 
 .strame-web-lobby-card {
-  background: #f8f9fc;
   border: 1px solid var(--sw-border);
-  border-radius: 10px;
-  padding: 12px;
+  border-radius: 12px;
+  padding: 16px;
+}
+
+.strame-web-lobby-card--host {
+  background: #f0f4ff;
+  border-color: #b8c9f7;
+  box-shadow: inset 4px 0 0 var(--sw-p1);
 }
 
 .strame-web-lobby-card--guest {
-  border-color: #c8d6ff;
-  background: #f3f6ff;
+  background: #fff0f0;
+  border-color: #f0b8b8;
+  box-shadow: inset 4px 0 0 var(--sw-p2);
+}
+
+.strame-web-lobby-card h3 {
+  font-size: 1rem;
+  margin: 0 0 4px;
+}
+
+.strame-web-lobby-lead {
+  font-size: 0.88rem;
+  color: var(--sw-text);
+  margin: 0 0 12px;
+  line-height: 1.45;
+}
+
+.strame-web-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 12px;
+}
+
+.strame-web-field label {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: var(--sw-text);
+}
+
+.strame-web-field input[type="text"],
+.strame-web-field select {
+  width: 100%;
+}
+
+.strame-web-lobby-card--guest .strame-web-field input[type="text"] {
+  font-size: 1.05rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  padding: 10px 12px;
+  border: 2px solid #e08080;
+  background: #fff;
 }
 
 .strame-web-hint {
   font-size: 0.78rem;
   color: var(--sw-muted);
-  margin: 8px 0 0;
+  margin: 10px 0 0;
   line-height: 1.4;
 }
 
 .strame-web-root button.block {
   display: block;
   width: 100%;
-  margin-top: 4px;
+  margin-top: 0;
+  padding: 11px 16px;
+  font-size: 1rem;
+}
+
+.strame-web-root button.primary-host {
+  background: var(--sw-p1);
+  border: 2px solid #2a4fd4;
+  color: #fff;
+  font-weight: 700;
+}
+
+.strame-web-root button.primary-host:hover {
+  background: #2a4fd4;
+}
+
+.strame-web-root button.primary-guest {
+  background: var(--sw-p2);
+  border: 2px solid #c53030;
+  color: #fff;
+  font-weight: 700;
+  box-shadow: 0 2px 8px rgba(224, 69, 69, 0.35);
+}
+
+.strame-web-root button.primary-guest:hover {
+  background: #c53030;
 }
 
 .strame-web-row {
