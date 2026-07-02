@@ -5,7 +5,7 @@
 (function (global) {
   "use strict";
 
-  const STARTING_GOLD = 5;
+  const WEB_CLIENT_VERSION = "20260702-recruit2";
   const RECRUIT_COST = 1;
   const KILL_GOLD = 1;
 
@@ -172,15 +172,26 @@
       return false;
     }
 
-    clearSelection(resetMode) {
+    clearPieceSelection() {
       this.selected = null;
-      if (resetMode !== false) this.uiMode = "idle";
+    }
+
+    resetActionMode() {
+      this.selected = null;
+      this.uiMode = "idle";
+    }
+
+    /** @deprecated use clearPieceSelection or resetActionMode */
+    clearSelection(resetMode) {
+      if (resetMode === false) this.clearPieceSelection();
+      else this.resetActionMode();
     }
 
     select(r, c) {
       const pc = this.pieceAt(r, c);
       if (!pc || pc.owner !== this.current || !this.pieceNeedsAction(pc)) {
-        this.clearSelection();
+        if (this.uiMode === "recruit") this.clearPieceSelection();
+        else this.resetActionMode();
         return;
       }
       this.selected = { r, c };
@@ -210,7 +221,7 @@
       this.passed.clear();
       this.placed.clear();
       this.mayPlaceThisTurn = true;
-      this.clearSelection();
+      this.resetActionMode();
       this.current = this.current === 0 ? 1 : 0;
       this.turnNumber++;
       this.checkGameOver();
@@ -245,7 +256,7 @@
       this.grid[r][c] = pc;
       this.placed.add(id);
       this.mayPlaceThisTurn = false;
-      this.clearSelection();
+      this.resetActionMode();
       this.emit(shortP(this.current) + "·" + pc.unit + "#" + id + ":new @" + rc(r, c));
       this.afterLocalAction();
       return true;
@@ -362,7 +373,7 @@
       const pc = this.pieceAt(this.selected.r, this.selected.c);
       if (!pc) return;
       this.passed.add(pc.id);
-      this.clearSelection();
+      this.resetActionMode();
       this.emit(shortP(pc.owner) + "·" + pc.unit + "#" + pc.id + ":pass");
       this.afterLocalAction();
     }
@@ -471,7 +482,7 @@
       model.placed.add(id);
       model.mayPlaceThisTurn = false;
       model.nextId = Math.max(model.nextId, id + 1);
-      model.clearSelection();
+      model.resetActionMode();
       if (!fromRemote) return;
       return;
     }
@@ -486,7 +497,7 @@
         model.grid[tr][tc] = pc;
         model.moved.add(id);
       }
-      model.clearSelection();
+      model.resetActionMode();
       return;
     }
 
@@ -518,15 +529,14 @@
           model.attacked.add(atkId);
         }
       }
-      model.clearSelection();
-      model.checkGameOver();
+      model.resetActionMode();
       return;
     }
 
     m = /^(P[12])·([SG])#(\d+):pass/.exec(line);
     if (m) {
       model.passed.add(+m[3]);
-      model.clearSelection();
+      model.resetActionMode();
       return;
     }
 
@@ -537,7 +547,7 @@
       model.passed.clear();
       model.placed.clear();
       model.mayPlaceThisTurn = true;
-      model.clearSelection();
+      model.resetActionMode();
       model.current = model.current === 0 ? 1 : 0;
       model.turnNumber++;
       model.checkGameOver();
@@ -823,12 +833,12 @@
     if (!root) throw new Error("StrameWeb.mount: container not found");
 
     root.classList.add("strame-web-root");
-    root.innerHTML = `
+      root.innerHTML = `
       <div class="strame-web-header">
         <h1>Strame Online</h1>
         <div class="strame-web-status" data-status>Offline</div>
       </div>
-      <p class="strame-web-note">Browser client (Soldier &amp; Gollem, preset maps). Run the desktop app separately for full features.</p>
+      <p class="strame-web-note">Browser client v${WEB_CLIENT_VERSION} (Soldier &amp; Gollem, preset maps). Run the desktop app separately for full features.</p>
       <div class="strame-web-panel" data-lobby>
         <h2>Connect</h2>
         <div class="strame-web-row">
@@ -1099,14 +1109,17 @@
     function highlights() {
       const out = [];
       if (!myTurn()) return out;
-      if (model.uiMode === "recruit") {
+
+      if (model.canStillRecruit()) {
         for (let r = 0; r < model.rows; r++) {
           const c = model.homeCol(seat);
           if (model.canRecruitAt(r, c)) out.push({ r, c, kind: "recruit" });
         }
+      }
+
+      if (model.uiMode === "recruit" || !model.selected) {
         return out;
       }
-      if (!model.selected) return out;
       if (model.uiMode === "move") {
         for (const t of model.legalMoveTargets(model.selected.r, model.selected.c)) {
           out.push({ r: t.r, c: t.c, kind: "move" });
@@ -1360,14 +1373,19 @@
 
       if (btn === el.recruitBtn) {
         if (!guardTurn()) return;
+        if (!model.canStillRecruit()) {
+          actionFlash(
+            "Cannot recruit — you already placed a unit this turn or need more gold.",
+            "warn"
+          );
+          return;
+        }
         model.recruitUnit = el.unit ? el.unit.value : "S";
-        model.uiMode = model.uiMode === "recruit" ? "idle" : "recruit";
-        model.clearSelection(false);
+        model.uiMode = "recruit";
+        model.clearPieceSelection();
         actionFlash(
-          model.uiMode === "recruit"
-            ? "Recruit mode ON — click a green square in your home column."
-            : "Recruit mode off.",
-          model.uiMode === "recruit" ? "ok" : "info"
+          "Recruit mode ON — click a green square in your home column (or click one directly).",
+          "ok"
         );
         refresh();
         return;
@@ -1503,5 +1521,5 @@
     refresh();
   }
 
-  global.StrameWeb = { mount, GameModel, MAPS, UNITS };
+  global.StrameWeb = { mount, GameModel, MAPS, UNITS, WEB_CLIENT_VERSION };
 })(typeof window !== "undefined" ? window : globalThis);

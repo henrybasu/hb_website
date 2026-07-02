@@ -19,7 +19,7 @@
   <meta name="description" content="Play Strame Standard Online in the browser on Page C of the Test Website demo site.">
   <title>Strame Online | Page C | Test Website</title>
   <link rel="stylesheet" href="css/styles.css">
-  <link rel="stylesheet" href="css/strame-web.css">
+  <link rel="stylesheet" href="css/strame-web.css?v=20260702-recruit2">
 </head>
 <body>
   <header class="site-header">
@@ -63,7 +63,7 @@
         <h3>In the match</h3>
         <ul class="strame-web-help-tips">
           <li><strong>Blue (P1)</strong> recruits on the <strong>left</strong> column; <strong>red (P2)</strong> on the <strong>right</strong>.</li>
-          <li>On your turn: click <strong>Recruit</strong>, pick Soldier or Gollem, then click an empty home-column square; or click your piece, then <strong>Move</strong> or <strong>Attack</strong>, then click a highlighted square.</li>
+          <li>On your turn: pick Soldier or Gollem, then click a <strong>green square</strong> in your home column (left for Blue, right for Red). You can click <strong>Recruit</strong> first or click the green square directly.</li>
           <li><strong>Pass</strong> skips the rest of a selected piece’s actions. <strong>End turn</strong> when you are done (including skipping recruit if you do not want another unit).</li>
           <li>Win by reducing the opponent to <strong>0 gold and 0 HP</strong> on the board.</li>
         </ul>
@@ -81,7 +81,7 @@
   </footer>
 
   <script src="js/main.js"></script>
-  <script src="js/strame-web.js"></script>
+  <script src="js/strame-web.js?v=20260702-recruit2"></script>
   <script>
     StrameWeb.mount("#strame-web-root", {
       relayUrl: new URLSearchParams(location.search).get("relay") || undefined,
