@@ -748,7 +748,12 @@
     }
 
     for (const hl of highlights || []) {
-      ctx.fillStyle = hl.kind === "move" ? "rgba(56,97,240,0.28)" : "rgba(224,69,69,0.28)";
+      ctx.fillStyle =
+        hl.kind === "recruit"
+          ? "rgba(22,163,74,0.38)"
+          : hl.kind === "move"
+            ? "rgba(56,97,240,0.28)"
+            : "rgba(224,69,69,0.28)";
       ctx.fillRect(hl.c * cell, hl.r * cell, cell, cell);
     }
 
@@ -1046,13 +1051,29 @@
       return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     }
 
+    function guardTurn() {
+      if (!myTurn()) {
+        el.actionsHint.textContent = "Not your turn — wait for the opponent.";
+        return false;
+      }
+      return true;
+    }
+
     function myTurn() {
       return seat !== null && model.current === seat && model.outcome === "ongoing";
     }
 
     function highlights() {
       const out = [];
-      if (!myTurn() || !model.selected) return out;
+      if (!myTurn()) return out;
+      if (model.uiMode === "recruit") {
+        for (let r = 0; r < model.rows; r++) {
+          const c = model.homeCol(seat);
+          if (model.canRecruitAt(r, c)) out.push({ r, c, kind: "move" });
+        }
+        return out;
+      }
+      if (!model.selected) return out;
       if (model.uiMode === "move") {
         for (const t of model.legalMoveTargets(model.selected.r, model.selected.c)) {
           out.push({ r: t.r, c: t.c, kind: "move" });
@@ -1117,17 +1138,15 @@
       }
 
       el.actions.classList.toggle("is-active", turnMine);
+      el.actions.classList.toggle("is-locked", !turnMine);
 
-      root.querySelectorAll("[data-move],[data-attack],[data-pass],[data-end],[data-mode-recruit]").forEach((b) => {
-        b.disabled = !turnMine;
-      });
       root.querySelector("[data-mode-recruit]").classList.toggle(
         "active",
         turnMine && model.uiMode === "recruit"
       );
       root.querySelector("[data-move]").classList.toggle("active", turnMine && model.uiMode === "move");
       root.querySelector("[data-attack]").classList.toggle("active", turnMine && model.uiMode === "attack");
-      el.unit.disabled = !turnMine;
+      if (el.unit) el.unit.disabled = !turnMine;
 
       if (model.outcome !== "ongoing") {
         el.banner.classList.remove("strame-web-hidden");
@@ -1223,6 +1242,7 @@
       matchSeed = seed;
       matchMap = mapId in MAPS ? mapId : "STANDARD_5X10";
       model.startOnline(seed, matchMap, gold);
+      if (el.unit) model.recruitUnit = el.unit.value;
       el.lobby.classList.add("strame-web-hidden");
       el.game.classList.remove("strame-web-hidden");
       setStatus(rematch ? "Rematch started" : "Match in progress");
@@ -1288,52 +1308,92 @@
     root.querySelector("[data-join]").addEventListener("click", () => connectOnline(false));
 
     root.querySelector("[data-mode-recruit]").addEventListener("click", () => {
-      if (!myTurn()) return;
+      if (!guardTurn()) return;
+      model.recruitUnit = el.unit ? el.unit.value : "S";
       model.uiMode = model.uiMode === "recruit" ? "idle" : "recruit";
       model.clearSelection();
+      el.actionsHint.textContent =
+        model.uiMode === "recruit"
+          ? "Recruit mode ON — click an empty square in your home column (highlighted green)."
+          : "Recruit mode off.";
       refresh();
     });
 
     root.querySelector("[data-move]").addEventListener("click", () => {
-      if (!myTurn() || !model.selected) return;
+      if (!guardTurn()) return;
+      if (!model.selected) {
+        el.actionsHint.textContent = "Select one of your pieces on the board first.";
+        refresh();
+        return;
+      }
       model.uiMode = "move";
+      el.actionsHint.textContent = "Move mode — click a highlighted blue square.";
       refresh();
     });
 
     root.querySelector("[data-attack]").addEventListener("click", () => {
-      if (!myTurn() || !model.selected) return;
+      if (!guardTurn()) return;
+      if (!model.selected) {
+        el.actionsHint.textContent = "Select one of your pieces on the board first.";
+        refresh();
+        return;
+      }
       model.uiMode = "attack";
+      el.actionsHint.textContent = "Attack mode — click a highlighted red square.";
       refresh();
     });
 
     root.querySelector("[data-pass]").addEventListener("click", () => {
-      if (!myTurn()) return;
+      if (!guardTurn()) return;
+      if (!model.selected) {
+        el.actionsHint.textContent = "Select one of your pieces on the board first.";
+        refresh();
+        return;
+      }
       model.passSelected();
+      el.actionsHint.textContent = "Passed with selected piece.";
       refresh();
     });
 
     root.querySelector("[data-end]").addEventListener("click", () => {
-      if (!myTurn()) return;
+      if (!guardTurn()) return;
+      if (model.countPieces(model.current) === 0) {
+        el.actionsHint.textContent = "Recruit at least one piece before ending your turn.";
+        refresh();
+        return;
+      }
       model.endTurnEarly();
+      el.actionsHint.textContent = "Turn ended.";
       refresh();
     });
 
-    el.unit.addEventListener("change", () => {
-      model.recruitUnit = el.unit.value;
-    });
+    if (el.unit) {
+      el.unit.addEventListener("change", () => {
+        model.recruitUnit = el.unit.value;
+      });
+    }
 
     el.canvas.addEventListener("click", (ev) => {
-      if (!myTurn()) return;
+      if (!guardTurn()) return;
       const rect = el.canvas.getBoundingClientRect();
+      if (!rect.width || !rect.height) return;
       const cellW = el.canvas.width / model.cols;
       const cellH = el.canvas.height / model.rows;
-      const c = Math.floor(((ev.clientX - rect.left) / rect.width) * el.canvas.width / cellW);
-      const r = Math.floor(((ev.clientY - rect.top) / rect.height) * el.canvas.height / cellH);
+      const x = (ev.clientX - rect.left) * (el.canvas.width / rect.width);
+      const y = (ev.clientY - rect.top) * (el.canvas.height / rect.height);
+      const c = Math.floor(x / cellW);
+      const r = Math.floor(y / cellH);
       if (r < 0 || c < 0 || r >= model.rows || c >= model.cols) return;
 
       if (model.uiMode === "recruit") {
+        if (!model.canRecruitAt(r, c)) {
+          el.actionsHint.textContent = "Recruit only on empty squares in your home column.";
+          refresh();
+          return;
+        }
         model.recruit(model.recruitUnit, r, c);
         model.uiMode = "idle";
+        el.actionsHint.textContent = "Recruited — select the piece to move or attack, or End turn.";
         refresh();
         return;
       }

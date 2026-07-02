@@ -362,6 +362,14 @@
   box-shadow: 0 0 0 2px rgba(56, 97, 240, 0.12);
 }
 
+.strame-web-actions.is-locked {
+  opacity: 0.85;
+}
+
+.strame-web-actions.is-locked button {
+  cursor: not-allowed;
+}
+
 .strame-web-actions-hint {
   margin: 0 0 10px;
   font-size: 0.88rem;
@@ -390,6 +398,14 @@
   border-color: var(--sw-p1);
   background: #eef3ff;
   color: #1e3a8a;
+  box-shadow: inset 0 0 0 1px var(--sw-p1);
+}
+
+.strame-web-root button.action-btn[data-mode-recruit].active {
+  border-color: #15803d;
+  background: #dcfce7;
+  color: #166534;
+  box-shadow: inset 0 0 0 2px #16a34a;
 }
 
 .strame-web-root button.end-turn-btn {
