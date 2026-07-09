@@ -35,7 +35,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.25";
+const WEB_CLIENT_VERSION_STR = "0.1.28";
 
   // --- math/util.ts ---
 
@@ -1467,7 +1467,7 @@ class SecretSeam {
   }
 
   isDone(){
-    return this.done || this.breakablesRemaining <= 0;
+    return this.done || this.breakablesRemaining < 0;
   }
 
   isHiddenBreakable(roomId, tx, ty){
@@ -1477,12 +1477,47 @@ class SecretSeam {
     );
   }
 
+  allBreakablesClearedForRoom(roomId){
+    for (const c of this.cells) {
+      if (c.role === SEAM_ROLE_BREAKABLE && c.roomId === roomId && !c.cleared) return false;
+    }
+    return true;
+  }
+
+  isBufferRole(role){
+    return role === SEAM_ROLE_BUFFER_WEST || role === SEAM_ROLE_BUFFER_EAST || role === SEAM_ROLE_BUFFER;
+  }
+
+  revealBuffersForRoom(rooms, roomId){
+    if (!this.allBreakablesClearedForRoom(roomId)) return;
+    for (const c of this.cells) {
+      if (!this.isBufferRole(c.role) || c.roomId !== roomId || c.bufferRevealed) continue;
+      c.bufferRevealed = true;
+      const map = rooms[roomId].map;
+      if (map.tileAt(c.tx, c.ty) !== TILE_SOLID) map.setTile(c.tx, c.ty, TILE_SOLID);
+    }
+  }
+
+  finishOpen(rooms){
+    this.breakablesRemaining = -1;
+    this.done = true;
+    for (const c of this.cells) {
+      if (!this.isBufferRole(c.role) || c.bufferRevealed) continue;
+      c.bufferRevealed = true;
+      c.cleared = true;
+      const map = rooms[c.roomId].map;
+      if (map.tileAt(c.tx, c.ty) !== TILE_SOLID) map.setTile(c.tx, c.ty, TILE_SOLID);
+    }
+  }
+
   markBreakableCleared(rooms, roomId, tx, ty){
     for (const c of this.cells) {
       if (c.role !== SEAM_ROLE_BREAKABLE || c.cleared || c.roomId !== roomId || c.tx !== tx || c.ty !== ty) continue;
       c.cleared = true;
       this.breakablesRemaining--;
       rooms[roomId].map.setTile(tx, ty, c.restore);
+      this.revealBuffersForRoom(rooms, roomId);
+      if (this.breakablesRemaining === 0) this.finishOpen(rooms);
       return true;
     }
     return false;
@@ -1503,7 +1538,8 @@ class SecretSeam {
         if (t0 !== TILE_DOOR && t0 !== TILE_BREAKABLE) g.map.setTile(L, 0, TILE_LADDER);
       }
     }
-    if (this.breakablesRemaining <= 0) this.done = true;
+    this.revealBuffersForRoom(rooms, roomId);
+    if (this.breakablesRemaining === 0) this.finishOpen(rooms);
   }
 
   seamMatchesTraverseDir(fromRoom, toRoom, dir){
@@ -1599,7 +1635,7 @@ function tryAddHorizontalSeam(layout, rooms, out, westRoomId, eastRoomId){
     map.setTile(tx, ty, TILE_BREAKABLE);
   };
   const addBuffer = (roomId, tx, ty, role) => {
-    cells.push({ roomId, tx, ty, restore: TILE_SOLID, role, cleared: false });
+    cells.push({ roomId, tx, ty, restore: TILE_SOLID, role, cleared: false, bufferRevealed: false });
   };
   for (let dy = 0; dy <= 1; dy++) {
     addBreakable(westRoomId, rx, ry + dy, TILE_DOOR, gW.map);
@@ -1638,7 +1674,7 @@ function tryAddVerticalSeam(layout, rooms, out, northRoomId, southRoomId){
   const hN = gN.map.getHeight();
   for (let y = 1; y < hN - 1; y++) {
     if (y === northY) continue;
-    cells.push({ roomId: northRoomId, tx: lN, ty: y, restore: TILE_SOLID, role: SEAM_ROLE_BUFFER, cleared: false });
+    cells.push({ roomId: northRoomId, tx: lN, ty: y, restore: TILE_SOLID, role: SEAM_ROLE_BUFFER, cleared: false, bufferRevealed: false });
   }
   if (gS.map.tileAt(lS, 0) !== TILE_DOOR && gS.map.tileAt(lS, 0) !== TILE_BREAKABLE) {
     gS.map.setTile(lS, 0, TILE_EMPTY);
@@ -1965,6 +2001,57 @@ function resolvedLadderRunwayRow(map, ladderTx, ladderSouth){
   return left;
 }
 
+function doorFrameSpawnPx(map, doorTileX, doorTopTileY){
+  const floorRow = Math.min(doorTopTileY + 2, map.getHeight() - 2);
+  const groundTop = floorRow * TILE_SIZE;
+  return {
+    x: doorTileX * TILE_SIZE,
+    y: Math.round(groundTop - PLAYER_STAND_H),
+  };
+}
+
+function horizontalDoorSpawnPx(gen, fromWest){
+  if (fromWest) {
+    if (gen.leftDoorTileX >= 0 && gen.leftDoorTopTileY >= 0) {
+      return doorFrameSpawnPx(gen.map, gen.leftDoorTileX, gen.leftDoorTopTileY);
+    }
+    return spawnAtFloor(gen.map, 2);
+  }
+  if (gen.rightDoorTileX >= 0 && gen.rightDoorTopTileY >= 0) {
+    return doorFrameSpawnPx(gen.map, gen.rightDoorTileX, gen.rightDoorTopTileY);
+  }
+  return spawnAtFloor(gen.map, gen.map.getWidth() - 3);
+}
+
+/** Spawn in the destination room beside the door/ladder used to enter (Java SpawnKind). */
+function spawnForRoomEntry(gen, node, map, travelDir){
+  switch (travelDir) {
+    case "east":
+      return { spawn: horizontalDoorSpawnPx(gen, true), onGround: true };
+    case "west":
+      return { spawn: horizontalDoorSpawnPx(gen, false), onGround: true };
+    case "south": {
+      const p = ladderSpawnFromNorth(node, map);
+      return {
+        spawn: p ?? spawnAtFloor(map, roomLadderColumnTx(node, map)),
+        onGround: false,
+      };
+    }
+    case "north": {
+      const p = ladderSpawnFromSouth(node, map);
+      return {
+        spawn: p ?? spawnAtFloor(map, roomLadderColumnTx(node, map)),
+        onGround: false,
+      };
+    }
+    default:
+      return {
+        spawn: spawnAtFloor(map, Math.floor(map.getWidth() / 2)),
+        onGround: true,
+      };
+  }
+}
+
 function roomSpawnTx(node, map, fromWest, fromEast){
   if (fromWest && node.doorWest) return 2;
   if (fromEast && node.doorEast) return map.getWidth() - 3;
@@ -2160,6 +2247,19 @@ function defaultPlayerRect(x, y){
 function spawnAtFloor(map, spawnTx, bodyHeight = PLAYER_STAND_H){
   const groundTop = map.groundTopWorldYAtColumn(spawnTx);
   return { x: spawnTx * TILE_SIZE, y: groundTop - bodyHeight };
+}
+
+function playerOverlapsLadder(map, player){
+  const x0 = Math.floor(player.x / TILE_SIZE);
+  const x1 = Math.floor((player.x + player.w() - 1) / TILE_SIZE);
+  const y0 = Math.floor(player.y / TILE_SIZE);
+  const y1 = Math.floor(player.feetY() / TILE_SIZE);
+  for (let ty = y0; ty <= y1; ty++) {
+    for (let tx = x0; tx <= x1; tx++) {
+      if (map.isLadderTile(tx, ty)) return true;
+    }
+  }
+  return false;
 }
 
 const ENEMY_CRAWLER_HITBOX_H = 12;
@@ -2409,28 +2509,36 @@ class Player {
     const blocksJump = this.attackPhase > 0 && this.attackPhase < 4;
     const inAttack = this.attackPhase > 0;
 
-    // Ladder
-    const tx = Math.floor((this.x + this.w() / 2) / TILE_SIZE);
-    const onLadder = map.isLadderTile(tx, Math.floor(this.feetY() / TILE_SIZE)) ||
-      map.isLadderTile(tx, Math.floor((this.y + 2) / TILE_SIZE));
+    // Ladder — latch while overlapping rungs; hold position when not pressing up/down (Java climb latch).
+    const onLadder = playerOverlapsLadder(map, this);
+    if (this.climbing && !onLadder) this.climbing = false;
+    if (!this.climbing && onLadder && (up || down)) this.climbing = true;
 
-    if (onLadder && (up || down)) {
-      this.climbing = true;
-      this.onGround = false;
-      this.vx = 0;
-      this.vy = 0;
-      if (up) this.y -= this.stats.climbSpeed * dt;
-      if (down) this.y += this.stats.climbSpeed * dt;
-      if (left) this.facing = -1;
-      if (right) this.facing = 1;
-      this.animAccum += dt;
-      if (this.animAccum > 0.12) {
-        this.animAccum = 0;
-        this.animFrame = (this.animFrame + 1) % 2;
+    if (this.climbing && onLadder) {
+      if (jumpEdge && this.attackPhase === 0) {
+        this.climbing = false;
+        this.vy = -this.stats.jumpVel;
+        this.onGround = false;
+        if (left && !right) this.vx = -this.stats.maxAirSpeed * 0.65;
+        else if (right && !left) this.vx = this.stats.maxAirSpeed * 0.65;
+        else this.vx = this.facing * this.stats.maxAirSpeed * 0.45;
+        this.coyoteTimer = 0;
+      } else {
+        this.onGround = false;
+        this.vx = 0;
+        this.vy = 0;
+        if (up) this.y -= this.stats.climbSpeed * dt;
+        if (down) this.y += this.stats.climbSpeed * dt;
+        if (left) this.facing = -1;
+        if (right) this.facing = 1;
+        this.animAccum += dt;
+        if (this.animAccum > 0.12) {
+          this.animAccum = 0;
+          this.animFrame = (this.animFrame + 1) % 2;
+        }
+        return;
       }
-      return;
     }
-    this.climbing = false;
 
     // Horizontal movement
     let targetVx = 0;
@@ -3172,28 +3280,29 @@ class GameSim {
     const y0 = Math.floor(pr.y / TILE_SIZE);
     const y1 = Math.floor((pr.y + pr.h - 1e-6) / TILE_SIZE);
 
+    const gen = this.currentGeneratedRoom();
+    const doorLeftX = gen?.leftDoorTileX ?? -1;
+    const doorRightX = gen?.rightDoorTileX ?? -1;
+
     let touchedLeft = false;
     let touchedRight = false;
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
         if (!this.map.isDoorTile(tx, ty)) continue;
-        if (tx <= 1) touchedLeft = true;
-        if (tx >= this.map.getWidth() - 2) touchedRight = true;
+        if (doorLeftX >= 0 ? tx === doorLeftX : tx <= 1) touchedLeft = true;
+        if (doorRightX >= 0 ? tx === doorRightX : tx >= this.map.getWidth() - 2) touchedRight = true;
       }
     }
 
     const node = this.layout.room(this.currentRoomId);
 
+    // Java does not block horizontal door transitions on secret seams — only ladder climbs.
     if (touchedRight && node.doorEast) {
       const east = this.layout.neighborEast(this.currentRoomId);
-      if (east >= 0 && !this.seamBlocksTransition(this.currentRoomId, east, "east")) {
-        this.beginTransition(east, "east", input);
-      }
+      if (east >= 0) this.beginTransition(east, "east", input);
     } else if (touchedLeft && node.doorWest) {
       const west = this.layout.neighborWest(this.currentRoomId);
-      if (west >= 0 && !this.seamBlocksTransition(this.currentRoomId, west, "west")) {
-        this.beginTransition(west, "west", input);
-      }
+      if (west >= 0) this.beginTransition(west, "west", input);
     }
   }
 
@@ -3277,34 +3386,11 @@ class GameSim {
     const node = this.layout.room(roomId);
     const gen = this.currentGeneratedRoom();
 
-    let spawn;
-    if (dir === "south") {
-      const p = ladderSpawnFromSouth(node, this.map);
-      spawn = p ? { x: p.x, y: p.y } : spawnAtFloor(this.map, roomSpawnTx(node, this.map, false, false));
-      this.player.resetAt(spawn.x, spawn.y);
-      this.player.onGround = false;
-    } else if (dir === "north") {
-      const p = ladderSpawnFromNorth(node, this.map);
-      spawn = p ? { x: p.x, y: p.y } : spawnAtFloor(this.map, roomSpawnTx(node, this.map, false, false));
-      this.player.resetAt(spawn.x, spawn.y);
-      this.player.onGround = false;
-    } else if (dir === "west" && gen.leftDoorTileX >= 0) {
-      spawn = {
-        x: (gen.leftDoorTileX + 1) * TILE_SIZE,
-        y: (gen.leftDoorTopTileY + 2) * TILE_SIZE - 32,
-      };
-      this.player.resetAt(spawn.x, spawn.y);
-    } else if (dir === "east" && gen.rightDoorTileX >= 0) {
-      spawn = {
-        x: (gen.rightDoorTileX - 1) * TILE_SIZE,
-        y: (gen.rightDoorTopTileY + 2) * TILE_SIZE - 32,
-      };
-      this.player.resetAt(spawn.x, spawn.y);
-    } else {
-      const spawnTx = roomSpawnTx(node, this.map, dir === "west", dir === "east");
-      spawn = spawnAtFloor(this.map, spawnTx);
-      this.player.resetAt(spawn.x, spawn.y);
-    }
+    const { spawn, onGround } = spawnForRoomEntry(gen, node, this.map, dir);
+    this.player.resetAt(spawn.x, spawn.y);
+    this.player.vx = 0;
+    this.player.vy = 0;
+    this.player.onGround = onGround;
 
     const bounds = this.scrollBounds();
     this.camera.reset(
