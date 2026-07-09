@@ -16,10 +16,14 @@ const WINDOW_SCALE = 2;
 const DISPLAY_WIDTH = INTERNAL_WIDTH * WINDOW_SCALE;
 const DISPLAY_HEIGHT = INTERNAL_HEIGHT * WINDOW_SCALE;
 const CAMERA_EDGE_BUFFER_WORLD = 16 / CAMERA_ZOOM;
+const LADDER_TRANSITION_NORTH_EDGE_PX = TILE_SIZE;
 const PLAYER_STAND_H = 18;
 const PLAYER_STAND_W = 10;
 const SPRITE_FRAME_W = 32;
 const SPRITE_FRAME_H = 32;
+const HP_BAR_W = 16;
+const HP_BAR_H = 2;
+const HP_BAR_GAP = 1;
 /** Sword overlay strip: 48×32 per frame (32px body + 16px reach extension on the right). */
 const WEAPON_ATTACK_FRAME_W = 48;
 const WEAPON_ATTACK_FRAME_H = 32;
@@ -35,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.29";
+const WEB_CLIENT_VERSION_STR = "0.1.36";
 
   // --- math/util.ts ---
 
@@ -330,6 +334,25 @@ function imageDrawable(img){
     return false;
   }
   return typeof img.width === "number" && img.width > 0;
+}
+
+function drawWorldHealthBar(ctx, centerX, headTopY, current, max){
+  const maxHp = Math.max(1e-9, max);
+  const cur = Math.max(0, Math.min(maxHp, current));
+  const frac = cur / maxHp;
+  const barBottom = headTopY - HP_BAR_GAP;
+  const barTop = barBottom - HP_BAR_H;
+  const barLeft = centerX - HP_BAR_W * 0.5;
+  ctx.fillStyle = "rgba(0,0,0,0.5)";
+  ctx.fillRect(barLeft, barTop, HP_BAR_W, HP_BAR_H);
+  if (frac > 0) {
+    ctx.fillStyle = "#e60000";
+    ctx.fillRect(barLeft, barTop, HP_BAR_W * frac, HP_BAR_H);
+  }
+}
+
+function enemyHeadTopY(e){
+  return e.y;
 }
 
 function drawForestTile(ctx, sheet, col, row, px, py) {
@@ -1430,9 +1453,14 @@ function makeGeneratedRoom(map, meta){
     rightDoorTileX: meta.rightDoorTileX ?? -1,
     rightDoorTopTileY: meta.rightDoorTopTileY ?? -1,
     ladderColumnTx: meta.ladderColumnTx ?? -1,
+    ladderFromNorthSpawnX: meta.ladderFromNorthSpawnX ?? -1,
+    ladderFromNorthSpawnY: meta.ladderFromNorthSpawnY ?? -1,
+    ladderFromSouthSpawnX: meta.ladderFromSouthSpawnX ?? -1,
+    ladderFromSouthSpawnY: meta.ladderFromSouthSpawnY ?? -1,
     contentSeed: meta.contentSeed ?? 0,
     kind: meta.kind ?? RoomKind.NORMAL,
-    enemyCount: meta.enemyCount ?? 2,
+    enemyCount: meta.enemyCount ?? 0,
+    enemySpawns: meta.enemySpawns ?? [],
   };
 }
 
@@ -1889,6 +1917,11 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null){
     }
   }
 
+  let ladderFromNorthSpawnX = -1;
+  let ladderFromNorthSpawnY = -1;
+  let ladderFromSouthSpawnX = -1;
+  let ladderFromSouthSpawnY = -1;
+
   if (dungeonLadderTx >= 3 && dungeonLadderTx < w - 3 && dungeonVerticalLink) {
     const L = dungeonLadderTx;
     const mouthRow = resolvedLadderRunwayRowOnGrid(grid, w, h, groundY, L, conn.ladderSouth);
@@ -1917,6 +1950,15 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null){
     }
     if (grid[0][L] !== "D") grid[0][L] = conn.ladderNorth ? "." : "#";
     finalizeDungeonLadderMouthOnGrid(grid, w, h, L, mouthRow, conn);
+    const lSpawnX = L * TILE_SIZE + TILE_SIZE / 2 - 5;
+    if (conn.ladderNorth) {
+      ladderFromNorthSpawnX = lSpawnX;
+      ladderFromNorthSpawnY = Math.min(y0 + 2, y1) * TILE_SIZE - PLAYER_STAND_H;
+    }
+    if (conn.ladderSouth) {
+      ladderFromSouthSpawnX = lSpawnX;
+      ladderFromSouthSpawnY = h * TILE_SIZE - PLAYER_STAND_H;
+    }
   }
 
   if (dungeonVerticalLink) {
@@ -1951,9 +1993,13 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null){
     rightDoorTileX: conn.doorEast ? rightDoorX : -1,
     rightDoorTopTileY: rightDoorTopY,
     ladderColumnTx: dungeonLadderTx,
+    ladderFromNorthSpawnX,
+    ladderFromNorthSpawnY,
+    ladderFromSouthSpawnX,
+    ladderFromSouthSpawnY,
     contentSeed: node.contentSeed,
     kind,
-    enemyCount: rollRoomEnemyCount(kind, node.contentSeed),
+    enemySpawns: [],
   });
   if (secretFinish?.secretSeams || secretFinish?.neighborFaces) {
     gen = secretRoomMapBuildFinish(
@@ -1964,7 +2010,8 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null){
       secretFinish.neighborFaces ?? null
     );
   }
-  return gen;
+  const enemySpawns = rollEnemySpawns(gen, node.contentSeed, kind, node.gridY);
+  return { ...gen, enemySpawns, enemyCount: enemySpawns.length };
 }
 
 function generateRoom(node){
@@ -2017,6 +2064,17 @@ function horizontalDoorSpawnPx(gen, fromWest){
   return spawnAtFloor(gen.map, gen.map.getWidth() - 3);
 }
 
+function ladderSpawnFromGeneratedRoom(gen, fromAbove){
+  if (fromAbove) {
+    if (gen.ladderFromNorthSpawnX >= 0 && gen.ladderFromNorthSpawnY >= 0) {
+      return { x: gen.ladderFromNorthSpawnX, y: gen.ladderFromNorthSpawnY };
+    }
+  } else if (gen.ladderFromSouthSpawnX >= 0 && gen.ladderFromSouthSpawnY >= 0) {
+    return { x: gen.ladderFromSouthSpawnX, y: gen.ladderFromSouthSpawnY };
+  }
+  return null;
+}
+
 /** Spawn in the destination room beside the door/ladder used to enter (Java SpawnKind). */
 function spawnForRoomEntry(gen, node, map, travelDir){
   switch (travelDir) {
@@ -2025,14 +2083,14 @@ function spawnForRoomEntry(gen, node, map, travelDir){
     case "west":
       return { spawn: horizontalDoorSpawnPx(gen, false), onGround: true };
     case "south": {
-      const p = ladderSpawnFromNorth(node, map);
+      const p = ladderSpawnFromGeneratedRoom(gen, true);
       return {
         spawn: p ?? spawnAtFloor(map, roomLadderColumnTx(node, map)),
         onGround: false,
       };
     }
     case "north": {
-      const p = ladderSpawnFromSouth(node, map);
+      const p = ladderSpawnFromGeneratedRoom(gen, false);
       return {
         spawn: p ?? spawnAtFloor(map, roomLadderColumnTx(node, map)),
         onGround: false,
@@ -2050,18 +2108,6 @@ function roomSpawnTx(node, map, fromWest, fromEast){
   if (fromWest && node.doorWest) return 2;
   if (fromEast && node.doorEast) return map.getWidth() - 3;
   return Math.floor(map.getWidth() / 2);
-}
-
-function ladderSpawnFromNorth(node, map){
-  const L = roomLadderColumnTx(node, map);
-  if (L < 0) return null;
-  return { x: L * TILE_SIZE + TILE_SIZE / 2 - 5, y: 3 * TILE_SIZE - 32 };
-}
-
-function ladderSpawnFromSouth(node, map){
-  const L = roomLadderColumnTx(node, map);
-  if (L < 0) return null;
-  return { x: L * TILE_SIZE + TILE_SIZE / 2 - 5, y: map.getHeight() * TILE_SIZE - 32 };
 }
 
 function tileKindLabel(kind){
@@ -2128,6 +2174,10 @@ class Health {
 
   heal(amount){
     this.redCurrent = Math.min(this.redMax, this.redCurrent + amount);
+  }
+
+  isAtFullHealth(){
+    return this.getRedCurrent() >= this.getRedMax();
   }
 
   addSoul(amount){
@@ -2241,6 +2291,53 @@ function defaultPlayerRect(x, y){
 function spawnAtFloor(map, spawnTx, bodyHeight = PLAYER_STAND_H){
   const groundTop = map.groundTopWorldYAtColumn(spawnTx);
   return { x: spawnTx * TILE_SIZE, y: groundTop - bodyHeight };
+}
+
+function ladderShaftBelowFeetPlatform(map, player, columnTx){
+  const feetTy = Math.floor((player.feetY() - 1e-3) / TILE_SIZE);
+  if (feetTy < 0 || feetTy >= map.getHeight()) return false;
+  if (!map.isPlatformTile(columnTx, feetTy)) return false;
+  for (let y = feetTy + 1; y < map.getHeight() - 1; y++) {
+    if (map.isLadderTile(columnTx, y)) return true;
+    const t = map.tileAt(columnTx, y);
+    if (t === TILE_SOLID || t === TILE_BREAKABLE || t === TILE_DOOR) break;
+  }
+  return false;
+}
+
+function playerOverlapsLadderColumn(map, player, columnTx){
+  if (columnTx < 0) return false;
+  if (ladderShaftBelowFeetPlatform(map, player, columnTx)) return true;
+  const leftTile = Math.floor((player.x + 0.001) / TILE_SIZE);
+  const rightTile = Math.floor((player.x + player.w() - 0.001) / TILE_SIZE);
+  if (columnTx < leftTile || columnTx > rightTile) return false;
+  const topTile = Math.floor((player.y + 0.001) / TILE_SIZE);
+  const bottomTile = Math.floor((player.feetY() - 0.001) / TILE_SIZE);
+  for (let ty = topTile; ty <= bottomTile; ty++) {
+    if (!map.isLadderTile(columnTx, ty)) continue;
+    const tileTop = ty * TILE_SIZE;
+    const tileBot = (ty + 1) * TILE_SIZE;
+    if (player.feetY() > tileTop && player.y < tileBot) return true;
+  }
+  return false;
+}
+
+function resolveClimbShaftColumn(map, player){
+  const centerTx = Math.floor((player.x + player.w() * 0.5) / TILE_SIZE);
+  const lo = Math.max(1, centerTx - 1);
+  const hi = Math.min(map.getWidth() - 2, centerTx + 1);
+  for (let tx = lo; tx <= hi; tx++) {
+    if (playerOverlapsLadderColumn(map, player, tx)) return tx;
+  }
+  return -1;
+}
+
+function constrainClimbingShaftColumn(player, columnTx){
+  const targetX = columnTx * TILE_SIZE + (TILE_SIZE - player.w()) * 0.5;
+  if (Math.abs(player.x - targetX) > 1e-3) {
+    player.x = targetX;
+    player.vx = 0;
+  }
 }
 
 function playerOverlapsLadder(map, player){
@@ -2373,11 +2470,81 @@ function anyPressed(input, codes){
 
   // --- entity/Player.ts ---
 
+/** Feet-anchored squash/stretch (ported from game.render.SquashStretch). */
+class SquashStretch {
+  decay = 0;
+  peakMag = 0;
+  verticalPeak = true;
+  recoverFrames = 20;
+  holdFramesRemaining = 0;
 
+  reset(){
+    this.decay = 0;
+    this.peakMag = 0;
+    this.holdFramesRemaining = 0;
+  }
 
+  applyStretchX(scaleX, recoverFrames = 20){
+    this.applyPeak(scaleX - 1, false, recoverFrames);
+  }
 
+  applyStretchY(scaleY, recoverFrames = 20){
+    this.applyPeak(scaleY - 1, true, recoverFrames);
+  }
 
+  applyPeak(mag, vertical, recoverFrames){
+    if (Math.abs(mag) < 1e-9) return;
+    this.peakMag = mag;
+    this.verticalPeak = vertical;
+    this.recoverFrames = Math.max(1, recoverFrames);
+    this.decay = 1;
+    this.holdFramesRemaining = 0;
+  }
 
+  tick(dt){
+    if (this.holdFramesRemaining > 0) {
+      this.holdFramesRemaining--;
+      this.decay = 1;
+      return;
+    }
+    if (this.decay <= 0) return;
+    const recoverSec = this.recoverFrames / FIXED_STEP_HZ;
+    if (recoverSec <= 1e-9) {
+      this.decay = 0;
+      return;
+    }
+    this.decay = Math.max(0, this.decay - dt / recoverSec);
+  }
+
+  active(){
+    return this.decay > 0;
+  }
+
+  scaleX(){
+    return this.scaleForAxis(false);
+  }
+
+  scaleY(){
+    return this.scaleForAxis(true);
+  }
+
+  scaleForAxis(yAxis){
+    if (this.decay <= 0) return 1;
+    const mag = this.peakMag * this.decay;
+    if (this.verticalPeak) {
+      return yAxis ? 1 + mag : 2 - (1 + mag);
+    }
+    return yAxis ? 2 - (1 + mag) : 1 + mag;
+  }
+}
+
+const LANDING_LOCK_MAX_FRAMES = 20;
+const EXTENDED_FALL_DELAY_SEC = 0.12;
+const LAND_SQUASH_SCALE_X = 1.2;
+
+function applyLandSquash(squash, recoverFrames){
+  squash.applyStretchX(LAND_SQUASH_SCALE_X, Math.max(1, recoverFrames));
+}
 
 class Player {
   x = 0;
@@ -2388,8 +2555,15 @@ class Player {
   onGround = false;
   wasOnGround = false;
   climbing = false;
+  activeClimbShaftTx = -1;
   crouching = false;
   jumpSquatFrames = 0;
+  landingLockFrames = 0;
+  extendedFallFrames = 0;
+  fallPhaseTimer = 0;
+  walkOffLedgeActive = false;
+  justLanded = false;
+  renderSquashStretch = new SquashStretch();
   coyoteTimer = 0;
   jumpBufferTimer = 0;
   attackPhase = 0;
@@ -2431,7 +2605,14 @@ class Player {
     this.onGround = false;
     this.wasOnGround = false;
     this.climbing = false;
+    this.activeClimbShaftTx = -1;
     this.jumpSquatFrames = 0;
+    this.landingLockFrames = 0;
+    this.extendedFallFrames = 0;
+    this.fallPhaseTimer = 0;
+    this.walkOffLedgeActive = false;
+    this.justLanded = false;
+    this.renderSquashStretch.reset();
     this.coyoteTimer = 0;
     this.jumpBufferTimer = 0;
     this.attackPhase = 0;
@@ -2469,6 +2650,7 @@ class Player {
     this.prevX = this.x;
     this.prevY = this.y;
     this.wasOnGround = this.onGround;
+    this.justLanded = false;
     this.health.tickInvuln(dt);
     if (this.hurtTint > 0) this.hurtTint = Math.max(0, this.hurtTint - dt);
 
@@ -2503,14 +2685,39 @@ class Player {
     const blocksJump = this.attackPhase > 0 && this.attackPhase < 4;
     const inAttack = this.attackPhase > 0;
 
-    // Ladder — latch while overlapping rungs; hold position when not pressing up/down (Java climb latch).
-    const onLadder = playerOverlapsLadder(map, this);
-    if (this.climbing && !onLadder) this.climbing = false;
-    if (!this.climbing && onLadder && (up || down)) this.climbing = true;
+    // Ladder — latch on dungeon shaft; hold when idle on rungs (Java climb latch).
+    let shaftCol = this.activeClimbShaftTx;
+    const resolvedShaft = resolveClimbShaftColumn(map, this);
+    if (resolvedShaft >= 0) this.activeClimbShaftTx = resolvedShaft;
+    shaftCol = this.activeClimbShaftTx >= 0 ? this.activeClimbShaftTx : resolvedShaft;
+    const onShaft = shaftCol >= 0 && playerOverlapsLadderColumn(map, this, shaftCol);
+    const onLadder = onShaft || playerOverlapsLadder(map, this);
+
+    if (
+      !this.climbing &&
+      down &&
+      this.onGround &&
+      shaftCol >= 0 &&
+      ladderShaftBelowFeetPlatform(map, this, shaftCol)
+    ) {
+      this.climbing = true;
+      this.activeClimbShaftTx = shaftCol;
+    }
+
+    if (this.climbing && !onLadder && !(this.climbing && down && shaftCol >= 0)) {
+      this.climbing = false;
+      this.activeClimbShaftTx = -1;
+    }
+    if (!this.climbing && onLadder && (up || down)) {
+      this.climbing = true;
+      if (shaftCol >= 0) this.activeClimbShaftTx = shaftCol;
+    }
 
     if (this.climbing && onLadder) {
+      if (shaftCol >= 0) constrainClimbingShaftColumn(this, shaftCol);
       if (jumpEdge && this.attackPhase === 0) {
         this.climbing = false;
+        this.activeClimbShaftTx = -1;
         this.vy = -this.stats.jumpVel;
         this.onGround = false;
         if (left && !right) this.vx = -this.stats.maxAirSpeed * 0.65;
@@ -2585,6 +2792,8 @@ class Player {
       this.jumpSquatFrames = this.stats.jumpSquatFrames;
       this.jumpBufferTimer = 0;
       this.coyoteTimer = 0;
+      this.landingLockFrames = 0;
+      this.walkOffLedgeActive = false;
     }
     if (this.jumpSquatFrames > 0) {
       this.vy = 0;
@@ -2610,6 +2819,52 @@ class Player {
     } else {
       this.onGround = result.onGround;
     }
+
+    if (
+      this.wasOnGround &&
+      !this.onGround &&
+      this.jumpSquatFrames === 0 &&
+      this.vy >= 0
+    ) {
+      this.walkOffLedgeActive = true;
+    }
+
+    if (this.climbing) {
+      this.extendedFallFrames = 0;
+      this.fallPhaseTimer = 0;
+    } else if (this.onGround || this.vy < 0) {
+      this.fallPhaseTimer = 0;
+    } else {
+      this.fallPhaseTimer += dt;
+      if (this.fallPhaseTimer >= EXTENDED_FALL_DELAY_SEC) {
+        this.extendedFallFrames++;
+      }
+    }
+
+    if (!this.wasOnGround && this.onGround) {
+      let lockFrames = Math.floor(this.extendedFallFrames / 5) * 2;
+      lockFrames = Math.max(lockFrames, 5);
+      lockFrames = Math.min(lockFrames, LANDING_LOCK_MAX_FRAMES);
+      if (lockFrames > 0) {
+        this.landingLockFrames = lockFrames;
+        this.justLanded = true;
+      }
+      applyLandSquash(this.renderSquashStretch, Math.max(1, lockFrames));
+      this.extendedFallFrames = 0;
+      this.fallPhaseTimer = 0;
+      this.walkOffLedgeActive = false;
+    }
+
+    if (
+      this.onGround &&
+      this.landingLockFrames > 0 &&
+      this.jumpSquatFrames === 0 &&
+      !this.justLanded
+    ) {
+      this.landingLockFrames--;
+    }
+
+    this.renderSquashStretch.tick(dt);
 
     // Walk anim
     if (this.onGround && Math.abs(this.vx) > 5) {
@@ -2648,6 +2903,12 @@ class Player {
     }
     if (this.climbing) return "vernan climb.png";
     if (!this.isGroundedForSprite()) return "vernan jump.png";
+    if (
+      this.jumpSquatFrames > 0 ||
+      (this.landingLockFrames > 0 && this.onGround)
+    ) {
+      return "vernan crouch.png";
+    }
     if (this.crouching) return "vernan crouch.png";
     if (Math.abs(this.vx) > 5) return "vernan walk.png";
     return "vernan idle.png";
@@ -2672,75 +2933,451 @@ function moveToward(current, target, maxDelta){
   return current + Math.sign(target - current) * maxDelta;
 }
 
-  // --- entity/CrawlerEnemy.ts ---
+  // --- entity/enemies.ts ---
 
+const EnemyKind = {
+  CRAWLER: "CRAWLER",
+  MOUSE: "MOUSE",
+  PENISMAN: "PENISMAN",
+  JACK_BLUE: "JACK_BLUE",
+  ROLLING_HEAD: "ROLLING_HEAD",
+};
 
+const ENEMY_SPAWN_HITBOX_H = 12;
+const ENEMY_REGULAR_KINDS = [
+  EnemyKind.CRAWLER,
+  EnemyKind.MOUSE,
+  EnemyKind.PENISMAN,
+  EnemyKind.JACK_BLUE,
+  EnemyKind.ROLLING_HEAD,
+];
 
+function enemyChallengeLevel(kind){
+  switch (kind) {
+    case EnemyKind.CRAWLER:
+    case EnemyKind.MOUSE:
+      return 1;
+    case EnemyKind.PENISMAN:
+      return 2;
+    case EnemyKind.JACK_BLUE:
+    case EnemyKind.ROLLING_HEAD:
+      return 4;
+    default:
+      return 99;
+  }
+}
 
+function enemyBaseMaxHealth(kind){
+  switch (kind) {
+    case EnemyKind.MOUSE: return 2;
+    case EnemyKind.CRAWLER: return 3;
+    case EnemyKind.PENISMAN: return 4;
+    case EnemyKind.JACK_BLUE: return 8;
+    case EnemyKind.ROLLING_HEAD: return 6;
+    default: return 2;
+  }
+}
 
+function enemyEligibleKinds(dungeonFloor, secretRoom){
+  const maxChallenge = secretRoom
+    ? Math.floor(dungeonFloor / 5)
+    : Math.max(1, dungeonFloor + 1);
+  return ENEMY_REGULAR_KINDS.filter((k) => enemyChallengeLevel(k) <= maxChallenge);
+}
 
+function enemyPickWeight(kind, secretRoom){
+  if (secretRoom) {
+    switch (kind) {
+      case EnemyKind.MOUSE: return 50;
+      case EnemyKind.CRAWLER: return 25;
+      case EnemyKind.PENISMAN: return 25;
+      case EnemyKind.JACK_BLUE: return 15;
+      case EnemyKind.ROLLING_HEAD: return 16;
+      default: return 0;
+    }
+  }
+  return 25;
+}
+
+function enemyPickWeighted(rng, eligible, secretRoom){
+  if (!eligible.length) return EnemyKind.CRAWLER;
+  if (eligible.length === 1) return eligible[0];
+  const weights = eligible.map((k) => enemyPickWeight(k, secretRoom));
+  const total = weights.reduce((a, b) => a + b, 0);
+  let roll = rng.nextInt(total);
+  for (let i = 0; i < eligible.length; i++) {
+    roll -= weights[i];
+    if (roll < 0) return eligible[i];
+  }
+  return eligible[eligible.length - 1];
+}
+
+function enemySpawnAnchorYPx(map, tx){
+  return Math.round(map.groundTopWorldYAtColumn(tx) - ENEMY_SPAWN_HITBOX_H);
+}
+
+function canSpawnEnemyAt(map, tx){
+  const yPx = enemySpawnAnchorYPx(map, tx);
+  if (yPx < TILE_SIZE) return false;
+  const floorRow = Math.floor((yPx + ENEMY_SPAWN_HITBOX_H) / TILE_SIZE);
+  if (floorRow < 1 || floorRow >= map.getHeight() - 1) return false;
+  if (!map.isStandableFloorTile(tx, floorRow)) return false;
+  const headRow = Math.floor(yPx / TILE_SIZE);
+  return headRow >= 1 && map.tileAt(tx, headRow) === TILE_EMPTY;
+}
+
+function isDoorColumn(gen, tx){
+  return (
+    (gen.leftDoorTileX >= 0 && tx === gen.leftDoorTileX) ||
+    (gen.rightDoorTileX >= 0 && tx === gen.rightDoorTileX)
+  );
+}
+
+function rollEnemySpawns(gen, contentSeed, kind, dungeonFloor){
+  if (
+    kind === RoomKind.BOSS ||
+    kind === RoomKind.SUPER_SECRET ||
+    kind === RoomKind.START ||
+    kind === RoomKind.SHOP ||
+    kind === RoomKind.ITEM
+  ) {
+    return [];
+  }
+  const secretRoom = kind === RoomKind.SECRET;
+  if (secretRoom) {
+    const chanceRng = javaRandom(Number(BigInt(contentSeed) ^ 0x5ec7e701n));
+    if (chanceRng.nextDouble() >= SECRET_ROOM_ENEMY_CHANCE) return [];
+  }
+  const eligible = enemyEligibleKinds(dungeonFloor, secretRoom);
+  if (!eligible.length) return [];
+  const rng = javaRandom(Number(BigInt(contentSeed) ^ 0x5deece66n));
+  const budget = rng.nextInt(Math.max(0, dungeonFloor) * 4 + 1);
+  if (budget <= 0) return [];
+
+  const want = 1 + rng.nextInt(Math.min(3, eligible.length));
+  const pool = eligible.slice();
+  const pickedTypes = [];
+  while (pickedTypes.length < want && pool.length) {
+    const k = enemyPickWeighted(rng, pool, secretRoom);
+    pickedTypes.push(k);
+    pool.splice(pool.indexOf(k), 1);
+  }
+
+  const map = gen.map;
+  const out = [];
+  let attempts = 0;
+  while (budget > 0 && attempts < 160) {
+    attempts++;
+    const kindPick = pickedTypes[rng.nextInt(pickedTypes.length)];
+    const cost = enemyChallengeLevel(kindPick);
+    if (cost > budget) continue;
+    const site = tryEnemyFloorSpawn(map, gen, rng);
+    if (!site) continue;
+    out.push({
+      x: site.x,
+      y: site.y,
+      hp: enemyBaseMaxHealth(kindPick),
+      kind: kindPick,
+      aggro: !secretRoom,
+    });
+    budget -= cost;
+  }
+  return out;
+}
+
+function tryEnemyFloorSpawn(map, gen, rng){
+  const w = map.getWidth();
+  const margin = Math.min(8, Math.max(2, Math.floor(w / 5)));
+  const ladderTx = gen.ladderColumnTx;
+  for (let attempt = 0; attempt < 24; attempt++) {
+    const x = margin + rng.nextInt(Math.max(1, w - margin * 2));
+    if (ladderTx >= 0 && Math.abs(x - ladderTx) <= 1) continue;
+    if (isDoorColumn(gen, x)) continue;
+    if (!canSpawnEnemyAt(map, x)) continue;
+    return { x: x * TILE_SIZE, y: enemySpawnAnchorYPx(map, x) };
+  }
+  return null;
+}
+
+function solidUnderFootAhead(map, feetX, feetY, dir){
+  const aheadX = feetX + dir * 8;
+  const col = Math.floor(aheadX / TILE_SIZE);
+  const footRow = Math.floor(feetY / TILE_SIZE);
+  return (
+    map.isStandableFloorTile(col, footRow) ||
+    map.isStandableFloorTile(col, footRow + 1) ||
+    map.isPlatformTile(col, footRow) ||
+    map.isPlatformTile(col, footRow + 1)
+  );
+}
+
+function enemyWallAhead(map, x, y, w, h, dir){
+  const probeX = dir > 0 ? Math.floor((x + w) / TILE_SIZE) : Math.floor((x - 1) / TILE_SIZE);
+  const y0 = Math.floor(y / TILE_SIZE);
+  const y1 = Math.floor((y + h - 1) / TILE_SIZE);
+  for (let ty = y0; ty <= y1; ty++) {
+    if (map.isSolidTile(probeX, ty)) return true;
+  }
+  return false;
+}
+
+function applyPatrolPhysics(dt, map, e, opts){
+  const { w, h, speed, turnAtLedge, state } = opts;
+  state.flipCooldown = Math.max(0, state.flipCooldown - dt);
+  state.suppressLedge = Math.max(0, state.suppressLedge - dt);
+
+  const prevVx = e.vx;
+  if (e.onGround) e.vx = e.patrolDir * speed;
+  if (!e.onGround) e.vy = Math.min(e.vy + GRAVITY * dt, 6000);
+
+  const r = moveAndCollide(map, e.x, e.y, w, h, e.vx, e.vy, dt);
+  e.x = r.x;
+  e.y = r.y;
+  e.vx = r.vx;
+  e.vy = r.vy;
+  e.onGround = r.onGround;
+
+  const wallHit = e.onGround && Math.abs(r.vx) < Math.abs(prevVx) * 0.4 && Math.abs(prevVx) > 1;
+  if (wallHit && state.flipCooldown <= 0) {
+    e.patrolDir *= -1;
+    state.flipCooldown = 0.2;
+    state.suppressLedge = 0.35;
+  } else if (
+    turnAtLedge &&
+    e.onGround &&
+    state.suppressLedge <= 0 &&
+    state.flipCooldown <= 0 &&
+    !solidUnderFootAhead(map, e.x + w * 0.5, e.y + h, e.patrolDir)
+  ) {
+    e.patrolDir *= -1;
+    state.flipCooldown = 0.2;
+  }
+}
+
+function playerSeenHorizontally(ex, ew, player, range = 192){
+  const pcx = player.x + player.w() * 0.5;
+  const ecx = ex + ew * 0.5;
+  return Math.abs(pcx - ecx) <= range;
+}
+
+const ENEMY_HURT_TINT_SEC = 0.35;
+const HITLAG_SHAKE_AMP_PX = 8;
+const COMBAT_SIM_FPS = 60;
+
+function combatFreezeFrames(damage, multiplier = 1){
+  return Math.max(1, Math.ceil(Math.max(5, 5 + damage) * multiplier));
+}
+
+function sampleHitShake(amp = HITLAG_SHAKE_AMP_PX){
+  return (Math.random() - 0.5) * amp;
+}
+
+function enemyIsReeling(enemy){
+  return (enemy.hitstunSec ?? 0) > 0 || !!enemy.hurtLocked;
+}
+
+function hurtTintDrawAlpha(hurtTint){
+  if (hurtTint <= 0) return 0;
+  const t = Math.max(0, Math.min(1, hurtTint / ENEMY_HURT_TINT_SEC));
+  return 0.86 * t;
+}
+
+function applyEnemyWeaponHit(enemy, damage, knockVx, knockVy){
+  if (!enemy.health.tryDamage(damage, 0.35)) return false;
+  const freezeSec = combatFreezeFrames(damage) / COMBAT_SIM_FPS;
+  enemy.hitstunSec = Math.max(enemy.hitstunSec ?? 0, freezeSec);
+  enemy.hitstunSolidRed = true;
+  enemy.pendingKnockVx = knockVx;
+  enemy.pendingKnockVy = knockVy;
+  enemy.hurtTint = ENEMY_HURT_TINT_SEC;
+  enemy.vx = 0;
+  enemy.vy = 0;
+  if (!enemy.health.isAlive()) enemy.dead = true;
+  return true;
+}
+
+function releaseEnemyKnockback(enemy){
+  enemy.shakeX = 0;
+  enemy.shakeY = 0;
+  enemy.hitstunSolidRed = false;
+  enemy.vx = enemy.pendingKnockVx ?? 0;
+  enemy.vy = enemy.pendingKnockVy ?? 0;
+  enemy.hurtLocked = true;
+  enemy.onGround = false;
+  enemy.hurtTint = Math.max(enemy.hurtTint ?? 0, ENEMY_HURT_TINT_SEC);
+  enemy.pendingKnockVx = 0;
+  enemy.pendingKnockVy = 0;
+}
+
+/** Returns true while hitstun freezes AI and movement. */
+function tickEnemyHitReaction(enemy, dt){
+  enemy.hitstunSec = enemy.hitstunSec ?? 0;
+  enemy.shakeX = enemy.shakeX ?? 0;
+  enemy.shakeY = enemy.shakeY ?? 0;
+  enemy.hurtLocked = enemy.hurtLocked ?? false;
+  enemy.hurtTint = enemy.hurtTint ?? 0;
+
+  enemy.health.tickInvuln(dt);
+  if (enemy.hurtTint > 0) enemy.hurtTint = Math.max(0, enemy.hurtTint - dt);
+
+  if (enemy.hitstunSec > 0) {
+    enemy.hitstunSec = Math.max(0, enemy.hitstunSec - dt);
+    enemy.shakeX = sampleHitShake();
+    enemy.shakeY = sampleHitShake();
+    enemy.vx = 0;
+    enemy.vy = 0;
+    if (enemy.hitstunSec <= 0) releaseEnemyKnockback(enemy);
+    return true;
+  }
+  return false;
+}
+
+function tickEnemyKnockbackLock(enemy){
+  if (enemy.hurtLocked && enemy.onGround) enemy.hurtLocked = false;
+}
+
+function applyKnockbackPhysics(dt, map, enemy, w, h){
+  if (!enemy.onGround) enemy.vy = Math.min(enemy.vy + GRAVITY * dt, 6000);
+  const r = moveAndCollide(map, enemy.x, enemy.y, w, h, enemy.vx, enemy.vy, dt);
+  enemy.x = r.x;
+  enemy.y = r.y;
+  enemy.vx = r.vx;
+  enemy.vy = r.vy;
+  enemy.onGround = r.onGround;
+  tickEnemyKnockbackLock(enemy);
+}
+
+function enemyContactDamage(player, enemy){
+  if (enemy.dead || enemyIsReeling(enemy)) return;
+  const pr = playerHurtRect(player.x, player.y, player.h());
+  const er = { x: enemy.x - 1, y: enemy.y, w: enemy.w + 2, h: enemy.h };
+  if (!rectsOverlapSlack(pr, er)) return;
+  if (player.health.tryDamage(1, 1.125)) {
+    player.hurtTint = 0.35;
+    const pcx = player.x + player.w() * 0.5;
+    const knockFromX = enemy.x + enemy.w * 0.5;
+    const sign = pcx < knockFromX ? -1 : 1;
+    player.applyContactKnockback(sign);
+  }
+}
+
+class EnemyProjectile {
+  x = 0;
+  y = 0;
+  vx = 0;
+  vy = 0;
+  w = 5;
+  h = 5;
+  damage = 1;
+  dead = false;
+  life = 5;
+  color = "#ffcc44";
+
+  constructor(x, y, vx, vy, opts = {}){
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = vy;
+    if (opts.w != null) this.w = opts.w;
+    if (opts.h != null) this.h = opts.h;
+    if (opts.damage != null) this.damage = opts.damage;
+    if (opts.life != null) this.life = opts.life;
+    if (opts.color) this.color = opts.color;
+  }
+
+  update(dt, map){
+    this.life -= dt;
+    if (this.life <= 0) {
+      this.dead = true;
+      return;
+    }
+    this.vy = Math.min(this.vy + GRAVITY * dt, 6000);
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    const tx = Math.floor((this.x + this.w * 0.5) / TILE_SIZE);
+    const ty = Math.floor((this.y + this.h * 0.5) / TILE_SIZE);
+    if (map.isSolidTile(tx, ty)) this.dead = true;
+  }
+
+  hitsPlayer(player){
+    const pr = playerHurtRect(player.x, player.y, player.h());
+    const hb = { x: this.x, y: this.y, w: this.w, h: this.h };
+    return rectsOverlapSlack(pr, hb);
+  }
+}
 
 const HOP_VX = 42;
 const HOP_VY = -165;
-const WALK_SPEED = 28;
+const CRAWLER_WALK_SPEED = 28;
 
 class CrawlerEnemy {
+  kind = EnemyKind.CRAWLER;
   x = 0;
   y = 0;
   vx = 0;
   vy = 0;
   dir = 1;
+  patrolDir = 1;
   onGround = false;
   hopCooldown = 0.5;
   hurtTint = 0;
-  health = new Health(2, true);
+  hitstunSec = 0;
+  hitstunSolidRed = false;
+  shakeX = 0;
+  shakeY = 0;
+  hurtLocked = false;
+  pendingKnockVx = 0;
+  pendingKnockVy = 0;
+  health = new Health(3, true);
   animFrame = 0;
   animAccum = 0;
   dead = false;
 
-  constructor(x, y) {
+  constructor(x, y, hp = 3) {
     this.x = x;
     this.y = y;
+    this.health = new Health(hp, true);
   }
 
   w = 8;
   h = ENEMY_CRAWLER_HITBOX_H;
-
-  feetY(){
-    return this.y + this.h;
-  }
 
   update(dt, map, player){
     if (this.dead || !this.health.isAlive()) {
       this.dead = true;
       return;
     }
-    this.health.tickInvuln(dt);
-    if (this.hurtTint > 0) this.hurtTint = Math.max(0, this.hurtTint - dt);
+    if (tickEnemyHitReaction(this, dt)) return;
 
-    this.hopCooldown -= dt;
-    const dx = player.x - this.x;
-    if (Math.abs(dx) > 4) this.dir = dx > 0 ? 1 : -1;
+    if (!this.hurtLocked) {
+      this.hopCooldown -= dt;
+      const dx = player.x - this.x;
+      if (Math.abs(dx) > 4) {
+        this.dir = dx > 0 ? 1 : -1;
+        this.patrolDir = this.dir;
+      }
 
-    if (this.onGround && this.hopCooldown <= 0) {
-      this.vx = this.dir * HOP_VX;
-      this.vy = HOP_VY;
-      this.onGround = false;
-      this.hopCooldown = 2.2 + Math.random() * 2;
-    } else if (this.onGround) {
-      this.vx = moveToward(this.vx, this.dir * WALK_SPEED, 200 * dt);
+      if (this.onGround && this.hopCooldown <= 0) {
+        this.vx = this.dir * HOP_VX;
+        this.vy = HOP_VY;
+        this.onGround = false;
+        this.hopCooldown = 2.2 + Math.random() * 2;
+      } else if (this.onGround) {
+        this.vx = moveToward(this.vx, this.dir * CRAWLER_WALK_SPEED, 200 * dt);
+      }
     }
 
-    if (!this.onGround) {
-      this.vy = Math.min(this.vy + GRAVITY * dt, 6000);
+    if (this.hurtLocked) {
+      applyKnockbackPhysics(dt, map, this, this.w, this.h);
+    } else {
+      if (!this.onGround) this.vy = Math.min(this.vy + GRAVITY * dt, 6000);
+      const r = moveAndCollide(map, this.x, this.y, this.w, this.h, this.vx, this.vy, dt);
+      this.x = r.x;
+      this.y = r.y;
+      this.vx = r.vx;
+      this.vy = r.vy;
+      this.onGround = r.onGround;
     }
-
-    const r = moveAndCollide(map, this.x, this.y, this.w, this.h, this.vx, this.vy, dt);
-    this.x = r.x;
-    this.y = r.y;
-    this.vx = r.vx;
-    this.vy = r.vy;
-    this.onGround = r.onGround;
 
     this.animAccum += dt;
     if (this.animAccum > 0.15) {
@@ -2750,29 +3387,11 @@ class CrawlerEnemy {
   }
 
   takeHit(damage){
-    if (this.health.tryDamage(damage, 0.35)) {
-      this.hurtTint = 0.35;
-      this.vx = -this.dir * 74;
-      this.vy = -98;
-      this.onGround = false;
-      if (!this.health.isAlive()) this.dead = true;
-    }
+    applyEnemyWeaponHit(this, damage, -this.dir * 74, -98);
   }
 
   contactDamage(player){
-    if (this.dead || !this.health.isAlive() || this.hurtTint > 0) return;
-
-    const pr = playerHurtRect(player.x, player.y, player.h());
-    const er = crawlerContactRect(this.x, this.y);
-    if (!rectsOverlapSlack(pr, er)) return;
-
-    if (player.health.tryDamage(1, 1.125)) {
-      player.hurtTint = 0.35;
-      const pcx = player.x + player.w() * 0.5;
-      const ecx = this.x + 4;
-      const sign = pcx < ecx ? -1 : 1;
-      player.applyContactKnockback(sign);
-    }
+    enemyContactDamage(player, this);
   }
 
   hitbox() {
@@ -2780,19 +3399,470 @@ class CrawlerEnemy {
   }
 }
 
-function moveToward(c, t, d){
-  if (Math.abs(t - c) <= d) return t;
-  return c + Math.sign(t - c) * d;
+const MOUSE_WALK_DORMANT = 32;
+const MOUSE_WALK_FULL = 64;
+const MOUSE_WALK_DAMAGED = 80;
+const ENEMY_MOUSE_HITBOX_W = 10;
+const ENEMY_MOUSE_HITBOX_H = 10;
+
+class MouseEnemy {
+  kind = EnemyKind.MOUSE;
+  x = 0;
+  y = 0;
+  vx = 0;
+  vy = 0;
+  patrolDir = -1;
+  onGround = false;
+  hurtTint = 0;
+  hitstunSec = 0;
+  hitstunSolidRed = false;
+  shakeX = 0;
+  shakeY = 0;
+  hurtLocked = false;
+  pendingKnockVx = 0;
+  pendingKnockVy = 0;
+  health;
+  animFrame = 0;
+  animAccum = 0;
+  dead = false;
+  activated = false;
+  patrolState = { flipCooldown: 0, suppressLedge: 0 };
+
+  constructor(x, y, hp = 2) {
+    this.x = x;
+    this.y = y;
+    this.health = new Health(hp, true);
+  }
+
+  w = ENEMY_MOUSE_HITBOX_W;
+  h = ENEMY_MOUSE_HITBOX_H;
+
+  update(dt, map, player){
+    if (this.dead || !this.health.isAlive()) {
+      this.dead = true;
+      return;
+    }
+    if (tickEnemyHitReaction(this, dt)) return;
+
+    if (!this.activated && playerSeenHorizontally(this.x, this.w, player)) {
+      this.activated = true;
+    }
+
+    if (!this.hurtLocked) {
+      const damaged = this.health.getMax() - this.health.getCurrent() > 0;
+      const speed = !this.activated
+        ? MOUSE_WALK_DORMANT
+        : damaged
+          ? MOUSE_WALK_DAMAGED
+          : MOUSE_WALK_FULL;
+      applyPatrolPhysics(dt, map, this, {
+        w: this.w,
+        h: this.h,
+        speed,
+        turnAtLedge: !this.activated,
+        state: this.patrolState,
+      });
+    } else {
+      applyKnockbackPhysics(dt, map, this, this.w, this.h);
+    }
+
+    this.animAccum += dt;
+    if (this.animAccum > 0.12) {
+      this.animAccum = 0;
+      this.animFrame = (this.animFrame + 1) % 4;
+    }
+  }
+
+  takeHit(damage){
+    if (applyEnemyWeaponHit(this, damage, -this.patrolDir * 90, -110)) {
+      this.activated = true;
+    }
+  }
+
+  contactDamage(player){
+    if (!this.activated) return;
+    enemyContactDamage(player, this);
+  }
+
+  hitbox() {
+    return { x: this.x, y: this.y, w: this.w, h: this.h };
+  }
 }
 
-function spawnEnemiesForRoom(map, seed, count = 2){
-  const enemies = [];
-  for (let i = 0; i < count; i++) {
-    const tx = 4 + ((seed + i * 7) % Math.max(1, map.getWidth() - 8));
-    const spawn = spawnAtFloor(map, tx, ENEMY_CRAWLER_HITBOX_H);
-    enemies.push(new CrawlerEnemy(spawn.x, spawn.y));
+const PENISMAN_WALK_SPEED = 28;
+const ENEMY_PENISMAN_HITBOX_W = 10;
+const ENEMY_PENISMAN_HITBOX_H = 14;
+
+class PenismanEnemy {
+  kind = EnemyKind.PENISMAN;
+  x = 0;
+  y = 0;
+  vx = 0;
+  vy = 0;
+  patrolDir = -1;
+  onGround = false;
+  hurtTint = 0;
+  hitstunSec = 0;
+  hitstunSolidRed = false;
+  shakeX = 0;
+  shakeY = 0;
+  hurtLocked = false;
+  pendingKnockVx = 0;
+  pendingKnockVy = 0;
+  health;
+  animFrame = 0;
+  animAccum = 0;
+  dead = false;
+  shootCooldown = 1.8;
+  patrolState = { flipCooldown: 0, suppressLedge: 0 };
+
+  constructor(x, y, hp = 4) {
+    this.x = x;
+    this.y = y;
+    this.health = new Health(hp, true);
+    this.shootCooldown = 1.8 + Math.random() * 0.6;
   }
-  return enemies;
+
+  w = ENEMY_PENISMAN_HITBOX_W;
+  h = ENEMY_PENISMAN_HITBOX_H;
+
+  canShootAtPlayer(player){
+    const pcx = player.x + player.w() * 0.5;
+    const ecx = this.x + this.w * 0.5;
+    const ahead = this.patrolDir > 0 ? pcx > ecx : pcx < ecx;
+    return ahead && Math.abs(pcx - ecx) <= 192;
+  }
+
+  update(dt, map, player, ctx){
+    if (this.dead || !this.health.isAlive()) {
+      this.dead = true;
+      return;
+    }
+    if (tickEnemyHitReaction(this, dt)) return;
+
+    if (!this.hurtLocked) {
+      applyPatrolPhysics(dt, map, this, {
+        w: this.w,
+        h: this.h,
+        speed: PENISMAN_WALK_SPEED,
+        turnAtLedge: true,
+        state: this.patrolState,
+      });
+
+      this.shootCooldown -= dt;
+      if (this.onGround && this.shootCooldown <= 0 && this.canShootAtPlayer(player)) {
+        const muzzleX = this.x + (this.patrolDir > 0 ? this.w : 0);
+        const muzzleY = this.y + 6;
+        ctx?.projectiles?.push(
+          new EnemyProjectile(muzzleX, muzzleY, this.patrolDir * 140, -60, {
+            w: 4,
+            h: 4,
+            color: "#e8c040",
+          })
+        );
+        this.shootCooldown = 1.8 + Math.random() * 0.6;
+      }
+    } else {
+      applyKnockbackPhysics(dt, map, this, this.w, this.h);
+    }
+
+    this.animAccum += dt;
+    if (this.animAccum > 0.14) {
+      this.animAccum = 0;
+      this.animFrame = (this.animFrame + 1) % 4;
+    }
+  }
+
+  takeHit(damage){
+    applyEnemyWeaponHit(this, damage, -this.patrolDir * 80, -100);
+  }
+
+  contactDamage(player){
+    enemyContactDamage(player, this);
+  }
+
+  hitbox() {
+    return { x: this.x, y: this.y, w: this.w, h: this.h };
+  }
+}
+
+const JACK_PATROL_SPEED = 16;
+const JACK_RETREAT_SPEED = 64;
+const JACK_APPROACH_SPEED = 32;
+const ENEMY_JACK_HITBOX_W = 14;
+const ENEMY_JACK_HITBOX_H = 22;
+
+class JackBlueEnemy {
+  kind = EnemyKind.JACK_BLUE;
+  x = 0;
+  y = 0;
+  vx = 0;
+  vy = 0;
+  patrolDir = -1;
+  onGround = false;
+  hurtTint = 0;
+  hitstunSec = 0;
+  hitstunSolidRed = false;
+  shakeX = 0;
+  shakeY = 0;
+  hurtLocked = false;
+  pendingKnockVx = 0;
+  pendingKnockVy = 0;
+  health;
+  animFrame = 0;
+  animAccum = 0;
+  dead = false;
+  activated = false;
+  patrolState = { flipCooldown: 0, suppressLedge: 0 };
+  throwCooldown = 2;
+
+  constructor(x, y, hp = 8) {
+    this.x = x;
+    this.y = y;
+    this.health = new Health(hp, true);
+  }
+
+  static onGround(xPx, groundTop, hp){
+    return new JackBlueEnemy(xPx, groundTop - ENEMY_JACK_HITBOX_H, hp);
+  }
+
+  w = ENEMY_JACK_HITBOX_W;
+  h = ENEMY_JACK_HITBOX_H;
+
+  update(dt, map, player, ctx){
+    if (this.dead || !this.health.isAlive()) {
+      this.dead = true;
+      return;
+    }
+    if (tickEnemyHitReaction(this, dt)) return;
+
+    if (!this.activated && playerSeenHorizontally(this.x, this.w, player)) {
+      this.activated = true;
+    }
+
+    if (!this.hurtLocked) {
+      const pcx = player.x + player.w() * 0.5;
+      const ecx = this.x + this.w * 0.5;
+      const dist = Math.abs(pcx - ecx);
+      const keepAway = 4 * TILE_SIZE;
+      const lowHp = this.health.getCurrent() <= this.health.getMax() * (3 / 8);
+
+      let speed = JACK_PATROL_SPEED;
+      if (this.activated) {
+        if (lowHp) {
+          speed = pcx < ecx ? -JACK_APPROACH_SPEED : JACK_APPROACH_SPEED;
+          this.patrolDir = speed > 0 ? 1 : -1;
+        } else if (dist < keepAway - 8) {
+          speed = pcx < ecx ? JACK_RETREAT_SPEED : -JACK_RETREAT_SPEED;
+          this.patrolDir = speed > 0 ? 1 : -1;
+        } else if (dist > keepAway + 16) {
+          speed = pcx < ecx ? JACK_APPROACH_SPEED : -JACK_APPROACH_SPEED;
+          this.patrolDir = speed > 0 ? 1 : -1;
+        } else {
+          speed = this.patrolDir * JACK_PATROL_SPEED;
+        }
+      }
+
+      applyPatrolPhysics(dt, map, this, {
+        w: this.w,
+        h: this.h,
+        speed: Math.abs(speed),
+        turnAtLedge: !this.activated,
+        state: this.patrolState,
+      });
+      if (this.activated && Math.abs(speed) !== JACK_PATROL_SPEED) {
+        this.vx = speed;
+      }
+
+      this.throwCooldown -= dt;
+      if (
+        this.activated &&
+        this.onGround &&
+        this.throwCooldown <= 0 &&
+        dist < keepAway + 32 &&
+        Math.random() < 0.02
+      ) {
+        const dir = pcx >= ecx ? 1 : -1;
+        const boneVy = -120 - Math.random() * 40;
+        ctx?.projectiles?.push(
+          new EnemyProjectile(this.x + this.w * 0.5, this.y + 10, dir * 90, boneVy, {
+            w: 6,
+            h: 6,
+            color: "#d8d0c0",
+            life: 4,
+          })
+        );
+        this.throwCooldown = 2 + Math.random() * 2;
+      }
+    } else {
+      applyKnockbackPhysics(dt, map, this, this.w, this.h);
+    }
+
+    this.animAccum += dt;
+    if (this.animAccum > 0.16) {
+      this.animAccum = 0;
+      this.animFrame = (this.animFrame + 1) % 3;
+    }
+  }
+
+  takeHit(damage){
+    if (applyEnemyWeaponHit(this, damage, -this.patrolDir * 70, -90)) {
+      this.activated = true;
+    }
+  }
+
+  contactDamage(player){
+    if (!this.activated) return;
+    enemyContactDamage(player, this);
+  }
+
+  hitbox() {
+    return { x: this.x, y: this.y, w: this.w, h: this.h };
+  }
+}
+
+const ROLLING_TRAVEL_SPEED = 32;
+const ROLLING_MIN_BOUNCE_VY = 120;
+const ENEMY_ROLLING_HITBOX_W = 12;
+const ENEMY_ROLLING_HITBOX_H = 12;
+
+class RollingHeadEnemy {
+  kind = EnemyKind.ROLLING_HEAD;
+  x = 0;
+  y = 0;
+  vx = 0;
+  vy = 0;
+  patrolDir = -1;
+  onGround = false;
+  hurtTint = 0;
+  hitstunSec = 0;
+  hitstunSolidRed = false;
+  shakeX = 0;
+  shakeY = 0;
+  hurtLocked = false;
+  pendingKnockVx = 0;
+  pendingKnockVy = 0;
+  health;
+  animFrame = 0;
+  animAccum = 0;
+  dead = false;
+
+  constructor(x, y, hp = 6) {
+    this.x = x;
+    this.y = y;
+    this.health = new Health(hp, true);
+  }
+
+  static spawnBouncing(anchorX, groundTop, hp){
+    const y = groundTop - ENEMY_ROLLING_HITBOX_H - 5 * TILE_SIZE;
+    const e = new RollingHeadEnemy(anchorX, y, hp);
+    e.vy = 0;
+    return e;
+  }
+
+  faceToward(worldX){
+    this.patrolDir = worldX >= this.x + this.w * 0.5 ? 1 : -1;
+  }
+
+  w = ENEMY_ROLLING_HITBOX_W;
+  h = ENEMY_ROLLING_HITBOX_H;
+
+  update(dt, map, player){
+    if (this.dead || !this.health.isAlive()) {
+      this.dead = true;
+      return;
+    }
+    if (tickEnemyHitReaction(this, dt)) return;
+
+    if (!this.hurtLocked) {
+      if (!this.onGround) {
+        this.vx = this.patrolDir * ROLLING_TRAVEL_SPEED;
+      }
+    }
+    this.vy = Math.min(this.vy + GRAVITY * dt, 6000);
+
+    const prevVy = this.vy;
+    const r = moveAndCollide(map, this.x, this.y, this.w, this.h, this.vx, this.vy, dt);
+    this.x = r.x;
+    this.y = r.y;
+    const landed = !this.onGround && r.onGround;
+    const hitCeiling = prevVy < 0 && r.vy >= 0 && !r.onGround;
+    this.vx = r.vx;
+    this.vy = r.vy;
+    this.onGround = r.onGround;
+
+    if (landed) {
+      this.vy = -Math.max(Math.abs(this.vy) * 0.92, ROLLING_MIN_BOUNCE_VY);
+      this.onGround = false;
+    } else if (hitCeiling) {
+      this.vy = Math.max(this.vy, ROLLING_MIN_BOUNCE_VY);
+    }
+    if (!this.hurtLocked && Math.abs(r.vx) < Math.abs(this.patrolDir * ROLLING_TRAVEL_SPEED) * 0.3) {
+      this.patrolDir *= -1;
+      this.vx = this.patrolDir * ROLLING_TRAVEL_SPEED;
+    }
+    tickEnemyKnockbackLock(this);
+
+    this.animAccum += dt;
+    if (this.animAccum > 0.1) {
+      this.animAccum = 0;
+      this.animFrame = (this.animFrame + 1) % 4;
+    }
+  }
+
+  takeHit(damage){
+    applyEnemyWeaponHit(this, damage, -this.patrolDir * 100, -140);
+  }
+
+  contactDamage(player){
+    enemyContactDamage(player, this);
+  }
+
+  hitbox() {
+    return { x: this.x, y: this.y, w: this.w, h: this.h };
+  }
+}
+
+function createEnemyFromSpawn(spawn, map, player){
+  switch (spawn.kind) {
+    case EnemyKind.MOUSE:
+      return new MouseEnemy(spawn.x, spawn.y, spawn.hp);
+    case EnemyKind.PENISMAN:
+      return new PenismanEnemy(spawn.x, spawn.y, spawn.hp);
+    case EnemyKind.JACK_BLUE: {
+      const tx = Math.floor(spawn.x / TILE_SIZE);
+      const groundTop = map.groundTopWorldYAtColumn(tx);
+      return JackBlueEnemy.onGround(spawn.x, groundTop, spawn.hp);
+    }
+    case EnemyKind.ROLLING_HEAD: {
+      const tx = Math.floor(spawn.x / TILE_SIZE);
+      const groundTop = map.groundTopWorldYAtColumn(tx);
+      const rh = RollingHeadEnemy.spawnBouncing(spawn.x, groundTop, spawn.hp);
+      if (player) rh.faceToward(player.x + player.w() * 0.5);
+      return rh;
+    }
+    case EnemyKind.CRAWLER:
+    default:
+      return new CrawlerEnemy(spawn.x, spawn.y, spawn.hp);
+  }
+}
+
+function spawnEnemiesFromRoom(map, gen, player){
+  const spawns = (gen.enemySpawns ?? []).slice();
+  if (!spawns.length && gen.enemyCount > 0) {
+    for (let i = 0; i < gen.enemyCount; i++) {
+      const tx = 4 + ((gen.contentSeed + i * 7) % Math.max(1, map.getWidth() - 8));
+      const y = enemySpawnAnchorYPx(map, tx);
+      spawns.push({
+        x: tx * TILE_SIZE,
+        y,
+        hp: 3,
+        kind: EnemyKind.CRAWLER,
+        aggro: true,
+      });
+    }
+  }
+  return spawns.map((s) => createEnemyFromSpawn(s, map, player));
 }
 
   // --- camera/SideScrollCamera.ts ---
@@ -2968,6 +4038,349 @@ class ItemCatalog {
     if (item.redHeartsHealOnPickup > 0) player.health.heal(item.redHeartsHealOnPickup);
     if (item.soulHeartsOnPickup > 0) player.health.addSoul(item.soulHeartsOnPickup);
   }
+
+  poolFallbackItem(){
+    for (const item of this.items.values()) {
+      if (item.poolFallback) return item.id;
+    }
+    return "HEART_LT3";
+  }
+
+  eligibleForPedestal(kind){
+    const out = [];
+    for (const item of this.items.values()) {
+      if (kind === PedestalSpawnKind.SHOP && item.spawnShop) out.push(item.id);
+      else if (kind === PedestalSpawnKind.ITEM_ROOM && item.spawnItemRoom) out.push(item.id);
+      else if (kind === PedestalSpawnKind.BOSS_CLEAR && item.spawnBossClear) out.push(item.id);
+      else if (kind === PedestalSpawnKind.SECRET && item.spawnSecret) out.push(item.id);
+    }
+    return out;
+  }
+}
+
+const PedestalSpawnKind = {
+  ITEM_ROOM: "ITEM_ROOM",
+  SHOP: "SHOP",
+  BOSS_CLEAR: "BOSS_CLEAR",
+  SECRET: "SECRET",
+};
+
+const SHOP_PEDESTAL_PRICE = 15;
+const SHOP_PICKUP_PRICE = 5;
+const PEDESTAL_BOB_AMP = 3;
+const PEDESTAL_BOB_OMEGA = Math.PI * 2.4;
+
+class PlayerItemInventory {
+  stacks = new Map();
+  acquired = new Set();
+  equippedSubweapon = null;
+
+  reset(){
+    this.stacks.clear();
+    this.acquired.clear();
+    this.equippedSubweapon = null;
+  }
+
+  count(id){
+    return this.stacks.get(id) ?? 0;
+  }
+
+  add(id, n = 1){
+    this.stacks.set(id, (this.stacks.get(id) ?? 0) + n);
+    this.acquired.add(id);
+  }
+
+  markAcquired(id){
+    this.acquired.add(id);
+  }
+
+  hasAcquired(id){
+    return this.acquired.has(id);
+  }
+
+  setEquippedSubweapon(id){
+    this.equippedSubweapon = id;
+  }
+}
+
+class PedestalItemDecks {
+  constructor(itemCatalog){
+    this.itemCatalog = itemCatalog;
+    this.queues = {
+      [PedestalSpawnKind.ITEM_ROOM]: [],
+      [PedestalSpawnKind.SHOP]: [],
+      [PedestalSpawnKind.BOSS_CLEAR]: [],
+      [PedestalSpawnKind.SECRET]: [],
+    };
+    this.rng = {
+      [PedestalSpawnKind.ITEM_ROOM]: javaRandom(0),
+      [PedestalSpawnKind.SHOP]: javaRandom(0),
+      [PedestalSpawnKind.BOSS_CLEAR]: javaRandom(0),
+      [PedestalSpawnKind.SECRET]: javaRandom(0),
+    };
+    this.assignedThisLevel = new Set();
+    this.acquired = new Set();
+  }
+
+  reset(runSeed){
+    this.rng[PedestalSpawnKind.ITEM_ROOM] = javaRandom(Number(BigInt(runSeed) ^ 0x1743505314dn));
+    this.rng[PedestalSpawnKind.SHOP] = javaRandom(Number(BigInt(runSeed) ^ 0x5b0b50d353n));
+    this.rng[PedestalSpawnKind.BOSS_CLEAR] = javaRandom(Number(BigInt(runSeed) ^ 0x8055c1ea4n));
+    this.rng[PedestalSpawnKind.SECRET] = javaRandom(Number(BigInt(runSeed) ^ 0x5ec401d00d5n));
+    for (const k of Object.keys(this.queues)) this.queues[k] = [];
+    this.assignedThisLevel.clear();
+    this.acquired.clear();
+  }
+
+  beginDungeonLevel(){
+    this.assignedThisLevel.clear();
+  }
+
+  purgeAcquired(id){
+    if (!id) return;
+    this.acquired.add(id);
+    for (const q of Object.values(this.queues)) {
+      for (let i = q.length - 1; i >= 0; i--) {
+        if (q[i] === id) q.splice(i, 1);
+      }
+    }
+  }
+
+  eligible(kind){
+    return this.itemCatalog.eligibleForPedestal(kind).filter((id) => !this.acquired.has(id));
+  }
+
+  draw(kind){
+    const queue = this.queues[kind];
+    const rng = this.rng[kind];
+    let safety = Math.max(8, this.eligible(kind).length * 2 + 4);
+    while (safety-- > 0) {
+      if (!queue.length) {
+        const pool = this.eligible(kind);
+        if (!pool.length) return this.itemCatalog.poolFallbackItem();
+        queue.push(...pool);
+        shuffleInPlace(queue, rng);
+      }
+      const next = queue.shift();
+      if (this.assignedThisLevel.has(next)) continue;
+      this.assignedThisLevel.add(next);
+      return next;
+    }
+    return this.itemCatalog.poolFallbackItem();
+  }
+
+  drawDistinct(kind, n){
+    if (n <= 0) return [];
+    const want = Math.min(n, this.eligible(kind).length);
+    const out = [];
+    const seen = new Set();
+    let safety = want * 4 + 4;
+    while (out.length < want && safety-- > 0) {
+      const next = this.draw(kind);
+      if (!next || seen.has(next)) continue;
+      seen.add(next);
+      out.push(next);
+    }
+    return out;
+  }
+}
+
+function shuffleInPlace(arr, rng){
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = rng.nextInt(i + 1);
+    const t = arr[i];
+    arr[i] = arr[j];
+    arr[j] = t;
+  }
+}
+
+function collectMapDoorColumns(map){
+  const cols = [];
+  const w = map.getWidth();
+  const h = map.getHeight();
+  for (let tx = 0; tx < w; tx++) {
+    for (let ty = 0; ty < h; ty++) {
+      if (map.isDoorTile(tx, ty)) {
+        cols.push(tx);
+        break;
+      }
+    }
+  }
+  return cols;
+}
+
+function collectMapLadderColumns(map){
+  const cols = [];
+  const w = map.getWidth();
+  const h = map.getHeight();
+  for (let tx = 0; tx < w; tx++) {
+    for (let ty = 0; ty < h; ty++) {
+      if (map.isLadderTile(tx, ty)) {
+        cols.push(tx);
+        break;
+      }
+    }
+  }
+  return cols;
+}
+
+function isAllowedShopSlotTileX(tx, ladderTxs, doorTxs){
+  for (const lx of ladderTxs) {
+    if (Math.abs(tx - lx) <= 1) return false;
+  }
+  for (const dx of doorTxs) {
+    if (Math.abs(tx - dx) <= 1) return false;
+  }
+  return true;
+}
+
+function rollShopLayout(seed, w, groundY, ladderTxs, doorTxs, luck){
+  const rng = javaRandom(Number(BigInt(seed) ^ 0x51040ac7beef5babn));
+  const totalSlots = 1 + rng.nextInt(6);
+  const keyCap = 1;
+  const heartCap = 3;
+  const pedCap = 2;
+
+  const candidates = [];
+  for (let tx = 2; tx <= w - 3; tx++) {
+    if (isAllowedShopSlotTileX(tx, ladderTxs, doorTxs)) candidates.push(tx);
+  }
+  shuffleInPlace(candidates, rng);
+
+  const chosenTx = [];
+  for (const tx of candidates) {
+    if (chosenTx.length >= totalSlots) break;
+    let ok = true;
+    for (const prev of chosenTx) {
+      if (Math.abs(prev - tx) < 2) {
+        ok = false;
+        break;
+      }
+    }
+    if (ok) chosenTx.push(tx);
+  }
+
+  const pedWeight = Math.max(0, 1 + luck);
+  const heartWeight = Math.max(0, 3 + 0.25 * luck);
+  const keyWeight = 5;
+
+  let keys = 0;
+  let hearts = 0;
+  let peds = 0;
+  const pedestals = [];
+  const pickups = [];
+
+  for (const tx of chosenTx) {
+    const effKey = keys < keyCap ? keyWeight : 0;
+    const effHeart = hearts < heartCap ? heartWeight : 0;
+    const effPed = peds < pedCap ? pedWeight : 0;
+    const total = effKey + effHeart + effPed;
+    if (total <= 1e-9) break;
+    const r = rng.nextDouble() * total;
+    const gyc = groundY[clamp(tx, 1, w - 2)];
+    const anchorX = tx * TILE_SIZE + TILE_SIZE * 0.5;
+    const groundTop = gyc * TILE_SIZE;
+    if (r < effKey) {
+      pickups.push({ kind: "KEY", x: anchorX, groundTop, price: SHOP_PICKUP_PRICE });
+      keys++;
+    } else if (r < effKey + effHeart) {
+      pickups.push({ kind: "HEART", x: anchorX, groundTop, price: SHOP_PICKUP_PRICE });
+      hearts++;
+    } else {
+      pedestals.push({ x: anchorX, groundTop });
+      peds++;
+    }
+  }
+  return { pedestals, pickups };
+}
+
+function shopKeeperColumnClearOfWares(cx, catHalf, clearMargin, wares){
+  for (const w of wares) {
+    const left = cx - catHalf - clearMargin;
+    const right = cx + catHalf + clearMargin;
+    const wLeft = w.x - w.halfW;
+    const wRight = w.x + w.halfW;
+    if (right > wLeft && left < wRight) return false;
+  }
+  return true;
+}
+
+function spawnShopKeeperForRoom(gen, pedestals, pickups, pedestalHalfW = TILE_SIZE){
+  const map = gen.map;
+  const wares = [];
+  for (const p of pedestals ?? []) {
+    wares.push({ x: p.x, halfW: pedestalHalfW });
+  }
+  for (const p of pickups ?? []) {
+    if (p.price > 0) wares.push({ x: p.x, halfW: TILE_SIZE * 0.5 });
+  }
+
+  const frame = 32;
+  const catHalf = frame * 0.5;
+  const clearMargin = 2;
+
+  let preferredX;
+  if (pedestals?.length) {
+    let minPedX = Infinity;
+    for (const p of pedestals) minPedX = Math.min(minPedX, p.x);
+    preferredX = minPedX - 2 * TILE_SIZE;
+  } else {
+    preferredX = 3.5 * TILE_SIZE;
+  }
+
+  const loTx = 2;
+  const hiTx = map.getWidth() - 3;
+  const preferredTx = clamp(Math.floor(preferredX / TILE_SIZE), loTx, hiTx);
+
+  let bestTx = -1;
+  let bestDist = Infinity;
+  for (let tx = loTx; tx <= hiTx; tx++) {
+    const cx = (tx + 0.5) * TILE_SIZE;
+    if (!shopKeeperColumnClearOfWares(cx, catHalf, clearMargin, wares)) continue;
+    const d = Math.abs(tx - preferredTx);
+    if (d < bestDist) {
+      bestDist = d;
+      bestTx = tx;
+    }
+  }
+  const tx = bestTx >= 0 ? bestTx : preferredTx;
+  const centerX = (tx + 0.5) * TILE_SIZE;
+  const groundTop = map.groundTopWorldYAtColumn(tx);
+  return {
+    x: centerX - frame / 2,
+    y: groundTop - frame,
+    frameSize: frame,
+  };
+}
+
+function itemSpritePath(spriteFileName){
+  return `sprites/items/${spriteFileName}`;
+}
+
+function playerPickupRect(player){
+  return {
+    x: player.x,
+    y: player.y,
+    w: player.w(),
+    h: player.h(),
+  };
+}
+
+function rectsOverlap(a, b){
+  return a.x < b.x + b.w && a.x + a.w > b.x && a.y < b.y + b.h && a.y + a.h > b.y;
+}
+
+function itemPedestalPickupRect(sp, itemH = 16, pedestalH = 16){
+  if (!sp.itemId) return null;
+  const pedestalTop = sp.groundTop - pedestalH;
+  const ix = sp.x - itemH * 0.5;
+  const iyMin = pedestalTop - itemH + 4 - PEDESTAL_BOB_AMP;
+  return { x: ix + 1, y: iyMin + 1, w: itemH - 2, h: itemH + 2 * PEDESTAL_BOB_AMP - 2 };
+}
+
+function shopPickupHitbox(p){
+  const size = 14;
+  return { x: p.x - size * 0.5, y: p.groundTop - size, w: size, h: size };
 }
 
   // --- assets/AssetLoader.ts ---
@@ -2999,6 +4412,15 @@ class AssetLoader {
     const optional = [
       "sprites/UI key.png",
       "sprites/UI coin.png",
+      "sprites/mouse.png",
+      "sprites/mouse hurt.png",
+      "sprites/penisman.png",
+      "sprites/jack blue.png",
+      "sprites/jack blue shield.png",
+      "sprites/rolling head cc.png",
+      "sprites/cat shopkeep sheet.png",
+      "sprites/items/item pedestal.png",
+      "sprites/heart pickup.png",
       "tiles/underground tileset.png",
       "tiles/la sheet.png",
     ];
@@ -3095,14 +4517,37 @@ class GameSim {
   camera = new SideScrollCamera();
   currentRoomId = 0;
   enemies = [];
+  enemyProjectiles = [];
   transitionFade = 0;
   transitionDir = null;
   debugOverlay = false;
   fps = 0;
   ups = 0;
   gameOver = false;
+  itemCatalog = null;
+  inventory = new PlayerItemInventory();
+  pedestalDecks = null;
+  resolvedShopPedestals = [];
+  resolvedShopPickups = [];
+  shopPedestalCollected = [];
+  shopPickupCollected = [];
+  shopRoomInitialized = [];
+  activeShopPickups = [];
+  shopKeeper = null;
+  pedestalBobPhase = 0;
+  itemPickupOverlay = null;
+  decorationTime = 0;
+
+  backgroundRegistry = null;
+  roomMathBackgroundPresetIds = [];
 
   constructor(opts) {
+    this.itemCatalog = opts.itemCatalog ?? null;
+    this.assetLoader = opts.assetLoader ?? null;
+    this.backgroundRegistry = opts.backgroundRegistry ?? null;
+    if (this.itemCatalog) {
+      this.pedestalDecks = new PedestalItemDecks(this.itemCatalog);
+    }
     this.initRun(opts.seed);
   }
 
@@ -3112,6 +4557,12 @@ class GameSim {
     this.transitionFade = 0;
     this.transitionDir = null;
     this.currentRoomId = 0;
+    this.inventory.reset();
+    this.pedestalDecks?.reset(this.seed);
+    this.pedestalDecks?.beginDungeonLevel();
+    this.pedestalBobPhase = 0;
+    this.decorationTime = 0;
+    this.itemPickupOverlay = null;
     this.layout = DungeonLayout.generate(this.seed, 12, 24);
     const built = buildDungeonContent(this.layout);
     this.cachedRooms = built.rooms;
@@ -3119,19 +4570,113 @@ class GameSim {
     const n = this.layout.roomCount();
     this.roomVisited = new Array(n).fill(false);
     this.minimapAdjacentSeen = new Array(n).fill(false);
+    this.resolvedShopPedestals = new Array(n).fill(null);
+    this.resolvedShopPickups = new Array(n).fill(null);
+    this.shopPedestalCollected = new Array(n).fill(null);
+    this.shopPickupCollected = new Array(n).fill(null);
+    this.shopRoomInitialized = new Array(n).fill(false);
+    this.assignRoomMathBackgroundPresets();
     this.roomVisited[0] = true;
     this.revealMinimapAdjacentNeighbors(0);
-    this.loadRoom(0);
     this.player = new Player();
+    this.loadRoom(0);
     const spawn = spawnAtFloor(this.map, roomSpawnTx(this.layout.room(0), this.map, false, false));
     this.player.resetAt(spawn.x, spawn.y);
     this.camera.reset(this.cameraAnchorX(), this.cameraAnchorY());
   }
 
+  assignRoomMathBackgroundPresets(){
+    const n = this.layout.roomCount();
+    this.roomMathBackgroundPresetIds = new Array(n).fill(null);
+    if (!this.backgroundRegistry) return;
+    for (let i = 0; i < n; i++) {
+      const node = this.layout.room(i);
+      const seed = node.contentSeed;
+      if (node.kind === RoomKind.BOSS) {
+        this.roomMathBackgroundPresetIds[i] = this.backgroundRegistry.pickBossPresetId(seed);
+      } else if (node.kind === RoomKind.SECRET || node.kind === RoomKind.SUPER_SECRET) {
+        this.roomMathBackgroundPresetIds[i] = this.backgroundRegistry.pickSecretPresetId(seed);
+      }
+    }
+  }
+
+  getBackgroundPresetId(roomId){
+    return this.roomMathBackgroundPresetIds[roomId] ?? null;
+  }
+
+  playerLuck(){
+    if (!this.itemCatalog) return 0;
+    let luck = 0;
+    for (const [id, count] of this.inventory.stacks) {
+      const def = this.itemCatalog.get(id);
+      if (def?.luckPerStack) luck += def.luckPerStack * count;
+    }
+    return luck;
+  }
+
+  resolveShopLayout(roomId){
+    if (this.resolvedShopPedestals[roomId]) return;
+    const gen = this.cachedRooms[roomId];
+    const node = this.layout.room(roomId);
+    const map = gen.map;
+    const w = map.getWidth();
+    const groundY = new Array(w);
+    for (let x = 0; x < w; x++) {
+      groundY[x] = Math.round(map.groundTopWorldYAtColumn(x) / TILE_SIZE);
+    }
+    const layout = rollShopLayout(
+      node.contentSeed,
+      w,
+      groundY,
+      collectMapLadderColumns(map),
+      collectMapDoorColumns(map),
+      this.playerLuck()
+    );
+    const itemIds = this.pedestalDecks?.drawDistinct(PedestalSpawnKind.SHOP, layout.pedestals.length) ?? [];
+    const resolvedPeds = layout.pedestals.map((slot, i) => ({
+      itemId: itemIds[i] ?? null,
+      x: slot.x,
+      groundTop: slot.groundTop,
+    }));
+    this.resolvedShopPedestals[roomId] = resolvedPeds;
+    this.resolvedShopPickups[roomId] = layout.pickups.map((p) => ({ ...p }));
+    this.shopPedestalCollected[roomId] = new Array(resolvedPeds.length).fill(false);
+    this.shopPickupCollected[roomId] = new Array(layout.pickups.length).fill(false);
+  }
+
+  spawnShopPickupsForRoom(roomId){
+    if (this.shopRoomInitialized[roomId]) {
+      const collected = this.shopPickupCollected[roomId] ?? [];
+      const all = this.resolvedShopPickups[roomId] ?? [];
+      this.activeShopPickups = all.filter((_, i) => !collected[i]);
+      return;
+    }
+    this.resolveShopLayout(roomId);
+    this.activeShopPickups = (this.resolvedShopPickups[roomId] ?? []).map((p) => ({ ...p }));
+    this.shopRoomInitialized[roomId] = true;
+  }
+
+  currentShopPedestals(){
+    return this.resolvedShopPedestals[this.currentRoomId] ?? [];
+  }
+
   loadRoom(roomId){
     const gen = this.cachedRooms[roomId];
     this.map = gen.map;
-    this.enemies = spawnEnemiesForRoom(this.map, gen.contentSeed, gen.enemyCount);
+    this.enemyProjectiles = [];
+    this.enemies = spawnEnemiesFromRoom(this.map, gen, this.player);
+    this.shopKeeper = null;
+    this.activeShopPickups = [];
+    const kind = this.layout.room(roomId).kind;
+    if (kind === RoomKind.SHOP) {
+      this.resolveShopLayout(roomId);
+      this.spawnShopPickupsForRoom(roomId);
+      this.shopKeeper = spawnShopKeeperForRoom(
+        gen,
+        this.resolvedShopPedestals[roomId],
+        this.resolvedShopPickups[roomId]
+      );
+    }
   }
 
   currentGeneratedRoom(){
@@ -3207,9 +4752,28 @@ class GameSim {
 
     this.player.update(dt, input, this.map);
 
+    const spawnCtx = { projectiles: this.enemyProjectiles };
     for (const e of this.enemies) {
-      e.update(dt, this.map, this.player);
+      e.update(dt, this.map, this.player, spawnCtx);
       e.contactDamage(this.player);
+    }
+
+    for (let i = this.enemyProjectiles.length - 1; i >= 0; i--) {
+      const p = this.enemyProjectiles[i];
+      p.update(dt, this.map);
+      if (p.dead) {
+        this.enemyProjectiles.splice(i, 1);
+        continue;
+      }
+      if (p.hitsPlayer(this.player) && this.player.health.isAlive()) {
+        if (this.player.health.tryDamage(p.damage, 1.125)) {
+          this.player.hurtTint = 0.35;
+          const pcx = this.player.x + this.player.w() * 0.5;
+          const sign = pcx < p.x ? -1 : 1;
+          this.player.applyContactKnockback(sign);
+        }
+        p.dead = true;
+      }
     }
 
     // Sword hits
@@ -3233,6 +4797,11 @@ class GameSim {
     // Room transitions (doors + ladder shafts)
     this.tryDoorTransition(input);
     this.tryLadderTransition(input);
+    this.tryShopInteractions(input);
+
+    this.pedestalBobPhase += dt * PEDESTAL_BOB_OMEGA;
+    this.decorationTime += dt;
+    this.tickItemPickupOverlay(dt);
 
     const bounds = this.scrollBounds();
     const follow = {
@@ -3259,7 +4828,78 @@ class GameSim {
     this.camera.update(dt, bounds, follow);
   }
 
-  tryDoorTransition(input){
+  tryShopInteractions(input){
+    if (this.layout.room(this.currentRoomId).kind !== RoomKind.SHOP) return;
+    if (!anyPressed(input, Keys.up)) return;
+    if (this.tryBuyShopPickups()) return;
+    this.tryBuyShopPedestal();
+  }
+
+  tryBuyShopPickups(){
+    const pr = playerPickupRect(this.player);
+    const collected = this.shopPickupCollected[this.currentRoomId] ?? [];
+    const all = this.resolvedShopPickups[this.currentRoomId] ?? [];
+    for (let i = 0; i < all.length; i++) {
+      if (collected[i]) continue;
+      const p = all[i];
+      if (!rectsOverlap(pr, shopPickupHitbox(p))) continue;
+      if (p.kind === "HEART" && this.player.health.isAtFullHealth()) return true;
+      if (this.player.stats.money < p.price) return true;
+      if (p.kind === "HEART") this.player.health.heal(2);
+      else if (p.kind === "KEY") this.player.stats.keys++;
+      this.player.stats.money -= p.price;
+      collected[i] = true;
+      this.activeShopPickups = all.filter((_, j) => !collected[j]);
+      return true;
+    }
+    return false;
+  }
+
+  tryBuyShopPedestal(){
+    if (!this.itemCatalog) return;
+    const pr = playerPickupRect(this.player);
+    const peds = this.currentShopPedestals();
+    const collected = this.shopPedestalCollected[this.currentRoomId] ?? [];
+    for (let i = 0; i < peds.length; i++) {
+      if (collected[i]) continue;
+      const sp = peds[i];
+      if (!sp.itemId) continue;
+      const pick = itemPedestalPickupRect(sp);
+      if (!pick || !rectsOverlap(pr, pick)) continue;
+      if (this.player.stats.money < SHOP_PEDESTAL_PRICE) return;
+      const def = this.itemCatalog.get(sp.itemId);
+      if (!def) return;
+      this.player.stats.money -= SHOP_PEDESTAL_PRICE;
+      if (def.subweapon) {
+        this.inventory.setEquippedSubweapon(sp.itemId);
+      } else {
+        this.inventory.add(sp.itemId, 1);
+      }
+      this.inventory.markAcquired(sp.itemId);
+      this.pedestalDecks?.purgeAcquired(sp.itemId);
+      this.itemCatalog.applyToPlayer(def, this.player);
+      collected[i] = true;
+      this.beginItemPickupOverlay(sp.itemId, def);
+      return;
+    }
+  }
+
+  beginItemPickupOverlay(itemId, def){
+    this.itemPickupOverlay = {
+      itemId,
+      title: def.displayName ?? itemId,
+      flavor: def.flavor ?? "",
+      effect: def.pickupEffectLine ?? "",
+      timer: 2.2,
+    };
+  }
+
+  tickItemPickupOverlay(dt){
+    if (!this.itemPickupOverlay) return;
+    this.itemPickupOverlay.timer -= dt;
+    if (this.itemPickupOverlay.timer <= 0) this.itemPickupOverlay = null;
+  }
+
     if (!anyPressed(input, Keys.up)) return;
     if (!this.player.onGround) return;
 
@@ -3302,45 +4942,46 @@ class GameSim {
 
   tryLadderTransition(input){
     const node = this.layout.room(this.currentRoomId);
-    const L = roomLadderColumnTx(node, this.map);
+    const gen = this.currentGeneratedRoom();
+    const L =
+      gen?.ladderColumnTx >= 0 ? clampLadderColumn(this.map.getWidth(), gen.ladderColumnTx) : -1;
     if (L < 0) return;
-    if (!this.playerOverlapsLadderColumn(L)) return;
+    if (!playerOverlapsLadderColumn(this.map, this.player, L)) return;
 
     const wantDown = anyDown(input, Keys.down);
     const wantUp = anyDown(input, Keys.up);
     if (!wantDown && !wantUp) return;
 
     if (wantDown && node.ladderSouth && this.playerNearRoomSouthEdge()) {
-      if (!this.southLadderMouthAllowsTransition(L)) return;
-      const south = this.layout.neighborSouth(this.currentRoomId);
-      if (south >= 0 && !this.seamBlocksTransition(this.currentRoomId, south, "south")) {
-        this.beginTransition(south, "south", input);
+      if (this.southLadderMouthAllowsTransition(L)) {
+        const south = this.layout.neighborSouth(this.currentRoomId);
+        if (south >= 0 && !this.seamBlocksTransition(this.currentRoomId, south, "south")) {
+          this.beginTransition(south, "south", input);
+          return;
+        }
       }
-      return;
     }
     if (wantUp && node.ladderNorth && this.playerNearRoomNorthEdge()) {
-      if (!this.northLadderSeamOpenAtTop(L)) return;
-      const north = this.layout.neighborNorth(this.currentRoomId);
-      if (north >= 0 && !this.seamBlocksTransition(this.currentRoomId, north, "north")) {
-        this.beginTransition(north, "north", input);
+      if (this.northLadderSeamOpenAtTop(L)) {
+        const north = this.layout.neighborNorth(this.currentRoomId);
+        if (north >= 0 && !this.seamBlocksTransition(this.currentRoomId, north, "north")) {
+          this.beginTransition(north, "north", input);
+        }
       }
     }
   }
 
-  playerOverlapsLadderColumn(ladderTx){
-    const left = ladderTx * TILE_SIZE;
-    const right = (ladderTx + 1) * TILE_SIZE;
-    const px1 = this.player.x;
-    const px2 = this.player.x + this.player.w();
-    return px2 > left && px1 < right;
+  worldCameraDeviceTy(){
+    return Math.floor(WORLD_VIEWPORT_H / 2 - CAMERA_ZOOM * this.camera.y);
   }
 
   playerNearRoomSouthEdge(){
-    return this.player.feetY() >= this.map.getHeight() * TILE_SIZE - TILE_SIZE * 2;
+    const feetDevY = Math.round(CAMERA_ZOOM * this.player.feetY() + this.worldCameraDeviceTy());
+    return feetDevY >= WORLD_VIEWPORT_H;
   }
 
   playerNearRoomNorthEdge(){
-    return this.player.y <= TILE_SIZE * 2;
+    return this.player.y <= LADDER_TRANSITION_NORTH_EDGE_PX;
   }
 
   southLadderMouthAllowsTransition(ladderTx){
@@ -3385,6 +5026,15 @@ class GameSim {
     this.player.vx = 0;
     this.player.vy = 0;
     this.player.onGround = onGround;
+    if (dir === "north" || dir === "south") {
+      const shaftCol =
+        gen?.ladderColumnTx >= 0 ? clampLadderColumn(this.map.getWidth(), gen.ladderColumnTx) : -1;
+      if (shaftCol >= 0) {
+        this.player.activeClimbShaftTx = shaftCol;
+        this.player.climbing = true;
+        constrainClimbingShaftColumn(this.player, shaftCol);
+      }
+    }
 
     const bounds = this.scrollBounds();
     this.camera.reset(
@@ -3442,12 +5092,31 @@ class GameSim {
       facing: this.player.facing,
       spriteName: this.player.spriteName(),
       spriteFrame: this.player.spriteFrameIndex(),
+      squashScaleX: this.player.renderSquashStretch.scaleX(),
+      squashScaleY: this.player.renderSquashStretch.scaleY(),
       enemies: this.enemies.map((e) => ({
         x: e.x,
         y: e.y,
         dead: e.dead,
         hurtTint: e.hurtTint,
+        hitstunSolidRed: e.hitstunSolidRed ?? false,
+        shakeX: e.shakeX ?? 0,
+        shakeY: e.shakeY ?? 0,
         animFrame: e.animFrame,
+        kind: e.kind ?? EnemyKind.CRAWLER,
+        patrolDir: e.patrolDir ?? e.dir ?? 1,
+        w: e.w ?? 8,
+        h: e.h ?? ENEMY_CRAWLER_HITBOX_H,
+        hp: e.health.redCurrent + e.health.soul,
+        hpMax: e.health.redMax + e.health.soul,
+      })),
+      enemyProjectiles: this.enemyProjectiles.map((p) => ({
+        x: p.x,
+        y: p.y,
+        w: p.w,
+        h: p.h,
+        color: p.color,
+        dead: p.dead,
       })),
       transitionFade: this.transitionFade,
       debugOverlay: this.debugOverlay,
@@ -3456,9 +5125,12 @@ class GameSim {
       hpMax: this.player.health.getMax(),
       hpRed: this.player.health.getRedCurrent(),
       hpRedMax: this.player.health.getRedMax(),
+      playerHp: this.player.health.redCurrent + this.player.health.soul,
+      playerHpMax: this.player.health.redMax + this.player.health.soul,
       keys: this.player.stats.keys,
       money: this.player.stats.money,
       roomKind: this.layout.room(this.currentRoomId).kind,
+      backgroundPresetId: this.getBackgroundPresetId(this.currentRoomId),
       displaySalt: this.layout.room(this.currentRoomId).contentSeed >>> 0,
       seed: this.seed,
       gameOver: this.gameOver,
@@ -3466,6 +5138,22 @@ class GameSim {
       currentRoomId: this.currentRoomId,
       roomVisited: this.roomVisited,
       minimapAdjacentSeen: this.minimapAdjacentSeen,
+      shopPedestals: this.currentShopPedestals().map((p, i) => ({
+        x: p.x,
+        groundTop: p.groundTop,
+        itemId: p.itemId,
+        collected: this.shopPedestalCollected[this.currentRoomId]?.[i] ?? false,
+      })),
+      shopPickups: (this.activeShopPickups ?? []).map((p) => ({
+        kind: p.kind,
+        x: p.x,
+        groundTop: p.groundTop,
+        price: p.price,
+      })),
+      shopKeeper: this.shopKeeper,
+      pedestalBobPhase: this.pedestalBobPhase,
+      decorationTime: this.decorationTime,
+      itemPickupOverlay: this.itemPickupOverlay,
     };
   }
 }
@@ -3595,7 +5283,7 @@ class RenderPipeline {
     this.gameOverRetryRect = null;
   }
 
-  draw(sim, snap, assets, tilesetRuntime){
+  draw(sim, snap, assets, tilesetRuntime, backgroundRegistry){
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#0d0d14";
@@ -3603,16 +5291,32 @@ class RenderPipeline {
 
     const tx = Math.floor(INTERNAL_WIDTH / 2 - CAMERA_ZOOM * snap.cameraX);
     const ty = Math.floor(WORLD_VIEWPORT_H / 2 - CAMERA_ZOOM * snap.cameraY);
+    const usesMathBg =
+      typeof VernanBackground !== "undefined" &&
+      VernanBackground.roomKindUsesMathBackground(snap.roomKind) &&
+      snap.backgroundPresetId &&
+      backgroundRegistry?.preset(snap.backgroundPresetId);
 
     ctx.save();
     ctx.beginPath();
     ctx.rect(0, 0, INTERNAL_WIDTH, WORLD_VIEWPORT_H);
     ctx.clip();
+
+    if (usesMathBg) {
+      this.drawRoomMathBackground(ctx, snap, sim, backgroundRegistry);
+    }
+
     ctx.setTransform(CAMERA_ZOOM, 0, 0, CAMERA_ZOOM, tx, ty);
 
-    this.drawTiles(ctx, sim, snap, assets, tilesetRuntime);
+    this.drawTiles(ctx, sim, snap, assets, tilesetRuntime, !usesMathBg);
+    this.drawShopPickups(ctx, snap, assets);
+    this.drawShopPedestals(ctx, snap, assets, sim.itemCatalog);
+    this.drawShopKeeper(ctx, snap, assets);
     this.drawEnemies(ctx, snap, assets);
+    this.drawEnemyProjectiles(ctx, snap);
     this.drawPlayer(ctx, snap, assets);
+    this.drawEntityHealthBars(ctx, snap);
+    this.drawShopPriceLabels(ctx, snap);
 
     if (snap.debugOverlay) {
       this.drawDebugGrid(ctx, sim);
@@ -3622,6 +5326,10 @@ class RenderPipeline {
 
     // HUD
     this.drawHud(ctx, snap, assets);
+
+    if (snap.itemPickupOverlay) {
+      this.drawItemPickupOverlay(ctx, snap.itemPickupOverlay);
+    }
 
     // Fade
     if (snap.transitionFade > 0) {
@@ -3651,7 +5359,48 @@ class RenderPipeline {
     );
   }
 
-  drawTiles(ctx, sim, snap, assets, tilesetRuntime){
+  drawRoomMathBackground(ctx, snap, sim, backgroundRegistry){
+    const preset = backgroundRegistry.preset(snap.backgroundPresetId);
+    if (!preset) return;
+    const pixelScale = CAMERA_ZOOM;
+    const bgW = Math.max(1, Math.floor(INTERNAL_WIDTH / pixelScale));
+    const bgH = Math.max(1, Math.floor(WORLD_VIEWPORT_H / pixelScale));
+    if (!this._bgCanvas) {
+      this._bgCanvas = document.createElement("canvas");
+      this._bgCtx = this._bgCanvas.getContext("2d", { willReadFrequently: true });
+    }
+    this._bgCanvas.width = bgW;
+    this._bgCanvas.height = bgH;
+    const camXSubpx = Math.round(snap.cameraX * 256);
+    const camYSubpx = Math.round(snap.cameraY * 256);
+    const simTick = Math.floor((snap.decorationTime ?? 0) * 60);
+    const occlusion = VernanBackground.buildBackgroundOcclusionMask(
+      sim.map,
+      snap.cameraX,
+      snap.cameraY,
+      bgW,
+      bgH,
+      TILE_SIZE,
+      INTERNAL_WIDTH,
+      WORLD_VIEWPORT_H,
+      CAMERA_ZOOM
+    );
+    VernanBackground.BackgroundRenderer.render(
+      preset,
+      backgroundRegistry.spritesMap(),
+      this._bgCtx,
+      bgW,
+      bgH,
+      camXSubpx,
+      camYSubpx,
+      simTick,
+      { pixelScale, occlusionMask: occlusion }
+    );
+    ctx.imageSmoothingEnabled = false;
+    ctx.drawImage(this._bgCanvas, 0, 0, INTERNAL_WIDTH, WORLD_VIEWPORT_H);
+  }
+
+  drawTiles(ctx, sim, snap, assets, tilesetRuntime, drawSky = true){
     const map = sim.map;
     const camX = snap.cameraX;
     const camY = snap.cameraY;
@@ -3669,7 +5418,9 @@ class RenderPipeline {
     const sheet =
       underground && imageDrawable(underground) ? underground : forest;
 
-    this.drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet, tilesetRuntime);
+    if (drawSky) {
+      this.drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet, tilesetRuntime);
+    }
 
     // v3 tileset draws grass underlay + terrain; legacy sprite layer only when tileset is unavailable.
     if (!tilesetRuntime) {
@@ -3760,15 +5511,23 @@ class RenderPipeline {
 
   drawPlayer(ctx, snap, assets){
     const sheet = assets.get("sprites/" + snap.spriteName);
+    const feetX = snap.playerX + 5;
     const feetY = snap.playerY + 18;
-    const drawX = snap.playerX + 5 - SPRITE_FRAME_W / 2;
+    const drawX = feetX - SPRITE_FRAME_W / 2;
     const drawY = feetY - SPRITE_FRAME_H;
     const attacking = snap.spriteName.includes("attack");
+    const squashX = snap.squashScaleX ?? 1;
+    const squashY = snap.squashScaleY ?? 1;
 
     if (imageDrawable(sheet)) {
       const frame = snap.spriteFrame;
       const fw = SPRITE_FRAME_W;
       ctx.save();
+      if (squashX !== 1 || squashY !== 1) {
+        ctx.translate(feetX, feetY);
+        ctx.scale(squashX, squashY);
+        ctx.translate(-feetX, -feetY);
+      }
       if (snap.facing < 0) {
         ctx.translate(drawX + fw, drawY);
         ctx.scale(-1, 1);
@@ -3787,6 +5546,19 @@ class RenderPipeline {
     } else {
       ctx.fillStyle = snap.playerHurtTint > 0 ? "#ffaaaa" : "#e8a87c";
       ctx.fillRect(snap.playerX, snap.playerY, 10, 18);
+    }
+  }
+
+  drawEntityHealthBars(ctx, snap){
+    if (!snap.gameOver) {
+      const playerHeadTop = snap.playerY + PLAYER_STAND_H - SPRITE_FRAME_H;
+      const playerCenterX = snap.playerX + PLAYER_STAND_W * 0.5;
+      drawWorldHealthBar(ctx, playerCenterX, playerHeadTop, snap.playerHp, snap.playerHpMax);
+    }
+    for (const e of snap.enemies) {
+      if (e.dead || e.hpMax <= 0) continue;
+      const cx = e.x + (e.w ?? 8) * 0.5;
+      drawWorldHealthBar(ctx, cx, enemyHeadTopY(e), e.hp, e.hpMax);
     }
   }
 
@@ -3815,13 +5587,112 @@ class RenderPipeline {
     snap,
     assets
   ){
-    const sheet = assets.get("sprites/crawler.png");
     for (const e of snap.enemies) {
       if (e.dead) continue;
-      if (imageDrawable(sheet)) {
-        const feetY = e.y + ENEMY_CRAWLER_HITBOX_H;
-        const drawX = e.x + 4 - ENEMY_CRAWLER_SPRITE_W / 2;
-        const drawY = feetY - ENEMY_CRAWLER_SPRITE_H;
+      const kind = e.kind ?? EnemyKind.CRAWLER;
+      const flipLeftFacing = e.patrolDir > 0;
+      switch (kind) {
+        case EnemyKind.MOUSE: {
+          const mouseSheet =
+            e.hp < e.hpMax && imageDrawable(assets.get("sprites/mouse hurt.png"))
+              ? assets.get("sprites/mouse hurt.png")
+              : assets.get("sprites/mouse.png");
+          this.drawPatrolEnemySprite(ctx, mouseSheet, e, 4, 10, 10, flipLeftFacing);
+          break;
+        }
+        case EnemyKind.PENISMAN:
+          this.drawPatrolEnemySprite(ctx, assets.get("sprites/penisman.png"), e, 4, 12, 14, flipLeftFacing);
+          break;
+        case EnemyKind.JACK_BLUE:
+          this.drawPatrolEnemySprite(ctx, assets.get("sprites/jack blue.png"), e, 3, 32, 32, flipLeftFacing);
+          this.drawPatrolEnemySprite(
+            ctx,
+            assets.get("sprites/jack blue shield.png"),
+            e,
+            3,
+            32,
+            32,
+            flipLeftFacing,
+            0.85
+          );
+          break;
+        case EnemyKind.ROLLING_HEAD:
+          this.drawPatrolEnemySprite(ctx, assets.get("sprites/rolling head cc.png"), e, 4, 16, 16, flipLeftFacing);
+          break;
+        case EnemyKind.CRAWLER:
+        default:
+          this.drawCrawlerSprite(ctx, assets.get("sprites/crawler.png"), e);
+          break;
+      }
+    }
+  }
+
+  drawEnemyHitOverlay(ctx, drawX, drawY, spriteW, spriteH, e){
+    if (e.hitstunSolidRed) {
+      ctx.fillStyle = "rgba(255,50,50,1)";
+      ctx.fillRect(drawX, drawY, spriteW, spriteH);
+    } else if (e.hurtTint > 0) {
+      const a = hurtTintDrawAlpha(e.hurtTint);
+      if (a > 0) {
+        ctx.fillStyle = `rgba(255,80,80,${a})`;
+        ctx.fillRect(drawX, drawY, spriteW, spriteH);
+      }
+    }
+  }
+
+  drawPatrolEnemySprite(ctx, sheet, e, frameCount, spriteW, spriteH, flip, alpha = 1){
+    const shakeX = e.shakeX ?? 0;
+    const shakeY = e.shakeY ?? 0;
+    const feetY = e.y + (e.h ?? spriteH) + shakeY;
+    const drawX = e.x + (e.w ?? spriteW) * 0.5 - spriteW * 0.5 + shakeX;
+    const drawY = feetY - spriteH;
+    if (imageDrawable(sheet)) {
+      const fw = Math.max(1, Math.floor(sheet.width / frameCount));
+      const fh = sheet.height;
+      const frame = e.animFrame % frameCount;
+      ctx.save();
+      ctx.globalAlpha = alpha;
+      if (flip) {
+        ctx.translate(drawX + spriteW, drawY);
+        ctx.scale(-1, 1);
+        ctx.drawImage(sheet, frame * fw, 0, fw, fh, 0, 0, spriteW, spriteH);
+        this.drawEnemyHitOverlay(ctx, 0, 0, spriteW, spriteH, e);
+      } else {
+        ctx.drawImage(sheet, frame * fw, 0, fw, fh, drawX, drawY, spriteW, spriteH);
+        this.drawEnemyHitOverlay(ctx, drawX, drawY, spriteW, spriteH, e);
+      }
+      ctx.restore();
+    } else {
+      ctx.fillStyle = e.hitstunSolidRed || e.hurtTint > 0 ? "#ff8888" : "#88aaff";
+      ctx.fillRect(drawX, drawY, e.w ?? 10, e.h ?? 12);
+    }
+  }
+
+  drawCrawlerSprite(ctx, sheet, e){
+    const shakeX = e.shakeX ?? 0;
+    const shakeY = e.shakeY ?? 0;
+    if (imageDrawable(sheet)) {
+      const feetY = e.y + ENEMY_CRAWLER_HITBOX_H + shakeY;
+      let drawX = e.x + 4 - ENEMY_CRAWLER_SPRITE_W / 2 + shakeX;
+      const drawY = feetY - ENEMY_CRAWLER_SPRITE_H;
+      ctx.save();
+      if (e.patrolDir < 0) {
+        drawX += ENEMY_CRAWLER_SPRITE_W;
+        ctx.translate(drawX, drawY);
+        ctx.scale(-1, 1);
+        ctx.drawImage(
+          sheet,
+          e.animFrame * ENEMY_CRAWLER_SPRITE_W,
+          0,
+          ENEMY_CRAWLER_SPRITE_W,
+          ENEMY_CRAWLER_SPRITE_H,
+          0,
+          0,
+          ENEMY_CRAWLER_SPRITE_W,
+          ENEMY_CRAWLER_SPRITE_H
+        );
+        this.drawEnemyHitOverlay(ctx, 0, 0, ENEMY_CRAWLER_SPRITE_W, ENEMY_CRAWLER_SPRITE_H, e);
+      } else {
         ctx.drawImage(
           sheet,
           e.animFrame * ENEMY_CRAWLER_SPRITE_W,
@@ -3833,11 +5704,148 @@ class RenderPipeline {
           ENEMY_CRAWLER_SPRITE_W,
           ENEMY_CRAWLER_SPRITE_H
         );
+        this.drawEnemyHitOverlay(ctx, drawX, drawY, ENEMY_CRAWLER_SPRITE_W, ENEMY_CRAWLER_SPRITE_H, e);
+      }
+      ctx.restore();
+    } else {
+      ctx.fillStyle = e.hitstunSolidRed || e.hurtTint > 0 ? "#ff8888" : "#88ff88";
+      ctx.fillRect(e.x + shakeX, e.y + shakeY, 8, ENEMY_CRAWLER_HITBOX_H);
+    }
+  }
+
+  drawEnemyProjectiles(ctx, snap){
+    for (const p of snap.enemyProjectiles ?? []) {
+      if (p.dead) continue;
+      ctx.fillStyle = p.color ?? "#ffcc44";
+      ctx.fillRect(p.x, p.y, p.w, p.h);
+    }
+  }
+
+  drawShopPickups(ctx, snap, assets){
+    for (const p of snap.shopPickups ?? []) {
+      const hb = shopPickupHitbox(p);
+      if (p.kind === "HEART") {
+        const heart = assets.get("sprites/heart pickup.png") ?? assets.get("sprites/UI health.png");
+        if (imageDrawable(heart)) {
+          const fw = Math.max(1, Math.floor(heart.width / 3));
+          ctx.drawImage(heart, 0, 0, fw, heart.height, hb.x, hb.y, hb.w, hb.h);
+        } else {
+          ctx.fillStyle = "#e74c3c";
+          ctx.fillRect(hb.x, hb.y, hb.w, hb.h);
+        }
       } else {
-        ctx.fillStyle = e.hurtTint > 0 ? "#ff8888" : "#88ff88";
-        ctx.fillRect(e.x, e.y, 8, ENEMY_CRAWLER_HITBOX_H);
+        const key = assets.get("sprites/UI key.png");
+        if (imageDrawable(key)) {
+          ctx.drawImage(key, hb.x, hb.y, hb.w, hb.h);
+        } else {
+          ctx.fillStyle = "#f1c40f";
+          ctx.fillRect(hb.x, hb.y, hb.w, hb.h);
+        }
       }
     }
+  }
+
+  drawShopPedestals(ctx, snap, assets, itemCatalog){
+    const pedestalImg = assets.get("sprites/items/item pedestal.png");
+    const pedestalH = imageDrawable(pedestalImg) ? pedestalImg.height : 16;
+    const pedestalW = imageDrawable(pedestalImg) ? pedestalImg.width : 16;
+    const bob = Math.sin(snap.pedestalBobPhase ?? 0) * PEDESTAL_BOB_AMP;
+
+    for (const sp of snap.shopPedestals ?? []) {
+      const left = sp.x - pedestalW * 0.5;
+      const top = sp.groundTop - pedestalH;
+      if (imageDrawable(pedestalImg)) {
+        ctx.drawImage(pedestalImg, left, top, pedestalW, pedestalH);
+      } else {
+        ctx.fillStyle = "#6a5a4a";
+        ctx.fillRect(left, top, pedestalW, pedestalH);
+      }
+      if (sp.collected || !sp.itemId || !itemCatalog) continue;
+      const def = itemCatalog.get(sp.itemId);
+      const itemImg = def ? assets.get(itemSpritePath(def.spriteFileName)) : null;
+      const itemH = imageDrawable(itemImg) ? itemImg.height : 14;
+      const itemW = imageDrawable(itemImg) ? itemImg.width : 14;
+      const iy = top - itemH + 4 + bob;
+      const ix = sp.x - itemW * 0.5;
+      if (imageDrawable(itemImg)) {
+        ctx.drawImage(itemImg, ix, iy, itemW, itemH);
+      } else {
+        ctx.fillStyle = "#9cf";
+        ctx.fillRect(ix, iy, itemW, itemH);
+        ctx.fillStyle = "#fff";
+        ctx.font = "6px monospace";
+        ctx.fillText((def?.displayName ?? sp.itemId).slice(0, 8), ix, iy + 8);
+      }
+    }
+  }
+
+  drawShopKeeper(ctx, snap, assets){
+    const sk = snap.shopKeeper;
+    if (!sk) return;
+    const sheet = assets.get("sprites/cat shopkeep sheet.png");
+    const frame = sk.frameSize ?? 32;
+    const headDy = Math.sin((snap.decorationTime ?? 0) * ((Math.PI * 2) / 1.6)) * 1;
+
+    if (imageDrawable(sheet)) {
+      const fw = Math.max(1, Math.floor(sheet.width / 3));
+      const fh = sheet.height;
+      const sx = (i) => i * fw;
+      ctx.drawImage(sheet, sx(2), 0, fw, fh, sk.x, sk.y, frame, frame);
+      ctx.drawImage(sheet, sx(1), 0, fw, fh, sk.x, sk.y, frame, frame);
+      ctx.drawImage(sheet, sx(0), 0, fw, fh, sk.x, sk.y + headDy, frame, frame);
+    } else {
+      ctx.fillStyle = "#c8a";
+      ctx.fillRect(sk.x, sk.y, frame, frame);
+      ctx.fillStyle = "#211";
+      ctx.fillRect(sk.x + 8, sk.y + 10 + headDy, 4, 4);
+      ctx.fillRect(sk.x + 20, sk.y + 10 + headDy, 4, 4);
+    }
+  }
+
+  drawShopPriceLabels(ctx, snap){
+    ctx.font = "8px monospace";
+    for (const p of snap.shopPickups ?? []) {
+      this.drawPriceLabel(ctx, p.x, p.groundTop - 20, p.price);
+    }
+    for (const sp of snap.shopPedestals ?? []) {
+      if (sp.collected) continue;
+      const top = sp.groundTop - 16 - 18;
+      this.drawPriceLabel(ctx, sp.x, top, SHOP_PEDESTAL_PRICE);
+    }
+  }
+
+  drawPriceLabel(ctx, worldCx, worldTopY, price){
+    const text = `$${price}`;
+    const tw = ctx.measureText(text).width;
+    const tx = Math.floor(worldCx - tw / 2);
+    const ty = Math.floor(worldTopY);
+    ctx.fillStyle = "rgba(0,0,0,0.8)";
+    ctx.fillText(text, tx + 1, ty + 1);
+    ctx.fillStyle = "#ffeb78";
+    ctx.fillText(text, tx, ty);
+  }
+
+  drawItemPickupOverlay(ctx, overlay){
+    ctx.fillStyle = "rgba(0,0,0,0.78)";
+    ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    ctx.fillStyle = "#fff";
+    ctx.font = "10px monospace";
+    const cx = INTERNAL_WIDTH / 2;
+    let y = Math.max(16, Math.round(INTERNAL_HEIGHT * 0.08));
+    const title = overlay.title ?? overlay.itemId ?? "item";
+    const titleW = ctx.measureText(title).width;
+    ctx.fillText(title, cx - titleW / 2, y);
+    y += 14;
+    ctx.fillStyle = "#dcd2eb";
+    const flavor = overlay.flavor ?? "";
+    const flavorW = ctx.measureText(flavor).width;
+    ctx.fillText(flavor, cx - flavorW / 2, y);
+    y += 12;
+    ctx.fillStyle = "#b9afc9";
+    ctx.font = "italic 8px monospace";
+    const effect = overlay.effect ?? "";
+    const effectW = ctx.measureText(effect).width;
+    ctx.fillText(effect, cx - effectW / 2, y);
   }
 
   drawHud(ctx, snap, assets){
@@ -4173,6 +6181,11 @@ async function mount(selector, options = {}){
     await loader.loadCore();
     progressEl.style.width = "92%";
     itemCatalog = await ItemCatalog.load(assetBase);
+    for (const item of itemCatalog.all()) {
+      if (item.spawnShop && item.spriteFileName) {
+        loader.loadImage(itemSpritePath(item.spriteFileName)).catch(() => {});
+      }
+    }
     clearInterval(progressTimer);
     progressEl.style.width = "100%";
   } catch (err) {
@@ -4181,6 +6194,16 @@ async function mount(selector, options = {}){
   }
 
   let tilesetRuntime = null;
+  let backgroundRegistry = null;
+  if (typeof VernanBackground !== "undefined") {
+    try {
+      backgroundRegistry = await VernanBackground.BackgroundPresetRegistry.load(assetBase, (rel) =>
+        loader.loadImage(rel)
+      );
+    } catch (err) {
+      console.warn("[Vernan] background preset load failed:", err);
+    }
+  }
   if (typeof VernanTileset !== "undefined") {
     try {
       tilesetRuntime = await Promise.race([
@@ -4200,7 +6223,7 @@ async function mount(selector, options = {}){
   canvas.focus();
   canvas.addEventListener("click", () => canvas.focus());
 
-  const sim = new GameSim({ seed, assetLoader: loader, itemCatalog });
+  const sim = new GameSim({ seed, assetLoader: loader, itemCatalog, backgroundRegistry });
   const pipeline = new RenderPipeline(canvas);
   const input = new Input();
   const unbindInput = input.bind(canvas);
@@ -4288,7 +6311,7 @@ async function mount(selector, options = {}){
     },
     render(alpha) {
       try {
-        pipeline.draw(sim, sim.renderAlpha(alpha), loader, tilesetRuntime);
+        pipeline.draw(sim, sim.renderAlpha(alpha), loader, tilesetRuntime, backgroundRegistry);
       } catch (err) {
         console.error("[Vernan] render failed:", err);
       }
