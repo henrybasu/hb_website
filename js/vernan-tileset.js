@@ -160,6 +160,82 @@
       return this.connectByTerrain.get(terrainInt) || "";
     }
 
+    clone() {
+      const out = new TerrainBridge();
+      out.choicesByTerrain = new Map(this.choicesByTerrain);
+      out.connectByTerrain = new Map(this.connectByTerrain);
+      out.displayChoicesByRoomKind = new Map();
+      for (const [code, kindMap] of this.displayChoicesByRoomKind) {
+        const copy = new Map();
+        for (const [k, list] of kindMap) copy.set(k, list.slice());
+        out.displayChoicesByRoomKind.set(code, copy);
+      }
+      out.connectAsTileIdByRoomKind = new Map();
+      for (const [code, kindMap] of this.connectAsTileIdByRoomKind) {
+        const copy = new Map();
+        for (const [k, v] of kindMap) copy.set(k, v);
+        out.connectAsTileIdByRoomKind.set(code, copy);
+      }
+      return out;
+    }
+
+    withBiomePoolOverrides(objects, poolEntries, exclusiveNonDefault) {
+      const EXCLUSIVE = exclusiveNonDefault
+        ? [TILE_SOLID, TILE_BREAKABLE, TILE_PLATFORM, TILE_LADDER]
+        : [];
+      const overrides = new Map();
+      const connectOverrides = new Map();
+      for (const entry of poolEntries || []) {
+        const objectId = String(entry.objectId || "").trim();
+        if (!objectId) continue;
+        const obj = findObjectRowOwningTileId(objects, objectId) || findObjectRowById(objects, objectId);
+        if (!obj) continue;
+        if (str(obj, "objectType", "") === "full object") continue;
+        const terrain = str(obj, "mapTerrain", "") || str(asMap(obj.editorObjectDefaults), "mapTerrain", "");
+        const code = terrainCode(terrain);
+        if (code < 0) continue;
+        const members = memberTileIdsOrdered(obj);
+        if (!members.length) continue;
+        const w = Math.max(1, Math.round(entry.weight || 1));
+        const bucket = overrides.get(code) || [];
+        for (const mid of members) bucket.push({ tileId: mid, weight: w });
+        overrides.set(code, bucket);
+        if (!connectOverrides.has(code)) {
+          const anchor = str(obj, "anchorTileId", "").trim();
+          connectOverrides.set(code, anchor && members.includes(anchor) ? anchor : members[0]);
+        }
+      }
+      if (!overrides.size) return this.clone();
+      const out = this.clone();
+      const clearCodes = new Set([...overrides.keys(), ...EXCLUSIVE]);
+      for (const code of clearCodes) {
+        out.choicesByTerrain.delete(code);
+        const kindMap = out.displayChoicesByRoomKind.get(code);
+        if (kindMap) {
+          for (const k of ["NORMAL", "START", "BOSS", "ITEM", "SHOP"]) kindMap.delete(k);
+        }
+      }
+      for (const [code, choices] of overrides) {
+        out.choicesByTerrain.set(code, choices);
+        let kindMap = out.displayChoicesByRoomKind.get(code);
+        if (!kindMap) {
+          kindMap = new Map();
+          out.displayChoicesByRoomKind.set(code, kindMap);
+        }
+        kindMap.set("NORMAL", choices.slice());
+      }
+      for (const [code, connect] of connectOverrides) {
+        out.connectByTerrain.set(code, connect);
+        let kindMap = out.connectAsTileIdByRoomKind.get(code);
+        if (!kindMap) {
+          kindMap = new Map();
+          out.connectAsTileIdByRoomKind.set(code, kindMap);
+        }
+        kindMap.set("NORMAL", connect);
+      }
+      return out;
+    }
+
     displayTileIdForDoorIfPaired(map, tx, ty, salt, roomKind) {
       const kind = roomKind ? String(roomKind).toUpperCase() : null;
       let choices =
@@ -224,6 +300,16 @@
     const ids = asList(obj?.tileIds);
     if (!ids?.length) return [];
     return ids.filter((x) => typeof x === "string" && x);
+  }
+
+  function findObjectRowById(objects, objectId) {
+    const want = String(objectId || "").trim();
+    if (!want || !objects) return null;
+    for (const raw of objects) {
+      const obj = asMap(raw);
+      if (obj && str(obj, "id", "").trim() === want) return obj;
+    }
+    return null;
   }
 
   function findObjectRowOwningTileId(objects, tileId) {
@@ -870,9 +956,10 @@
     salt,
     roomKind,
     objects,
-    tileDefById
+    tileDefById,
+    decoByCell
   ) {
-    const displayId = bridgeDisplayTileId(map, tx, ty, terrainCode, bridge, salt, roomKind);
+    const displayId = bridgeDisplayTileId(map, tx, ty, terrainCode, bridge, salt, roomKind, decoByCell);
     if (!displayId) return null;
     if (terrainCode === TILE_SOLID || terrainCode === TILE_BREAKABLE) {
       const connectId = bridge.connectTileIdForRoomKind(terrainCode, roomKind);
@@ -992,10 +1079,18 @@
     return allow.map((x) => String(x).toUpperCase()).includes(String(roomKind).toUpperCase());
   }
 
-  function bridgeDisplayTileId(map, tx, ty, terrainCode, bridge, salt, roomKind) {
+  function packCell(tx, ty) {
+    return (BigInt(ty) << 32n) | (BigInt(tx) & 0xffffffffn);
+  }
+
+  function bridgeDisplayTileId(map, tx, ty, terrainCode, bridge, salt, roomKind, decoByCell) {
+    if (terrainCode === TILE_EMPTY && decoByCell) {
+      const fromDeco = decoByCell.get(packCell(tx, ty));
+      if (fromDeco) return fromDeco;
+    }
     if (terrainCode === TILE_EMPTY) {
       if (!proceduralDecoSolidOrBreakableBelow(map, tx, ty)) return null;
-      return bridge.displayTileIdForRoomKind(TILE_EMPTY, tx, ty, salt, roomKind, null) || "grass";
+      return bridge.displayTileIdForRoomKind(TILE_EMPTY, tx, ty, salt, roomKind, null);
     }
     if (terrainCode === TILE_DOOR) {
       return bridge.displayTileIdForDoorIfPaired(map, tx, ty, salt, roomKind);
@@ -1006,7 +1101,7 @@
     });
   }
 
-  function resolveTerrainCell(map, tx, ty, terrainCode, bridge, salt, roomKind, objects, tileDefById) {
+  function resolveTerrainCell(map, tx, ty, terrainCode, bridge, salt, roomKind, objects, tileDefById, decoByCell) {
     return resolveTerrainMassCell(
       map,
       tx,
@@ -1016,7 +1111,8 @@
       salt,
       roomKind,
       objects,
-      tileDefById
+      tileDefById,
+      decoByCell
     );
   }
 
@@ -1137,6 +1233,57 @@
       return drew;
     }
 
+    drawDecoTiles(ctx, map, decoTiles, opts) {
+      const {
+        x0 = 0,
+        y0 = 0,
+        x1 = map.getWidth() - 1,
+        y1 = map.getHeight() - 1,
+        bridge = this.bridge,
+        displaySalt = 0,
+        roomKind = "NORMAL",
+        grassTuftsOnly = false,
+        isGrassTuft = null,
+      } = opts || {};
+      const tileDefById = (id) => this.tileById(id);
+      let drawn = 0;
+      for (const d of decoTiles || []) {
+        if (d.tx < x0 || d.tx > x1 || d.ty < y0 || d.ty > y1) continue;
+        const tuft = isGrassTuft ? isGrassTuft(d.decoTileId) : false;
+        if (tuft !== grassTuftsOnly) continue;
+        const t = map.tileAt(d.tx, d.ty);
+        if (t === TILE_DOOR || t === TILE_BREAKABLE) continue;
+        const px = d.tx * 16;
+        const py = d.ty * 16;
+        if (d.decoTileId) {
+          const tileId = resolvePaintedCell(
+            d.decoTileId,
+            map,
+            d.tx,
+            d.ty,
+            t,
+            bridge,
+            displaySalt,
+            roomKind,
+            this.objects,
+            tileDefById
+          );
+          if (tileId && this.drawTile(ctx, tileId, px, py)) drawn++;
+        } else if (d.argb) {
+          const a = ((d.argb >>> 24) & 255) / 255;
+          const r = (d.argb >>> 16) & 255;
+          const g = (d.argb >>> 8) & 255;
+          const b = d.argb & 255;
+          ctx.save();
+          ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+          ctx.fillRect(px, py, 16, 16);
+          ctx.restore();
+          drawn++;
+        }
+      }
+      return drawn;
+    }
+
     drawRoom(ctx, map, opts) {
       const {
         roomKind = "NORMAL",
@@ -1146,36 +1293,23 @@
         x1 = map.getWidth() - 1,
         y1 = map.getHeight() - 1,
         terrainAt = null,
+        bridge: bridgeOverride = null,
+        decoTiles = null,
+        isGrassTuft = null,
       } = opts || {};
+      const bridge = bridgeOverride || this.bridge;
       const tileAt = (tx, ty) => (terrainAt ? terrainAt(tx, ty) : map.tileAt(tx, ty));
       const tileDefById = (id) => this.tileById(id);
+      const decoByCell =
+        decoTiles && global.VernanProceduralDeco?.indexDecoByCell
+          ? global.VernanProceduralDeco.indexDecoByCell(decoTiles)
+          : null;
       let drawn = 0;
       const kind = String(roomKind || "").toUpperCase();
-      const skipGrassUnderlay = kind === "SECRET" || kind === "SUPER_SECRET";
-      // Pass 1: background grass / empty underlay above solid
-      for (let ty = y0; ty <= y1; ty++) {
-        for (let tx = x0; tx <= x1; tx++) {
-          const t = tileAt(tx, ty);
-          if (t === TILE_SOLID || t === TILE_BREAKABLE || t === TILE_DOOR) continue;
-          if (t === TILE_LADDER || t === TILE_PLATFORM) continue;
-          if (t !== TILE_EMPTY) continue;
-          if (skipGrassUnderlay) continue;
-          if (!proceduralDecoSolidOrBreakableBelow(map, tx, ty)) continue;
-          const tileId = resolveTerrainCell(
-            map,
-            tx,
-            ty,
-            TILE_EMPTY,
-            this.bridge,
-            displaySalt,
-            roomKind,
-            this.objects,
-            tileDefById
-          );
-          if (tileId && this.drawTile(ctx, tileId, tx * 16, ty * 16)) drawn++;
-        }
-      }
-      // Pass 2: solids, breakables, platforms, ladders, doors
+      const decoOpts = { x0, y0, x1, y1, bridge, displaySalt, roomKind, isGrassTuft };
+
+      drawn += this.drawDecoTiles(ctx, map, decoTiles, { ...decoOpts, grassTuftsOnly: false });
+
       for (let ty = y0; ty <= y1; ty++) {
         for (let tx = x0; tx <= x1; tx++) {
           const t = tileAt(tx, ty);
@@ -1193,15 +1327,18 @@
             tx,
             ty,
             t,
-            this.bridge,
+            bridge,
             displaySalt,
             roomKind,
             this.objects,
-            tileDefById
+            tileDefById,
+            decoByCell
           );
           if (tileId && this.drawTile(ctx, tileId, tx * 16, ty * 16)) drawn++;
         }
       }
+
+      drawn += this.drawDecoTiles(ctx, map, decoTiles, { ...decoOpts, grassTuftsOnly: true });
       return drawn;
     }
   }

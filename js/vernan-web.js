@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.41";
+const WEB_CLIENT_VERSION_STR = "0.1.42";
 
   // --- math/util.ts ---
 
@@ -1461,6 +1461,9 @@ function makeGeneratedRoom(map, meta){
     kind: meta.kind ?? RoomKind.NORMAL,
     enemyCount: meta.enemyCount ?? 0,
     enemySpawns: meta.enemySpawns ?? [],
+    decoTiles: meta.decoTiles ?? [],
+    roomBridge: meta.roomBridge ?? null,
+    biomeId: meta.biomeId ?? null,
   };
 }
 
@@ -1718,7 +1721,7 @@ function openEnteredFaceForTransition(layout, rooms, seams, fromRoom, toRoom, di
   if (seam && !seam.isDone()) seam.openRoomFaceInstant(rooms, toRoom);
 }
 
-function buildDungeonContent(layout, dungeonFloorOrdinal = 1){
+function buildDungeonContent(layout, dungeonFloorOrdinal = 1, tilesetRuntime = null){
   const n = layout.roomCount();
   const plannedW = plannedRoomWidths(layout);
   const plannedH = plannedRoomHeights(layout);
@@ -1728,14 +1731,14 @@ function buildDungeonContent(layout, dungeonFloorOrdinal = 1){
     if (isSecretKind(kind)) continue;
     rooms[i] = generateRoomContent(layout.room(i), plannedW[i], plannedH[i], {
       neighborFaces: neighborSecretFaces(layout, i),
-    });
+    }, dungeonFloorOrdinal, tilesetRuntime);
   }
   for (let i = 0; i < n; i++) {
     const kind = layout.room(i).kind;
     if (!isSecretKind(kind)) continue;
     rooms[i] = generateRoomContent(layout.room(i), plannedW[i], plannedH[i], {
       secretSeams: secretRoomSeams(layout, i, rooms),
-    });
+    }, dungeonFloorOrdinal, tilesetRuntime);
   }
   const seams = placeSecretEntranceSeams(layout, rooms);
   applyPostGenerationEnemies(layout, rooms, dungeonFloorOrdinal);
@@ -1743,7 +1746,7 @@ function buildDungeonContent(layout, dungeonFloorOrdinal = 1){
 }
 
 /** Procedural room generator (port of Java RoomGenerator core terrain pass). */
-function generateRoomContent(node, plannedW, plannedH, secretFinish = null){
+function generateRoomContent(node, plannedW, plannedH, secretFinish = null, dungeonFloorOrdinal = 1, tilesetRuntime = null){
   const kind = node.kind;
   const w = plannedW;
   const h = plannedH;
@@ -2011,7 +2014,29 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null){
       secretFinish.neighborFaces ?? null
     );
   }
-  return { ...gen, enemySpawns: [], enemyCount: 0 };
+
+  let decoTiles = [];
+  let roomBridge = null;
+  let biomeId = null;
+  if (tilesetRuntime && typeof VernanProceduralDeco !== "undefined") {
+    const biome = VernanProceduralDeco.resolveRoomBiome(tilesetRuntime, kind, node.contentSeed, rng);
+    biomeId = biome.biomeId;
+    roomBridge = VernanProceduralDeco.buildRoomTerrainBridge(tilesetRuntime, biome.biomeRow, kind);
+    decoTiles = VernanProceduralDeco.scatterRoomDeco({
+      grid,
+      w,
+      h,
+      contentSeed: node.contentSeed,
+      ladderTx: dungeonLadderTx,
+      roomKind: kind,
+      tilesetRoot: tilesetRuntime.root,
+      objects: tilesetRuntime.objects,
+      biomeRow: biome.biomeRow,
+      rng,
+    });
+  }
+
+  return { ...gen, enemySpawns: [], enemyCount: 0, decoTiles, roomBridge, biomeId };
 }
 
 function rollPostGenerationEnemies(gen, contentSeed, kind, dungeonFloorOrdinal) {
@@ -4573,6 +4598,7 @@ class GameSim {
     this.itemCatalog = opts.itemCatalog ?? null;
     this.assetLoader = opts.assetLoader ?? null;
     this.backgroundRegistry = opts.backgroundRegistry ?? null;
+    this.tilesetRuntime = opts.tilesetRuntime ?? null;
     if (this.itemCatalog) {
       this.pedestalDecks = new PedestalItemDecks(this.itemCatalog);
     }
@@ -4593,7 +4619,7 @@ class GameSim {
     this.decorationTime = 0;
     this.itemPickupOverlay = null;
     this.layout = DungeonLayout.generate(this.seed, 12, 24);
-    const built = buildDungeonContent(this.layout, this.dungeonLevel);
+    const built = buildDungeonContent(this.layout, this.dungeonLevel, this.tilesetRuntime);
     this.cachedRooms = built.rooms;
     this.secretEntranceSeams = built.seams;
     const n = this.layout.roomCount();
@@ -5162,6 +5188,8 @@ class GameSim {
       roomKind: this.layout.room(this.currentRoomId).kind,
       backgroundPresetId: this.getBackgroundPresetId(this.currentRoomId),
       displaySalt: this.layout.room(this.currentRoomId).contentSeed,
+      decoTiles: this.currentGeneratedRoom()?.decoTiles ?? [],
+      roomBridge: this.currentGeneratedRoom()?.roomBridge ?? null,
       seed: this.seed,
       gameOver: this.gameOver,
       layout: this.layout,
@@ -5448,6 +5476,7 @@ class RenderPipeline {
     const sheet =
       underground && imageDrawable(underground) ? underground : forest;
 
+    const drawSky = !tilesetRuntime;
     if (drawSky) {
       this.drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet, tilesetRuntime);
     }
@@ -5459,9 +5488,16 @@ class RenderPipeline {
 
     if (tilesetRuntime) {
       try {
+        const objects = tilesetRuntime.objects || [];
+        const isGrassTuft = (tid) =>
+          typeof VernanProceduralDeco !== "undefined" &&
+          VernanProceduralDeco.isGrassTuftDeco(objects, tid);
         tilesetRuntime.drawRoom(ctx, map, {
           roomKind: snap.roomKind,
           displaySalt: snap.displaySalt,
+          bridge: snap.roomBridge || undefined,
+          decoTiles: snap.decoTiles,
+          isGrassTuft,
           x0,
           y0,
           x1,
@@ -6258,7 +6294,7 @@ async function mount(selector, options = {}){
   canvas.focus();
   canvas.addEventListener("click", () => canvas.focus());
 
-  const sim = new GameSim({ seed, assetLoader: loader, itemCatalog, backgroundRegistry });
+  const sim = new GameSim({ seed, assetLoader: loader, itemCatalog, backgroundRegistry, tilesetRuntime });
   const pipeline = new RenderPipeline(canvas);
   const input = new Input();
   const unbindInput = input.bind(canvas);
