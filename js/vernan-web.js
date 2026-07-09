@@ -2851,7 +2851,8 @@ function moveAndCollide(
   vx,
   vy,
   dt,
-  onPlatform = false
+  onPlatform = false,
+  climbing = false
 ){
   let nx = x + vx * dt;
   let ny = y + vy * dt;
@@ -2862,13 +2863,13 @@ function moveAndCollide(
   // Horizontal
   if (vx !== 0) {
     const test = rect(nx, y, w, h);
-    if (!overlapsSolids(map, test, onPlatform)) {
+    if (!overlapsSolids(map, test, onPlatform, false, climbing)) {
       x = nx;
     } else {
       const step = vx > 0 ? 1 : -1;
       while (Math.abs(nx - x) > 0.01) {
         const tryX = x + step;
-        if (!overlapsSolids(map, rect(tryX, y, w, h), onPlatform)) x = tryX;
+        if (!overlapsSolids(map, rect(tryX, y, w, h), onPlatform, false, climbing)) x = tryX;
         else break;
       }
       nvx = 0;
@@ -2878,13 +2879,13 @@ function moveAndCollide(
   // Vertical
   if (vy !== 0) {
     const test = rect(x, ny, w, h);
-    if (!overlapsSolids(map, test, onPlatform, vy > 0)) {
+    if (!overlapsSolids(map, test, onPlatform, vy > 0, climbing)) {
       y = ny;
     } else {
       const step = vy > 0 ? 1 : -1;
       while (Math.abs(ny - y) > 0.01) {
         const tryY = y + step;
-        if (!overlapsSolids(map, rect(x, tryY, w, h), onPlatform, vy > 0)) y = tryY;
+        if (!overlapsSolids(map, rect(x, tryY, w, h), onPlatform, vy > 0, climbing)) y = tryY;
         else break;
       }
       if (vy > 0) {
@@ -2896,7 +2897,7 @@ function moveAndCollide(
     }
   }
 
-  if (!grounded && nvy <= 0 && vy >= 0) {
+  if (!grounded && nvy <= 0 && vy >= 0 && !climbing) {
     grounded = probeGrounded(map, x, y, w, h, onPlatform);
   }
 
@@ -2912,7 +2913,8 @@ function overlapsSolids(
   map,
   r,
   allowPlatform,
-  falling = false
+  falling = false,
+  climbing = false
 ){
   const x0 = Math.floor(r.x / TILE_SIZE);
   const x1 = Math.floor((r.x + r.w - 1e-6) / TILE_SIZE);
@@ -2921,6 +2923,7 @@ function overlapsSolids(
   for (let ty = y0; ty <= y1; ty++) {
     for (let tx = x0; tx <= x1; tx++) {
       if (map.isSolidTile(tx, ty)) return true;
+      if (climbing) continue;
       if (map.isPlatformTile(tx, ty)) {
         if (!allowPlatform && falling) {
           const platTop = ty * TILE_SIZE;
@@ -3000,6 +3003,39 @@ function playerOverlapsLadder(map, player){
     }
   }
   return false;
+}
+
+/** True when feet rest on a one-way deck in the climb shaft column (mouth platform). */
+function feetOnPlatformDeckInColumn(map, player, columnTx){
+  if (columnTx < 0) return false;
+  const feetTy = Math.floor((player.feetY() - 1e-3) / TILE_SIZE);
+  if (feetTy < 0 || feetTy >= map.getHeight()) return false;
+  if (!map.isPlatformTile(columnTx, feetTy)) return false;
+  const deckTop = feetTy * TILE_SIZE;
+  return player.feetY() >= deckTop - 1 && player.feetY() <= deckTop + 2;
+}
+
+/** Ladder continues above the mouth deck in this column — not a dead-end roof. */
+function ladderContinuesAboveDeck(map, columnTx, deckTy){
+  if (columnTx < 0 || deckTy < 1) return false;
+  for (let y = deckTy - 1; y >= 1; y--) {
+    if (map.isLadderTile(columnTx, y)) return true;
+    if (map.isSolidTile(columnTx, y)) return false;
+  }
+  return false;
+}
+
+/**
+ * Java canStepOffLadderTop (simplified): allow standing on mouth deck only when the shaft does not
+ * continue above it. Otherwise the player stays latched on the ladder under the roof.
+ */
+function canStepOffLadderTop(map, player, columnTx){
+  if (columnTx < 0 || player.y <= TILE_SIZE) return false;
+  if (!feetOnPlatformDeckInColumn(map, player, columnTx)) return false;
+  if (!playerOverlapsLadderColumn(map, player, columnTx)) return false;
+  const deckTy = Math.floor((player.feetY() - 1e-3) / TILE_SIZE);
+  if (ladderContinuesAboveDeck(map, columnTx, deckTy)) return false;
+  return true;
 }
 
 const ENEMY_CRAWLER_HITBOX_H = 12;
@@ -3190,6 +3226,9 @@ class SquashStretch {
 const LANDING_LOCK_MAX_FRAMES = 20;
 const EXTENDED_FALL_DELAY_SEC = 0.12;
 const LAND_SQUASH_SCALE_X = 1.2;
+/** Ground/air jump vy multiplier when lift-off speed ≥99% of max run speed (Java PlayerStats). */
+const HIGH_SPEED_JUMP_VEL_MULT = 1.2;
+const HIGH_SPEED_JUMP_SPEED_FRAC = 0.99;
 
 function applyLandSquash(squash, recoverFrames){
   squash.applyStretchX(LAND_SQUASH_SCALE_X, Math.max(1, recoverFrames));
@@ -3207,6 +3246,7 @@ class Player {
   activeClimbShaftTx = -1;
   crouching = false;
   jumpSquatFrames = 0;
+  jumpSquatMaxAbsVx = 0;
   landingLockFrames = 0;
   extendedFallFrames = 0;
   fallPhaseTimer = 0;
@@ -3256,6 +3296,7 @@ class Player {
     this.climbing = false;
     this.activeClimbShaftTx = -1;
     this.jumpSquatFrames = 0;
+    this.jumpSquatMaxAbsVx = 0;
     this.landingLockFrames = 0;
     this.extendedFallFrames = 0;
     this.fallPhaseTimer = 0;
@@ -3377,8 +3418,37 @@ class Player {
         this.onGround = false;
         this.vx = 0;
         this.vy = 0;
-        if (up) this.y -= this.stats.climbSpeed * dt;
-        if (down) this.y += this.stats.climbSpeed * dt;
+        let climbVy = 0;
+        if (up) climbVy -= this.stats.climbSpeed;
+        if (down) climbVy += this.stats.climbSpeed;
+        if (climbVy !== 0) {
+          const cr = moveAndCollide(
+            map,
+            this.x,
+            this.y,
+            this.w(),
+            this.h(),
+            0,
+            climbVy,
+            dt,
+            false,
+            true
+          );
+          this.y = cr.y;
+          if (climbVy > 0 && cr.onGround) {
+            if (shaftCol >= 0 && feetOnPlatformDeckInColumn(map, this, shaftCol)) {
+              if (canStepOffLadderTop(map, this, shaftCol)) {
+                this.climbing = false;
+                this.onGround = true;
+              } else if (!playerOverlapsLadderColumn(map, this, shaftCol)) {
+                this.climbing = false;
+                this.onGround = false;
+              }
+            } else {
+              this.onGround = cr.onGround;
+            }
+          }
+        }
         if (left) this.facing = -1;
         if (right) this.facing = 1;
         if (up || down) {
@@ -3443,20 +3513,32 @@ class Player {
     const canJump = this.onGround || this.coyoteTimer > 0;
     const wantsJump = jumpHeld || this.jumpBufferTimer > 0;
 
-    // Jump squat
+    // Jump squat — track peak horizontal speed during wind-up for high-speed jump (Java jumpSquatMaxAbsVx).
     if (!blocksJump && wantsJump && canJump && this.jumpSquatFrames === 0) {
       this.jumpSquatFrames = this.stats.jumpSquatFrames;
+      this.jumpSquatMaxAbsVx = Math.abs(this.vx);
       this.jumpBufferTimer = 0;
       this.coyoteTimer = 0;
       this.landingLockFrames = 0;
       this.walkOffLedgeActive = false;
     }
     if (this.jumpSquatFrames > 0) {
+      this.jumpSquatMaxAbsVx = Math.max(this.jumpSquatMaxAbsVx, Math.abs(this.vx));
       this.vy = 0;
       this.jumpSquatFrames--;
       if (this.jumpSquatFrames === 0) {
-        this.vy = -this.stats.jumpVel;
+        let jumpVel = this.stats.jumpVel;
+        const highRunSpeed =
+          this.jumpSquatMaxAbsVx >= this.stats.maxGroundSpeed * HIGH_SPEED_JUMP_SPEED_FRAC;
+        const highAirSpeed =
+          this.jumpSquatMaxAbsVx >= this.stats.maxAirSpeed * HIGH_SPEED_JUMP_SPEED_FRAC;
+        if (highRunSpeed || highAirSpeed) {
+          jumpVel *= HIGH_SPEED_JUMP_VEL_MULT;
+        }
+        this.vy = -jumpVel;
+        this.vx = clamp(this.vx, -this.stats.maxAirSpeed, this.stats.maxAirSpeed);
         this.onGround = false;
+        this.jumpSquatMaxAbsVx = 0;
       }
     }
 
