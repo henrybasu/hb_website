@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.37";
+const WEB_CLIENT_VERSION_STR = "0.1.38";
 
   // --- math/util.ts ---
 
@@ -3051,7 +3051,7 @@ function rollEnemySpawns(gen, contentSeed, kind, dungeonFloor){
   const eligible = enemyEligibleKinds(dungeonFloor, secretRoom);
   if (!eligible.length) return [];
   const rng = javaRandom(Number(BigInt(contentSeed) ^ 0x5deece66n));
-  const budget = rng.nextInt(Math.max(0, dungeonFloor) * 4 + 1);
+  let budget = rng.nextInt(Math.max(0, dungeonFloor) * 4 + 1);
   if (budget <= 0) return [];
 
   const want = 1 + rng.nextInt(Math.min(3, eligible.length));
