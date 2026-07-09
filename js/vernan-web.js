@@ -20,6 +20,11 @@ const PLAYER_STAND_H = 18;
 const PLAYER_STAND_W = 10;
 const SPRITE_FRAME_W = 32;
 const SPRITE_FRAME_H = 32;
+/** Sword overlay strip: 48×32 per frame (32px body + 16px reach extension on the right). */
+const WEAPON_ATTACK_FRAME_W = 48;
+const WEAPON_ATTACK_FRAME_H = 32;
+const WEAPON_ATTACK_BODY_W = 32;
+const WEAPON_ATTACK_EXTENSION_PX = 16;
 
 const TILE_EMPTY = 0;
 const TILE_SOLID = 1;
@@ -30,7 +35,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.12";
+const WEB_CLIENT_VERSION_STR = "0.1.20";
 
   // --- math/util.ts ---
 
@@ -91,6 +96,54 @@ function mulberry32(seed){
     t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
     return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
   };
+}
+
+/** Java-compatible Random (48-bit LCG) for dungeon / room parity with desktop Vernan. */
+function javaRandom(seed){
+  const MULTIPLIER = 0x5deece66dn;
+  const ADDEND = 0xbn;
+  const MASK = (1n << 48n) - 1n;
+  let state = (BigInt.asUintN(64, BigInt(seed)) ^ MULTIPLIER) & MASK;
+  function next(bits){
+    state = (state * MULTIPLIER + ADDEND) & MASK;
+    return Number(state >> (48n - BigInt(bits)));
+  }
+  return {
+    nextInt(bound){
+      if (bound <= 0) return 0;
+      if ((bound & -bound) === bound) return next(31) & (bound - 1);
+      let bits;
+      let val;
+      do {
+        bits = next(31);
+        val = bits % bound;
+      } while (bits - val + (bound - 1) < 0);
+      return val;
+    },
+    nextDouble(){
+      return (next(26) * 2 ** 27 + next(27)) / 2 ** 53;
+    },
+    nextBoolean(){
+      return next(1) !== 0;
+    },
+  };
+}
+
+function shuffleInPlace(arr, rng){
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = rng.nextInt(i + 1);
+    const tmp = arr[i];
+    arr[i] = arr[j];
+    arr[j] = tmp;
+  }
+}
+
+function roomContentSeed(runSeed, roomId, gx, gy){
+  const a = BigInt.asUintN(64, BigInt(runSeed));
+  const b = BigInt(roomId) * 0x9e3779b97f4a7c15n;
+  const c = BigInt(gx) * 0x51c3n;
+  const d = BigInt(gy) * 0x1b873593n;
+  return Number((a + b + c + d) & 0xffffffffffffffffn);
 }
 
 function hashLayout(rooms){
@@ -234,6 +287,67 @@ function charToTile(c){
   }
 }
 
+function isFloorTerrainTile(map, tx, ty) {
+  const t = map.tileAt(tx, ty);
+  return t === TILE_SOLID || t === TILE_BREAKABLE;
+}
+
+function solidAutotileCell(map, tx, ty) {
+  const n = isFloorTerrainTile(map, tx, ty - 1);
+  const s = isFloorTerrainTile(map, tx, ty + 1);
+  const e = isFloorTerrainTile(map, tx + 1, ty);
+  const w = isFloorTerrainTile(map, tx - 1, ty);
+  const mask = (n ? 1 : 0) | (e ? 2 : 0) | (s ? 4 : 0) | (w ? 8 : 0);
+  const cells = [
+    [2, 2],
+    [3, 1],
+    [2, 1],
+    [3, 1],
+    [2, 0],
+    [3, 0],
+    [2, 0],
+    [3, 0],
+    [3, 2],
+    [3, 2],
+    [2, 2],
+    [3, 2],
+    [2, 2],
+    [3, 2],
+    [2, 2],
+    [2, 2],
+  ];
+  return cells[mask] || [2, 2];
+}
+
+function resolveAssetUrl(assetBase, relPath){
+  try {
+    return new URL(relPath, assetBase).href;
+  } catch (_e) {
+    return assetBase + relPath;
+  }
+}
+
+/** True when an HTMLImageElement is safe to pass to drawImage. */
+function imageDrawable(img){
+  if (!img) return false;
+  if (img instanceof HTMLImageElement) {
+    if (img.naturalWidth > 0 && img.naturalHeight > 0) return true;
+    if (img.complete && img.width > 0 && img.height > 0) return true;
+    return false;
+  }
+  return typeof img.width === "number" && img.width > 0;
+}
+
+function drawForestTile(ctx, sheet, col, row, px, py) {
+  if (!imageDrawable(sheet)) return false;
+  try {
+    ctx.drawImage(sheet, col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE, px, py, TILE_SIZE, TILE_SIZE);
+    return true;
+  } catch (_e) {
+    return false;
+  }
+}
+
 function tileToColor(tile){
   switch (tile) {
     case TILE_SOLID:
@@ -328,66 +442,284 @@ class DungeonLayout {
   }
 
   static generate(runSeed, targetRooms = 12, roomWidthTiles = 24){
-    const n = Math.max(6, Math.min(24, targetRooms));
     const w = Math.max(24, roomWidthTiles);
-    const rng = mulberry32(Number(runSeed & 0xffffffff));
+    const n = clamp(targetRooms, 6, 24);
+    const SPECIAL_ROOM_ATTEMPTS = 256;
 
-    const cells = [{ gx: 0, gy: 0 }];
-    const cellSet = new Set([key(0, 0)]);
+    for (let attempt = 0; attempt < SPECIAL_ROOM_ATTEMPTS; attempt++) {
+      const salt = Number(BigInt(runSeed) ^ (BigInt(attempt) * 0x9e3779b97f4a7c15n));
+      const rng = javaRandom(Number(BigInt(salt) ^ 0xc0ffeeb00ban));
+      const g = buildDungeonGraph(rng, n, w, runSeed);
+      if (!canPlaceSpecialRooms(g.rooms)) continue;
+      assignSpecialRoomKinds(g.rooms, rng);
+      return new DungeonLayout(g.rooms, g.cellToId);
+    }
 
-    while (cells.length < n) {
-      const pick = Math.floor(rng() * cells.length);
-      const base = cells[pick];
-      const dirs = [
-        { gx: base.gx - 1, gy: base.gy },
-        { gx: base.gx + 1, gy: base.gy },
-        { gx: base.gx, gy: base.gy - 1 },
-        { gx: base.gx, gy: base.gy + 1 },
-      ];
-      const d = dirs[Math.floor(rng() * dirs.length)];
-      const k = key(d.gx, d.gy);
-      if (!cellSet.has(k)) {
-        cellSet.add(k);
-        cells.push(d);
+    for (let attempt = 0; attempt < SPECIAL_ROOM_ATTEMPTS; attempt++) {
+      const salt = Number(BigInt(runSeed) ^ 0xdeadbeefn ^ (BigInt(attempt) * 0x9e3779b97f4a7c15n));
+      const rng = javaRandom(Number(BigInt(salt) ^ 0xc0ffeeb00ban));
+      const g = buildDungeonGraph(rng, n, w, runSeed);
+      assignSpecialRoomKindsRelaxed(g.rooms, rng);
+      return new DungeonLayout(g.rooms, g.cellToId);
+    }
+
+    const rng = javaRandom(Number(BigInt(runSeed) ^ 0xdeadbeefdeadbeefn ^ 0xc0ffeeb00ban));
+    const g = buildDungeonGraph(rng, n, w, runSeed);
+    assignSpecialRoomKindsRelaxed(g.rooms, rng);
+    return new DungeonLayout(g.rooms, g.cellToId);
+  }
+}
+
+function buildDungeonGraph(rng, n, w, runSeed){
+  const cells = [[0, 0]];
+  const index = new Map([[key(0, 0), 0]]);
+  if (n >= 2) {
+    cells.push([0, 1]);
+    index.set(key(0, 1), 1);
+  }
+
+  const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]];
+
+  while (cells.length < n) {
+    const pick = pickExpansionCell(cells, index, rng);
+    const gx = cells[pick][0];
+    const gy = cells[pick][1];
+    const shuffled = dirs.map((d) => d.slice());
+    shuffleInPlace(shuffled, rng);
+
+    let added = false;
+    for (const d of shuffled) {
+      const nx = gx + d[0];
+      const ny = gy + d[1];
+      if (Math.abs(nx) > 6 || Math.abs(ny) > 6) continue;
+      const k = key(nx, ny);
+      if (index.has(k)) continue;
+      index.set(k, cells.length);
+      cells.push([nx, ny]);
+      added = true;
+      break;
+    }
+    if (!added) {
+      let any = false;
+      for (let attempt = 0; attempt < cells.length * 4; attempt++) {
+        const j = rng.nextInt(cells.length);
+        const cx = cells[j][0];
+        const cy = cells[j][1];
+        const d = dirs[rng.nextInt(4)];
+        const nx = cx + d[0];
+        const ny = cy + d[1];
+        if (Math.abs(nx) > 6 || Math.abs(ny) > 6) continue;
+        const k = key(nx, ny);
+        if (index.has(k)) continue;
+        index.set(k, cells.length);
+        cells.push([nx, ny]);
+        any = true;
+        break;
+      }
+      if (!any) break;
+    }
+  }
+
+  const count = cells.length;
+  const doorW = new Array(count).fill(false);
+  const doorE = new Array(count).fill(false);
+  const ladN = new Array(count).fill(false);
+  const ladS = new Array(count).fill(false);
+  const ladderTx = new Array(count).fill(-1);
+
+  for (let i = 0; i < count; i++) {
+    const gx = cells[i][0];
+    const gy = cells[i][1];
+    if (index.has(key(gx - 1, gy))) doorW[i] = true;
+    if (index.has(key(gx + 1, gy))) doorE[i] = true;
+    if (index.has(key(gx, gy - 1))) ladN[i] = true;
+    if (index.has(key(gx, gy + 1))) ladS[i] = true;
+  }
+
+  const ladderMin = 8;
+  const ladderMaxExcl = Math.max(ladderMin + 1, w - 8);
+  const ladderSpan = ladderMaxExcl - ladderMin;
+  for (let i = 0; i < count; i++) {
+    if (!ladS[i]) continue;
+    const gx = cells[i][0];
+    const gy = cells[i][1];
+    const j = index.get(key(gx, gy + 1));
+    if (j == null) continue;
+    let L;
+    if (ladderTx[i] >= 0) L = ladderTx[i];
+    else if (ladderTx[j] >= 0) L = ladderTx[j];
+    else L = ladderMin + (ladderSpan > 0 ? rng.nextInt(ladderSpan) : 0);
+    ladderTx[i] = L;
+    ladderTx[j] = L;
+  }
+
+  for (let i = 0; i < count; i++) {
+    if (!ladN[i] && !ladS[i]) continue;
+    if (ladderTx[i] >= 0) continue;
+    const gx = cells[i][0];
+    const gy = cells[i][1];
+    let L = ladderMin + (ladderSpan > 0 ? rng.nextInt(ladderSpan) : 0);
+    if (ladS[i]) {
+      const j = index.get(key(gx, gy + 1));
+      if (j != null) {
+        ladderTx[i] = L;
+        ladderTx[j] = L;
+      }
+    } else if (ladN[i]) {
+      const j = index.get(key(gx, gy - 1));
+      if (j != null) {
+        if (ladderTx[j] >= 0) L = ladderTx[j];
+        ladderTx[i] = L;
+        ladderTx[j] = L;
       }
     }
+  }
 
-    const cellToId = new Map();
-    const rooms = cells.map((c, id) => {
-      cellToId.set(key(c.gx, c.gy), id);
-      const contentSeed = (runSeed ^ (id * 0x9e3779b9)) >>> 0;
-      return {
-        id,
-        gridX: c.gx,
-        gridY: c.gy,
-        contentSeed,
-        doorWest: false,
-        doorEast: false,
-        ladderNorth: false,
-        ladderSouth: false,
-        ladderColumnTx: 3 + Math.floor(rng() * Math.max(1, w - 7)),
-        kind: id === 0 ? RoomKind.START : RoomKind.NORMAL,
-      };
+  const rooms = [];
+  const cellToId = new Map();
+  for (let i = 0; i < count; i++) {
+    const gx = cells[i][0];
+    const gy = cells[i][1];
+    cellToId.set(key(gx, gy), i);
+    rooms.push({
+      id: i,
+      gridX: gx,
+      gridY: gy,
+      contentSeed: roomContentSeed(runSeed, i, gx, gy),
+      doorWest: doorW[i],
+      doorEast: doorE[i],
+      ladderNorth: ladN[i],
+      ladderSouth: ladS[i],
+      ladderColumnTx: ladderTx[i],
+      kind: RoomKind.NORMAL,
     });
+  }
+  return { rooms, cellToId };
+}
 
-    for (const r of rooms) {
-      r.doorWest = cellToId.has(key(r.gridX - 1, r.gridY));
-      r.doorEast = cellToId.has(key(r.gridX + 1, r.gridY));
-      r.ladderNorth = cellToId.has(key(r.gridX, r.gridY - 1));
-      r.ladderSouth = cellToId.has(key(r.gridX, r.gridY + 1));
+function pickExpansionCell(cells, index, rng){
+  const leafIdx = [];
+  for (let i = 0; i < cells.length; i++) {
+    const gx = cells[i][0];
+    const gy = cells[i][1];
+    let deg = 0;
+    if (index.has(key(gx - 1, gy))) deg++;
+    if (index.has(key(gx + 1, gy))) deg++;
+    if (index.has(key(gx, gy - 1))) deg++;
+    if (index.has(key(gx, gy + 1))) deg++;
+    if (deg === 1) leafIdx.push(i);
+  }
+  if (leafIdx.length > 0 && rng.nextDouble() < 0.65) {
+    return leafIdx[rng.nextInt(leafIdx.length)];
+  }
+  return rng.nextInt(cells.length);
+}
+
+function graphDegree(r){
+  return (r.doorWest ? 1 : 0) + (r.doorEast ? 1 : 0) + (r.ladderNorth ? 1 : 0) + (r.ladderSouth ? 1 : 0);
+}
+
+function isAdjacentToStart(rooms, roomId){
+  const a = rooms[0];
+  const b = rooms[roomId];
+  const dx = Math.abs(a.gridX - b.gridX);
+  const dy = Math.abs(a.gridY - b.gridY);
+  return (dx === 1 && dy === 0) || (dx === 0 && dy === 1);
+}
+
+function canPlaceSpecialRooms(rooms){
+  let leaves = 0;
+  let bossOkApartFromStart = 0;
+  for (let id = 1; id < rooms.length; id++) {
+    const r = rooms[id];
+    if (graphDegree(r) === 1) leaves++;
+    const horiz = (r.doorWest ? 1 : 0) + (r.doorEast ? 1 : 0);
+    if (horiz === 1 && !r.ladderNorth && !r.ladderSouth && !isAdjacentToStart(rooms, id)) {
+      bossOkApartFromStart++;
     }
+  }
+  return bossOkApartFromStart >= 1 && leaves >= 3;
+}
 
-    // Assign special rooms
-    const specials = [RoomKind.ITEM, RoomKind.SHOP, RoomKind.BOSS];
-    const candidates = rooms.filter((r) => r.id !== 0 && r.kind === RoomKind.NORMAL);
-    for (const kind of specials) {
-      if (candidates.length === 0) break;
-      const idx = Math.floor(rng() * candidates.length);
-      candidates[idx].kind = kind;
-      candidates.splice(idx, 1);
+function assignSpecialRoomKinds(rooms, rng){
+  const kinds = rooms.map(() => RoomKind.NORMAL);
+  kinds[0] = RoomKind.START;
+
+  const leaves = [];
+  const bossEligible = [];
+  for (let id = 1; id < rooms.length; id++) {
+    const r = rooms[id];
+    if (graphDegree(r) === 1) leaves.push(id);
+    const horiz = (r.doorWest ? 1 : 0) + (r.doorEast ? 1 : 0);
+    if (horiz === 1 && !r.ladderNorth && !r.ladderSouth && !isAdjacentToStart(rooms, id)) {
+      bossEligible.push(id);
     }
+  }
+  shuffleInPlace(leaves, rng);
+  shuffleInPlace(bossEligible, rng);
 
-    return new DungeonLayout(rooms, cellToId);
+  const bossId = bossEligible[0];
+  kinds[bossId] = RoomKind.BOSS;
+
+  let itemId = -1;
+  for (const id of leaves) {
+    if (id !== bossId) {
+      itemId = id;
+      kinds[id] = RoomKind.ITEM;
+      break;
+    }
+  }
+  for (const id of leaves) {
+    if (id !== bossId && id !== itemId) {
+      kinds[id] = RoomKind.SHOP;
+      break;
+    }
+  }
+
+  for (let i = 0; i < rooms.length; i++) {
+    rooms[i].kind = kinds[i];
+  }
+}
+
+function assignSpecialRoomKindsRelaxed(rooms, rng){
+  const kinds = rooms.map(() => RoomKind.NORMAL);
+  kinds[0] = RoomKind.START;
+
+  const pool = [];
+  for (let id = 1; id < rooms.length; id++) pool.push(id);
+  shuffleInPlace(pool, rng);
+
+  const bossEligible = [];
+  const bossEligibleNearStart = [];
+  for (let id = 1; id < rooms.length; id++) {
+    const r = rooms[id];
+    const horiz = (r.doorWest ? 1 : 0) + (r.doorEast ? 1 : 0);
+    if (horiz === 1 && !r.ladderNorth && !r.ladderSouth) {
+      (isAdjacentToStart(rooms, id) ? bossEligibleNearStart : bossEligible).push(id);
+    }
+  }
+  shuffleInPlace(bossEligible, rng);
+  shuffleInPlace(bossEligibleNearStart, rng);
+
+  if (bossEligible.length > 0) kinds[bossEligible[0]] = RoomKind.BOSS;
+  else if (bossEligibleNearStart.length > 0) kinds[bossEligibleNearStart[0]] = RoomKind.BOSS;
+  else if (pool.length > 0) kinds[pool[0]] = RoomKind.BOSS;
+
+  for (const id of pool) {
+    if (kinds[id] === RoomKind.NORMAL) {
+      kinds[id] = RoomKind.ITEM;
+      break;
+    }
+  }
+  for (const id of pool) {
+    if (kinds[id] === RoomKind.NORMAL) {
+      kinds[id] = RoomKind.SHOP;
+      break;
+    }
+  }
+
+  for (let i = 0; i < rooms.length; i++) {
+    rooms[i].kind = kinds[i];
   }
 }
 
@@ -424,87 +756,338 @@ const WIDE_W = Math.max(64, WORLD_VIEWPORT_W / TILE_SIZE);
 const WIDE_H = Math.max(12, WORLD_VIEWPORT_H / TILE_SIZE);
 const SCREEN_W = Math.max(10, Math.ceil(WORLD_VIEWPORT_W / TILE_SIZE));
 const SCREEN_H = Math.max(8, Math.ceil(WORLD_VIEWPORT_H / TILE_SIZE));
+const STANDARD_TERRAIN_REACH_FROM_GRID_Y = 4;
+const EASY_TERRAIN_MAX_VERTICAL_REACH_TILES = 2;
+const STANDARD_TERRAIN_MAX_VERTICAL_REACH_TILES = 3;
 
 function isOneScreenRoomKind(k){
   return k !== RoomKind.NORMAL && k !== RoomKind.SECRET;
 }
 
-/** Procedural room generator (simplified port of RoomGenerator). */
-function generateRoom(node){
-  const oneScreen = isOneScreenRoomKind(node.kind);
-  const w = oneScreen ? SCREEN_W : WIDE_W;
-  const h = oneScreen ? SCREEN_H : WIDE_H;
-  const rng = mulberry32(node.contentSeed >>> 0);
-
-  const rows = [];
-  for (let y = 0; y < h; y++) {
-    let row = "";
-    for (let x = 0; x < w; x++) {
-      const border = x === 0 || y === 0 || x === w - 1 || y === h - 1;
-      if (border) row += "#";
-      else if (y === h - 2) row += "#";
-      else row += ".";
-    }
-    rows.push(row);
-  }
-
-  // Floor variation
-  const gy = h - 2;
-  for (let x = 1; x < w - 1; x++) {
-    if (rng() < 0.08 && x > 3 && x < w - 4) {
-      rows[gy] = setChar(rows[gy], x, "-");
-    }
-  }
-
-  // Platforms
-  const platCount = oneScreen ? 1 + Math.floor(rng() * 2) : 2 + Math.floor(rng() * 4);
-  for (let i = 0; i < platCount; i++) {
-    const px = 2 + Math.floor(rng() * (w - 6));
-    const py = 4 + Math.floor(rng() * (h - 8));
-    const len = 2 + Math.floor(rng() * 4);
-    for (let dx = 0; dx < len && px + dx < w - 1; dx++) {
-      rows[py] = setChar(rows[py], px + dx, "-");
-    }
-  }
-
-  // Ladder shaft
-  if (node.ladderNorth || node.ladderSouth) {
-    const lx = Math.max(2, Math.min(w - 3, node.ladderColumnTx));
-    const y0 = node.ladderNorth ? 1 : Math.floor(h / 2);
-    const y1 = node.ladderSouth ? h - 3 : Math.floor(h / 2);
-    for (let ly = y0; ly <= y1; ly++) {
-      rows[ly] = setChar(rows[ly], lx, "H");
-    }
-  }
-
-  // Doors
-  if (node.doorWest) {
-    rows[gy] = setChar(rows[gy], 1, "D");
-    rows[gy - 1] = setChar(rows[gy - 1], 1, "D");
-  }
-  if (node.doorEast) {
-    rows[gy] = setChar(rows[gy], w - 2, "D");
-    rows[gy - 1] = setChar(rows[gy - 1], w - 2, "D");
-  }
-
-  // Boss room marker — solid pillars
-  if (node.kind === RoomKind.BOSS) {
-    for (let x = 4; x < w - 4; x += 5) {
-      rows[gy - 3] = setChar(rows[gy - 3], x, "#");
-    }
-  }
-
-  return TileMap.fromAscii(rows);
+function usesFlatLadderFloorKind(kind){
+  return (
+    kind === RoomKind.START ||
+    kind === RoomKind.NORMAL ||
+    kind === RoomKind.SHOP ||
+    kind === RoomKind.SUPER_SECRET
+  );
 }
 
-function setChar(row, x, c){
-  return row.substring(0, x) + c + row.substring(x + 1);
+function maxVerticalReachTilesForGridY(gridY){
+  return gridY < STANDARD_TERRAIN_REACH_FROM_GRID_Y
+    ? EASY_TERRAIN_MAX_VERTICAL_REACH_TILES
+    : STANDARD_TERRAIN_MAX_VERTICAL_REACH_TILES;
+}
+
+function valueNoise1D(seed, n, periodTiles){
+  const r = javaRandom(seed);
+  const period = Math.max(2, periodTiles);
+  const points = Math.floor(n / period) + 3;
+  const knots = new Array(points);
+  for (let i = 0; i < points; i++) knots[i] = r.nextDouble() * 2 - 1;
+  const out = new Array(n);
+  for (let x = 0; x < n; x++) {
+    const t = x / period;
+    const i0 = Math.floor(t);
+    const f = t - i0;
+    const a = knots[i0];
+    const b = knots[i0 + 1];
+    const s = f * f * (3 - 2 * f);
+    out[x] = a + (b - a) * s;
+  }
+  return out;
+}
+
+function flattenGroundRun(groundY, lo, hi){
+  if (lo > hi) return;
+  let t = groundY[lo];
+  for (let x = lo; x <= hi; x++) t = Math.max(t, groundY[x]);
+  for (let x = lo; x <= hi; x++) groundY[x] = t;
+}
+
+function enforceMaxWalkableGroundYStep(groundY, maxStep){
+  const w = groundY.length;
+  for (let pass = 0; pass < w; pass++) {
+    let changed = false;
+    for (let x = 1; x < w; x++) {
+      if (groundY[x] - groundY[x - 1] > maxStep) {
+        groundY[x] = groundY[x - 1] + maxStep;
+        changed = true;
+      }
+      if (groundY[x - 1] - groundY[x] > maxStep) {
+        groundY[x - 1] = groundY[x] + maxStep;
+        changed = true;
+      }
+    }
+    if (!changed) break;
+  }
+}
+
+function flankPlayFloorRowFromGroundY(groundY, flankTx){
+  const col = clamp(flankTx, 1, groundY.length - 2);
+  return groundY[col];
+}
+
+function resolvedLadderRunwayRowOnGrid(grid, w, h, groundY, ladderTx, ladderSouth){
+  const l = clamp(ladderTx, 1, w - 2);
+  const left = flankPlayFloorRowFromGroundY(groundY, l - 1);
+  const right = flankPlayFloorRowFromGroundY(groundY, l + 1);
+  if (left !== right) return ladderSouth ? Math.max(left, right) : Math.min(left, right);
+  return left;
+}
+
+function gridToAsciiRows(grid){
+  return grid.map((row) => row.join(""));
+}
+
+/** Procedural room generator (port of Java RoomGenerator core terrain pass). */
+function generateRoom(node){
+  const kind = node.kind;
+  const largeArena = kind === RoomKind.NORMAL || kind === RoomKind.SECRET;
+  const w = largeArena ? WIDE_W : SCREEN_W;
+  const h = largeArena ? WIDE_H : SCREEN_H;
+  const seed = Number(BigInt(node.contentSeed) ^ 0x9e3779b97f4a7c15n);
+  const rng = javaRandom(seed);
+  const conn = {
+    doorWest: node.doorWest,
+    doorEast: node.doorEast,
+    ladderNorth: node.ladderNorth,
+    ladderSouth: node.ladderSouth,
+    ladderColumnTx: node.ladderColumnTx,
+  };
+  let dungeonLadderTx = conn.ladderColumnTx;
+  if (dungeonLadderTx >= 0) dungeonLadderTx = clamp(dungeonLadderTx, 3, w - 4);
+  const maxReach = maxVerticalReachTilesForGridY(node.gridY);
+  const noise = valueNoise1D(seed, w, 8);
+
+  const groundY = new Array(w);
+  const base = Math.min(h - 2, Math.round(h * 0.75));
+  const minY = Math.max(4, h - 12);
+  const maxY = h - 2;
+
+  if (kind === RoomKind.START) {
+    const flatY = clamp(base, minY, maxY);
+    groundY.fill(flatY);
+  } else {
+    let prev = clamp(Math.round(base - noise[0] * 4), minY, maxY);
+    groundY[0] = prev;
+    let flatRun = 0;
+    for (let x = 1; x < w; x++) {
+      let target = clamp(Math.round(base - noise[x] * 4), minY, maxY);
+      let dy = target - prev;
+      if (dy > 1) target = prev + 1;
+      if (dy < -1) target = prev - 1;
+      const bigUp = target < prev - 1 ? 1 : 0;
+      if (bigUp === 1 && flatRun < 2) target = prev;
+      if (target === prev) flatRun++;
+      else flatRun = 0;
+      prev = target;
+      groundY[x] = prev;
+    }
+  }
+
+  const grid = Array.from({ length: h }, () => new Array(w).fill("."));
+  for (let x = 0; x < w; x++) {
+    grid[0][x] = "#";
+    grid[h - 1][x] = "#";
+  }
+  for (let y = 0; y < h; y++) {
+    grid[y][0] = "#";
+    grid[y][w - 1] = "#";
+  }
+
+  const entryPadStartX = 1;
+  const entryX = Math.min(entryPadStartX + 1, w - 2);
+  const entryY = groundY[entryX];
+  const entryPadEndX = Math.min(entryPadStartX + 5, w - 2);
+  for (let x = entryPadStartX; x <= entryPadEndX; x++) {
+    const gy = entryY;
+    for (let y = 1; y < h - 1; y++) grid[y][x] = ".";
+    for (let y = gy; y < h - 1; y++) grid[y][x] = "#";
+    groundY[x] = entryY;
+  }
+
+  if (kind === RoomKind.SHOP || kind === RoomKind.SUPER_SECRET) {
+    groundY.fill(entryY);
+  } else {
+    const rampX = entryPadEndX + 1;
+    if (rampX < w - 2) {
+      const dy = groundY[rampX] - entryY;
+      if (dy > maxReach) {
+        for (let i = 1; i <= maxReach; i++) {
+          const py = Math.max(2, entryY + i);
+          if (py >= 2 && py < h - 1) grid[py][rampX] = "-";
+        }
+        groundY[rampX] = entryY + maxReach;
+      } else if (dy < -maxReach) {
+        groundY[rampX] = entryY - maxReach;
+        for (let y = groundY[rampX]; y <= entryY; y++) {
+          if (y >= 1 && y < h - 1) grid[y][rampX] = "H";
+        }
+      }
+    }
+  }
+
+  const leftDoorX = 1;
+  const rightDoorX = w - 2;
+  if (conn.doorWest) {
+    const leftAdjX = 2;
+    groundY[leftDoorX] = groundY[Math.min(leftAdjX, w - 2)];
+    groundY[Math.min(leftAdjX, w - 2)] = groundY[leftDoorX];
+    flattenGroundRun(groundY, 1, Math.min(3, w - 2));
+  }
+  if (conn.doorEast) {
+    const rightAdjX = w - 3;
+    groundY[rightDoorX] = groundY[Math.max(1, Math.min(rightAdjX, w - 2))];
+    groundY[Math.max(1, Math.min(rightAdjX, w - 2))] = groundY[rightDoorX];
+    const eastHi = w - 2;
+    const eastLo = Math.max(7, eastHi - 3);
+    if (eastLo <= eastHi) flattenGroundRun(groundY, eastLo, eastHi);
+  }
+
+  const leftGroundY = conn.doorWest ? groundY[Math.min(leftDoorX, w - 2)] : -1;
+  const rightGroundY = conn.doorEast ? groundY[Math.min(rightDoorX, w - 2)] : -1;
+  const leftDoorTopY = conn.doorWest ? clamp(leftGroundY - 2, 1, h - 3) : -1;
+  const rightDoorTopY = conn.doorEast ? clamp(rightGroundY - 2, 1, h - 3) : -1;
+
+  if (
+    dungeonLadderTx >= 7 &&
+    dungeonLadderTx < w - 2 &&
+    (conn.ladderNorth || conn.ladderSouth) &&
+    !usesFlatLadderFloorKind(kind)
+  ) {
+    const L = dungeonLadderTx;
+    const x0 = Math.max(7, L - 4);
+    let baseFloor = groundY[L];
+    for (let x = x0; x <= Math.min(L + 1, w - 3); x++) baseFloor = Math.max(baseFloor, groundY[x]);
+    for (let x = x0; x <= Math.min(L + 1, w - 3); x++) groundY[x] = baseFloor;
+  }
+
+  if (kind !== RoomKind.SECRET && kind !== RoomKind.SUPER_SECRET && kind !== RoomKind.SHOP) {
+    enforceMaxWalkableGroundYStep(groundY, maxReach);
+  }
+
+  for (let x = 1; x < w - 1; x++) {
+    const gy = clamp(groundY[x], 1, h - 2);
+    for (let y = 1; y < h - 1; y++) grid[y][x] = ".";
+    for (let y = gy; y < h - 1; y++) grid[y][x] = "#";
+  }
+
+  if (conn.doorWest) {
+    grid[leftDoorTopY][leftDoorX] = "D";
+    grid[leftDoorTopY + 1][leftDoorX] = "D";
+  }
+  if (conn.doorEast) {
+    grid[rightDoorTopY][rightDoorX] = "D";
+    grid[rightDoorTopY + 1][rightDoorX] = "D";
+  }
+
+  const placeRandomLadders = kind === RoomKind.NORMAL;
+  const placeRandomPlatforms = kind === RoomKind.NORMAL || kind === RoomKind.BOSS;
+  const dungeonVerticalLink =
+    dungeonLadderTx >= 0 && (conn.ladderNorth || conn.ladderSouth);
+
+  for (let x = 3; x < w - 3; x++) {
+    if (x === leftDoorX || x === rightDoorX) continue;
+    if (dungeonLadderTx >= 0 && x === dungeonLadderTx) continue;
+    if (placeRandomLadders && rng.nextInt(10) === 0) {
+      const gy = clamp(groundY[x], 2, h - 2);
+      const ladderH = 3 + rng.nextInt(4);
+      for (let y = Math.max(1, gy - ladderH); y <= gy - 1; y++) {
+        if (grid[y][x] === ".") grid[y][x] = "H";
+      }
+    }
+    if (placeRandomPlatforms && rng.nextInt(7) === 0) {
+      const gy = clamp(groundY[x], 4, h - 2);
+      const py = clamp(gy - (3 + rng.nextInt(5)), 2, h - 4);
+      if (py >= 2 && py < gy - 1) {
+        const len = rng.nextInt(5) === 0 ? 2 : 3 + rng.nextInt(3);
+        const sx = clamp(x - rng.nextInt(2), 2, w - 3);
+        for (let dx = 0; dx < len; dx++) {
+          const tx = sx + dx;
+          if (tx <= 1 || tx >= w - 2) continue;
+          if (dungeonLadderTx >= 0 && tx === dungeonLadderTx) continue;
+          if (grid[py][tx] === ".") grid[py][tx] = "-";
+        }
+      }
+    }
+  }
+
+  if (dungeonLadderTx >= 3 && dungeonLadderTx < w - 3 && dungeonVerticalLink) {
+    const L = dungeonLadderTx;
+    const mouthRow = resolvedLadderRunwayRowOnGrid(grid, w, h, groundY, L, conn.ladderSouth);
+    let y0;
+    const y1 = mouthRow - 1;
+    if (conn.ladderNorth && conn.ladderSouth) y0 = 1;
+    else if (conn.ladderSouth) y0 = Math.max(1, mouthRow - 14);
+    else y0 = 1;
+    for (let y = y0; y <= y1; y++) {
+      if (y < 1 || y >= h - 1) continue;
+      if (grid[y][L] === "D") continue;
+      grid[y][L] = "H";
+    }
+    if (conn.ladderSouth) {
+      for (let y = mouthRow + 1; y < h - 1; y++) {
+        if (grid[y][L] === "D") continue;
+        grid[y][L] = "H";
+      }
+      if (grid[h - 1][L] !== "D") grid[h - 1][L] = "H";
+    } else {
+      if (grid[mouthRow][L] !== "D") grid[mouthRow][L] = "#";
+      for (let y = mouthRow + 1; y < h - 1; y++) {
+        if (grid[y][L] === "D") continue;
+        grid[y][L] = "#";
+      }
+    }
+    if (grid[0][L] !== "D") grid[0][L] = conn.ladderNorth ? "." : "#";
+  }
+
+  if (kind === RoomKind.BOSS) {
+    const bossGy = groundY[Math.floor(w / 2)];
+    for (let x = 4; x < w - 4; x += 5) {
+      const py = bossGy - 3;
+      if (py >= 1 && py < h - 1) grid[py][x] = "#";
+    }
+  }
+
+  return TileMap.fromAscii(gridToAsciiRows(grid));
+}
+
+function playFloorRowAt(map, tx){
+  const w = map.getWidth();
+  const h = map.getHeight();
+  const col = clamp(tx, 1, w - 2);
+  for (let y = h - 2; y >= 1; y--) {
+    if (map.isSolidTile(col, y) || map.isPlatformTile(col, y)) return y;
+  }
+  return h - 2;
+}
+
+function resolvedLadderRunwayRow(map, ladderTx, ladderSouth){
+  const w = map.getWidth();
+  const l = clamp(ladderTx, 1, w - 2);
+  const left = playFloorRowAt(map, l - 1);
+  const right = playFloorRowAt(map, l + 1);
+  if (left !== right) return ladderSouth ? Math.max(left, right) : Math.min(left, right);
+  return left;
 }
 
 function roomSpawnTx(node, map, fromWest, fromEast){
   if (fromWest && node.doorWest) return 2;
   if (fromEast && node.doorEast) return map.getWidth() - 3;
   return Math.floor(map.getWidth() / 2);
+}
+
+function ladderSpawnFromNorth(node, map){
+  const L = node.ladderColumnTx;
+  if (L < 0) return null;
+  return { x: L * TILE_SIZE + TILE_SIZE / 2 - 5, y: 3 * TILE_SIZE - 32 };
+}
+
+function ladderSpawnFromSouth(node, map){
+  const L = node.ladderColumnTx;
+  if (L < 0) return null;
+  return { x: L * TILE_SIZE + TILE_SIZE / 2 - 5, y: map.getHeight() * TILE_SIZE - 32 };
 }
 
 function tileKindLabel(kind){
@@ -1361,7 +1944,7 @@ class ItemCatalog {
 
   static async load(assetBase){
     const cat = new ItemCatalog();
-    const res = await fetch(assetBase + "data/items.json");
+    const res = await fetch(new URL("data/items.json", assetBase).href);
     if (!res.ok) throw new Error("Failed to load items.json");
     const json = await res.json();
     for (const item of json.items) {
@@ -1392,6 +1975,7 @@ class ItemCatalog {
 /** Sprite & JSON asset loader with progress tracking. */
 class AssetLoader {
   images = new Map();
+  inflight = new Map();
   loaded = 0;
   total = 0;
 
@@ -1408,13 +1992,16 @@ class AssetLoader {
       "sprites/vernan climb.png",
       "sprites/vernan attack.png",
       "sprites/vernan air attack.png",
+      "sprites/sword attack.png",
       "sprites/crawler.png",
       "sprites/UI health.png",
+      "tiles/forest tileset.png",
     ];
     const optional = [
       "sprites/UI key.png",
       "sprites/UI coin.png",
-      "tiles/forest tileset.png",
+      "tiles/underground tileset.png",
+      "tiles/la sheet.png",
     ];
     this.total = required.length + optional.length;
     this.loaded = 0;
@@ -1432,25 +2019,42 @@ class AssetLoader {
     const key = relPath;
     const existing = this.images.get(key);
     if (existing) return existing;
+    const pending = this.inflight.get(key);
+    if (pending) return pending;
 
-    const url = this.assetBase + relPath;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error(`Failed to load ${url}`);
-    const blob = await res.blob();
-    let img;
-    if (typeof createImageBitmap === "function") {
-      img = await createImageBitmap(blob);
+    const loadPromise = this._fetchImage(relPath);
+    this.inflight.set(key, loadPromise);
+    try {
+      const img = await loadPromise;
+      this.images.set(key, img);
+      this.loaded++;
+      return img;
+    } finally {
+      this.inflight.delete(key);
+    }
+  }
+
+  async _fetchImage(relPath){
+    const url = resolveAssetUrl(this.assetBase, relPath);
+    const el = new Image();
+    el.decoding = "async";
+    el.src = url;
+    if (typeof el.decode === "function") {
+      try {
+        await el.decode();
+      } catch (_e) {
+        await new Promise((resolve, reject) => {
+          el.onload = () => resolve();
+          el.onerror = () => reject(new Error(`Failed to decode ${url}`));
+        });
+      }
     } else {
-      img = await new Promise((resolve, reject) => {
-        const el = new Image();
-        el.onload = () => resolve(el);
-        el.onerror = reject;
-        el.src = URL.createObjectURL(blob);
+      await new Promise((resolve, reject) => {
+        el.onload = () => resolve();
+        el.onerror = () => reject(new Error(`Failed to load ${url}`));
       });
     }
-    this.images.set(key, img);
-    this.loaded++;
-    return img;
+    return el;
   }
 
   get(relPath){
@@ -1533,8 +2137,9 @@ class GameSim {
       }
     }
 
-    // Door transitions
+    // Room transitions (doors + ladder shafts)
     this.tryDoorTransition(input);
+    this.tryLadderTransition(input);
 
     const bounds = this.scrollBounds();
     const follow = {
@@ -1590,14 +2195,71 @@ class GameSim {
 
     if (touchedRight && node.doorEast) {
       const east = this.layout.neighborEast(this.currentRoomId);
-      if (east >= 0) this.beginTransition(east, "east");
+      if (east >= 0) this.beginTransition(east, "east", input);
     } else if (touchedLeft && node.doorWest) {
       const west = this.layout.neighborWest(this.currentRoomId);
-      if (west >= 0) this.beginTransition(west, "west");
+      if (west >= 0) this.beginTransition(west, "west", input);
     }
   }
 
-  beginTransition(roomId, dir) {
+  tryLadderTransition(input){
+    const node = this.layout.room(this.currentRoomId);
+    const L = node.ladderColumnTx;
+    if (L < 0) return;
+    if (!this.playerOverlapsLadderColumn(L)) return;
+
+    const wantDown = anyDown(input, Keys.down);
+    const wantUp = anyDown(input, Keys.up);
+    if (!wantDown && !wantUp) return;
+
+    if (wantDown && node.ladderSouth && this.playerNearRoomSouthEdge()) {
+      if (!this.southLadderMouthAllowsTransition(L)) return;
+      const south = this.layout.neighborSouth(this.currentRoomId);
+      if (south >= 0) this.beginTransition(south, "south", input);
+      return;
+    }
+    if (wantUp && node.ladderNorth && this.playerNearRoomNorthEdge()) {
+      if (!this.northLadderSeamOpenAtTop(L)) return;
+      const north = this.layout.neighborNorth(this.currentRoomId);
+      if (north >= 0) this.beginTransition(north, "north", input);
+    }
+  }
+
+  playerOverlapsLadderColumn(ladderTx){
+    const left = ladderTx * TILE_SIZE;
+    const right = (ladderTx + 1) * TILE_SIZE;
+    const px1 = this.player.x;
+    const px2 = this.player.x + this.player.w();
+    return px2 > left && px1 < right;
+  }
+
+  playerNearRoomSouthEdge(){
+    return this.player.feetY() >= this.map.getHeight() * TILE_SIZE - TILE_SIZE * 2;
+  }
+
+  playerNearRoomNorthEdge(){
+    return this.player.y <= TILE_SIZE * 2;
+  }
+
+  southLadderMouthAllowsTransition(ladderTx){
+    const runwayRow = resolvedLadderRunwayRow(this.map, ladderTx, true);
+    const h = this.map.getHeight();
+    if (runwayRow < 1 || runwayRow >= h - 1) return false;
+    const t = this.map.tileAt(ladderTx, runwayRow);
+    return (
+      t !== TILE_SOLID &&
+      t !== TILE_BREAKABLE &&
+      t !== TILE_KEYBLOCK &&
+      t !== TILE_KEYBLOCK_CONNECTOR
+    );
+  }
+
+  northLadderSeamOpenAtTop(ladderTx){
+    const t = this.map.tileAt(ladderTx, 0);
+    return t === TILE_EMPTY || t === TILE_LADDER;
+  }
+
+  beginTransition(roomId, dir, input) {
     this.currentRoomId = roomId;
     const node = this.layout.room(roomId);
     this.map = generateRoom(node);
@@ -1606,11 +2268,32 @@ class GameSim {
       node.contentSeed,
       node.kind === RoomKind.BOSS ? 0 : 2
     );
-    const spawnTx = roomSpawnTx(node, this.map, dir === "west", dir === "east");
-    const spawn = spawnAtFloor(this.map, spawnTx);
-    this.player.resetAt(spawn.x, spawn.y);
+
+    let spawn;
+    if (dir === "south") {
+      const p = ladderSpawnFromSouth(node, this.map);
+      spawn = p ? { x: p.x, y: p.y } : spawnAtFloor(this.map, roomSpawnTx(node, this.map, false, false));
+      this.player.resetAt(spawn.x, spawn.y);
+      this.player.onGround = false;
+    } else if (dir === "north") {
+      const p = ladderSpawnFromNorth(node, this.map);
+      spawn = p ? { x: p.x, y: p.y } : spawnAtFloor(this.map, roomSpawnTx(node, this.map, false, false));
+      this.player.resetAt(spawn.x, spawn.y);
+      this.player.onGround = false;
+    } else {
+      const spawnTx = roomSpawnTx(node, this.map, dir === "west", dir === "east");
+      spawn = spawnAtFloor(this.map, spawnTx);
+      this.player.resetAt(spawn.x, spawn.y);
+    }
+
+    const bounds = this.scrollBounds();
+    this.camera.reset(
+      clamp(this.cameraAnchorX(), bounds.minAnchorX, bounds.maxAnchorX),
+      clamp(this.cameraAnchorY(), bounds.minAnchorY, bounds.maxAnchorY)
+    );
     this.transitionFade = 1;
     this.transitionDir = dir;
+    input?.clearHardwareStateForRoomTransition?.();
   }
 
   scrollBounds(){
@@ -1676,6 +2359,7 @@ class GameSim {
       keys: this.player.stats.keys,
       money: this.player.stats.money,
       roomKind: this.layout.room(this.currentRoomId).kind,
+      displaySalt: this.layout.room(this.currentRoomId).contentSeed >>> 0,
       seed: this.seed,
     };
   }
@@ -1804,7 +2488,7 @@ class RenderPipeline {
     this.ctx.imageSmoothingEnabled = false;
   }
 
-  draw(sim, snap, assets){
+  draw(sim, snap, assets, tilesetRuntime){
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#0d0d14";
@@ -1819,7 +2503,7 @@ class RenderPipeline {
     ctx.clip();
     ctx.setTransform(CAMERA_ZOOM, 0, 0, CAMERA_ZOOM, tx, ty);
 
-    this.drawTiles(ctx, sim, snap.cameraX, snap.cameraY, assets);
+    this.drawTiles(ctx, sim, snap, assets, tilesetRuntime);
     this.drawEnemies(ctx, snap, assets);
     this.drawPlayer(ctx, snap, assets);
 
@@ -1856,9 +2540,10 @@ class RenderPipeline {
     );
   }
 
-  drawTiles(ctx, sim, camX, camY, assets){
+  drawTiles(ctx, sim, snap, assets, tilesetRuntime){
     const map = sim.map;
-    const tileset = assets.get("tiles/forest tileset.png");
+    const camX = snap.cameraX;
+    const camY = snap.cameraY;
     const viewWorldW = WORLD_VIEWPORT_W;
     const viewWorldH = WORLD_VIEWPORT_H / CAMERA_ZOOM;
     const viewLeft = camX - viewWorldW / 2;
@@ -1868,17 +2553,87 @@ class RenderPipeline {
     const x1 = Math.min(map.getWidth() - 1, Math.ceil((viewLeft + viewWorldW) / TILE_SIZE) + 1);
     const y1 = Math.min(map.getHeight() - 1, Math.ceil((viewTop + viewWorldH) / TILE_SIZE) + 1);
 
+    const forest = assets.get("tiles/forest tileset.png");
+    const underground = assets.get("tiles/underground tileset.png");
+    const sheet =
+      underground && imageDrawable(underground) ? underground : forest;
+
+    this.drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet);
+
+    let tilesDrawn = 0;
+    if (tilesetRuntime) {
+      try {
+        tilesDrawn = tilesetRuntime.drawRoom(ctx, map, {
+          roomKind: snap.roomKind,
+          displaySalt: snap.displaySalt >>> 0,
+          x0,
+          y0,
+          x1,
+          y1,
+        });
+      } catch (err) {
+        console.error("[Vernan] tileset draw failed; using sprite tiles:", err);
+      }
+    }
+
+    if (tilesDrawn === 0) {
+      this.drawTilesSpriteLayer(ctx, map, x0, y0, x1, y1, sheet);
+    }
+  }
+
+  drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet) {
+    if (!imageDrawable(sheet)) return;
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (map.tileAt(tx, ty) !== TILE_EMPTY) continue;
+        drawForestTile(ctx, sheet, 0, 0, tx * TILE_SIZE, ty * TILE_SIZE);
+      }
+    }
+  }
+
+  drawTilesSpriteLayer(ctx, map, x0, y0, x1, y1, sheet) {
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        const t = map.tileAt(tx, ty);
+        if (t === TILE_EMPTY && isFloorTerrainTile(map, tx, ty + 1)) {
+          const px = tx * TILE_SIZE;
+          const py = ty * TILE_SIZE;
+          if (!drawForestTile(ctx, sheet, 1, 0, px, py)) {
+            ctx.fillStyle = "#5a8f4a";
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
+        }
+      }
+    }
+
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
         const t = map.tileAt(tx, ty);
         const px = tx * TILE_SIZE;
         const py = ty * TILE_SIZE;
-        if (tileset && t === 1) {
-          // Solid floor — row 7 of forest tileset
-          ctx.drawImage(tileset, 0, 7 * 16, 16, 16, px, py, 16, 16);
-        } else {
-          ctx.fillStyle = tileToColor(t);
-          ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+        if (t === TILE_SOLID || t === TILE_BREAKABLE) {
+          const [col, row] = solidAutotileCell(map, tx, ty);
+          if (!drawForestTile(ctx, sheet, col, row, px, py)) {
+            ctx.fillStyle = tileToColor(t);
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
+        } else if (t === TILE_PLATFORM) {
+          if (!drawForestTile(ctx, sheet, 0, 1, px, py)) {
+            ctx.fillStyle = tileToColor(t);
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
+        } else if (t === TILE_LADDER) {
+          if (!drawForestTile(ctx, sheet, 2, 5, px, py)) {
+            ctx.fillStyle = tileToColor(t);
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
+        } else if (t === TILE_DOOR) {
+          const doorTop = ty + 1 < map.getHeight() && map.tileAt(tx, ty + 1) === TILE_DOOR;
+          const [col, row] = doorTop ? [2, 9] : [3, 10];
+          if (!drawForestTile(ctx, sheet, col, row, px, py)) {
+            ctx.fillStyle = tileToColor(t);
+            ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
+          }
         }
       }
     }
@@ -1889,8 +2644,9 @@ class RenderPipeline {
     const feetY = snap.playerY + 18;
     const drawX = snap.playerX + 5 - SPRITE_FRAME_W / 2;
     const drawY = feetY - SPRITE_FRAME_H;
+    const attacking = snap.spriteName.includes("attack");
 
-    if (sheet) {
+    if (imageDrawable(sheet)) {
       const frame = snap.spriteFrame;
       const fw = SPRITE_FRAME_W;
       ctx.save();
@@ -1908,10 +2664,31 @@ class RenderPipeline {
         ctx.fillRect(0, 0, fw, SPRITE_FRAME_H);
       }
       ctx.restore();
+      if (attacking) this.drawAttackWeaponOverlay(ctx, snap, assets, drawY);
     } else {
       ctx.fillStyle = snap.playerHurtTint > 0 ? "#ffaaaa" : "#e8a87c";
       ctx.fillRect(snap.playerX, snap.playerY, 10, 18);
     }
+  }
+
+  drawAttackWeaponOverlay(ctx, snap, assets, bodyTopY){
+    const sword = assets.get("sprites/sword attack.png");
+    if (!imageDrawable(sword)) return;
+    const frame = snap.spriteFrame;
+    const fw = WEAPON_ATTACK_FRAME_W;
+    const fh = WEAPON_ATTACK_FRAME_H;
+    const bodyLeft = snap.playerX + PLAYER_STAND_W * 0.5 - WEAPON_ATTACK_BODY_W * 0.5;
+    const weaponX =
+      snap.facing >= 0 ? bodyLeft : bodyLeft - WEAPON_ATTACK_EXTENSION_PX;
+    ctx.save();
+    if (snap.facing < 0) {
+      ctx.translate(weaponX + fw, bodyTopY);
+      ctx.scale(-1, 1);
+      ctx.drawImage(sword, frame * fw, 0, fw, fh, 0, 0, fw, fh);
+    } else {
+      ctx.drawImage(sword, frame * fw, 0, fw, fh, weaponX, bodyTopY, fw, fh);
+    }
+    ctx.restore();
   }
 
   drawEnemies(
@@ -1922,7 +2699,7 @@ class RenderPipeline {
     const sheet = assets.get("sprites/crawler.png");
     for (const e of snap.enemies) {
       if (e.dead) continue;
-      if (sheet) {
+      if (imageDrawable(sheet)) {
         const feetY = e.y + ENEMY_CRAWLER_HITBOX_H;
         const drawX = e.x + 4 - ENEMY_CRAWLER_SPRITE_W / 2;
         const drawY = feetY - ENEMY_CRAWLER_SPRITE_H;
@@ -1958,7 +2735,7 @@ class RenderPipeline {
     let hx = PAD_L;
     for (let slot = 0; slot < heartSlots; slot++) {
       const fi = uiHeartFrameIndexForSlot(slot, snap.hpRed, snap.hpRedMax);
-      if (heart) {
+      if (imageDrawable(heart)) {
         ctx.drawImage(
           heart,
           fi * frameW,
@@ -2171,8 +2948,9 @@ async function mount(selector, options = {}){
       : selector;
   if (!root) throw new Error("VernanWeb.mount: root element not found");
 
-  const assetBase = options.assetBase ?? "../";
-  if (!assetBase.endsWith("/")) throw new Error("assetBase must end with /");
+  const assetBaseRaw = options.assetBase ?? "assets/vernan/";
+  if (!assetBaseRaw.endsWith("/")) throw new Error("assetBase must end with /");
+  const assetBase = new URL(assetBaseRaw, window.location.href).href;
 
   root.classList.add("vernan-web-root");
   root.innerHTML = `
@@ -2222,6 +3000,22 @@ async function mount(selector, options = {}){
   } catch (err) {
     loadingEl.innerHTML = `<span class="vernan-web-banner error">Failed to load assets: ${String(err)}</span>`;
     throw err;
+  }
+
+  let tilesetRuntime = null;
+  if (typeof VernanTileset !== "undefined") {
+    try {
+      tilesetRuntime = await Promise.race([
+        VernanTileset.TilesetRuntime.load(assetBase, (rel) => loader.loadImage(rel)),
+        new Promise((_, reject) =>
+          setTimeout(() => reject(new Error("tileset load timeout")), 30000)
+        ),
+      ]);
+    } catch (err) {
+      console.warn("[Vernan] tileset load failed; using forest sprite tiles:", err);
+    }
+  } else {
+    console.warn("[Vernan] vernan-tileset.js missing — using forest sprite tiles only");
   }
 
   loadingEl.style.display = "none";
@@ -2295,7 +3089,11 @@ async function mount(selector, options = {}){
       sim.update(dt, input);
     },
     render(alpha) {
-      pipeline.draw(sim, sim.renderAlpha(alpha), loader);
+      try {
+        pipeline.draw(sim, sim.renderAlpha(alpha), loader, tilesetRuntime);
+      } catch (err) {
+        console.error("[Vernan] render failed:", err);
+      }
     },
     onFpsUpdate(fps, ups) {
       fpsEl.textContent = `${fps} fps · ${ups} ups`;
