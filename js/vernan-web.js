@@ -35,7 +35,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.22";
+const WEB_CLIENT_VERSION_STR = "0.1.25";
 
   // --- math/util.ts ---
 
@@ -441,9 +441,11 @@ class DungeonLayout {
     return new DungeonLayout([node], cell);
   }
 
-  static generate(runSeed, targetRooms = 12, roomWidthTiles = 24){
+  static generate(runSeed, targetRooms = 12, roomWidthTiles = 24, bonusSecretRooms = 0, bonusSuperSecretRooms = 0){
     const w = Math.max(24, roomWidthTiles);
     const n = clamp(targetRooms, 6, 24);
+    const targetSecrets = 1 + Math.max(0, bonusSecretRooms);
+    const targetSuperSecrets = 1 + Math.max(0, bonusSuperSecretRooms);
     const SPECIAL_ROOM_ATTEMPTS = 256;
 
     for (let attempt = 0; attempt < SPECIAL_ROOM_ATTEMPTS; attempt++) {
@@ -452,7 +454,8 @@ class DungeonLayout {
       const g = buildDungeonGraph(rng, n, w, runSeed);
       if (!canPlaceSpecialRooms(g.rooms)) continue;
       assignSpecialRoomKinds(g.rooms, rng);
-      return new DungeonLayout(g.rooms, g.cellToId);
+      const laid = tryInsertSecrets(cloneLayout(new DungeonLayout(g.rooms, g.cellToId)), rng, w, targetSecrets, targetSuperSecrets);
+      if (laid) return laid;
     }
 
     for (let attempt = 0; attempt < SPECIAL_ROOM_ATTEMPTS; attempt++) {
@@ -460,13 +463,20 @@ class DungeonLayout {
       const rng = javaRandom(Number(BigInt(salt) ^ 0xc0ffeeb00ban));
       const g = buildDungeonGraph(rng, n, w, runSeed);
       assignSpecialRoomKindsRelaxed(g.rooms, rng);
-      return new DungeonLayout(g.rooms, g.cellToId);
+      const laid = tryInsertSecrets(cloneLayout(new DungeonLayout(g.rooms, g.cellToId)), rng, w, targetSecrets, targetSuperSecrets);
+      if (laid) return laid;
     }
 
     const rng = javaRandom(Number(BigInt(runSeed) ^ 0xdeadbeefdeadbeefn ^ 0xc0ffeeb00ban));
     const g = buildDungeonGraph(rng, n, w, runSeed);
     assignSpecialRoomKindsRelaxed(g.rooms, rng);
-    return new DungeonLayout(g.rooms, g.cellToId);
+    return secretRoomGraphPlacerInsert(
+      cloneLayout(new DungeonLayout(g.rooms, g.cellToId)),
+      rng,
+      w,
+      targetSecrets,
+      targetSuperSecrets
+    ).layout;
   }
 }
 
@@ -723,6 +733,201 @@ function assignSpecialRoomKindsRelaxed(rooms, rng){
   }
 }
 
+function cloneLayout(layout){
+  const rooms = layout.allRooms().map((r) => ({ ...r }));
+  const cellToId = new Map(layout.cellToId);
+  return new DungeonLayout(rooms, cellToId);
+}
+
+function isSecretKind(kind){
+  return kind === RoomKind.SECRET || kind === RoomKind.SUPER_SECRET;
+}
+
+function tryInsertSecrets(baseLayout, rng, w, targetSecrets, targetSuperSecrets){
+  const result = secretRoomGraphPlacerInsert(baseLayout, rng, w, targetSecrets, targetSuperSecrets);
+  if (result.secretsPlaced >= targetSecrets && result.superSecretsPlaced >= targetSuperSecrets) {
+    return result.layout;
+  }
+  return null;
+}
+
+function secretRoomGraphPlacerInsert(base, rng, roomWidthTiles, targetSecrets, targetSuperSecrets){
+  const list = base.allRooms().map((r) => ({ ...r }));
+  const cell = new Map(base.cellToId);
+  let secretsPlaced = 0;
+  for (let n = 0; n < targetSecrets; n++) {
+    if (!placeOneSecretRoom(list, cell, roomWidthTiles, rng)) break;
+    secretsPlaced++;
+  }
+  let superSecretsPlaced = 0;
+  for (let n = 0; n < targetSuperSecrets; n++) {
+    if (!placeOneSuperSecretRoom(list, cell, roomWidthTiles, rng)) break;
+    superSecretsPlaced++;
+  }
+  return { layout: new DungeonLayout(list, cell), secretsPlaced, superSecretsPlaced };
+}
+
+function graphDegreeAt(cell, gx, gy){
+  let d = 0;
+  if (cell.has(key(gx - 1, gy))) d++;
+  if (cell.has(key(gx + 1, gy))) d++;
+  if (cell.has(key(gx, gy - 1))) d++;
+  if (cell.has(key(gx, gy + 1))) d++;
+  return d;
+}
+
+function emptyAdjacentCandidates(cell){
+  const seen = new Set();
+  const out = [];
+  for (const k of [...cell.keys()]) {
+    const comma = k.indexOf(",");
+    const gx = Number(k.slice(0, comma));
+    const gy = Number(k.slice(comma + 1));
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1]]) {
+      const nx = gx + dx;
+      const ny = gy + dy;
+      if (Math.abs(nx) > 7 || Math.abs(ny) > 7) continue;
+      const nk = key(nx, ny);
+      if (cell.has(nk) || seen.has(nk)) continue;
+      seen.add(nk);
+      out.push([nx, ny]);
+    }
+  }
+  return out;
+}
+
+function rankedSecretCandidates(cell, rng){
+  const candidates = emptyAdjacentCandidates(cell);
+  shuffleInPlace(candidates, rng);
+  candidates.sort((a, b) => graphDegreeAt(cell, b[0], b[1]) - graphDegreeAt(cell, a[0], a[1]));
+  return candidates;
+}
+
+function neighborRoomIdsAt(cell, list, gx, gy){
+  const out = [];
+  const w = cell.get(key(gx - 1, gy));
+  const e = cell.get(key(gx + 1, gy));
+  const n = cell.get(key(gx, gy - 1));
+  const s = cell.get(key(gx, gy + 1));
+  if (w != null) out.push(w);
+  if (e != null) out.push(e);
+  if (n != null) out.push(n);
+  if (s != null) out.push(s);
+  return out;
+}
+
+function okSecretPlacement(list, cell, gx, gy){
+  if (graphDegreeAt(cell, gx, gy) < 1) return false;
+  for (const id of neighborRoomIdsAt(cell, list, gx, gy)) {
+    const k = list[id].kind;
+    if (k === RoomKind.BOSS || k === RoomKind.SUPER_SECRET) return false;
+  }
+  return true;
+}
+
+function okSuperSecretPlacement(list, cell, gx, gy){
+  if (graphDegreeAt(cell, gx, gy) !== 1) return false;
+  for (const id of neighborRoomIdsAt(cell, list, gx, gy)) {
+    const k = list[id].kind;
+    if (k !== RoomKind.NORMAL && k !== RoomKind.START) return false;
+  }
+  return true;
+}
+
+function withDoorEastRoom(r, doorEast){
+  return { ...r, doorEast };
+}
+function withDoorWestRoom(r, doorWest){
+  return { ...r, doorWest };
+}
+function withLadderSouthRoom(r, ladderSouth, ladderTx){
+  return { ...r, ladderSouth, ladderColumnTx: ladderTx >= 0 ? ladderTx : r.ladderColumnTx };
+}
+function withLadderNorthRoom(r, ladderNorth, ladderTx){
+  return { ...r, ladderNorth, ladderColumnTx: ladderTx >= 0 ? ladderTx : r.ladderColumnTx };
+}
+
+function pickSecretLadderTx(list, nn, ns, wTiles, rng, needLadder){
+  if (!needLadder) return -1;
+  const cand = [];
+  if (nn != null && list[nn].ladderColumnTx >= 0) cand.push(list[nn].ladderColumnTx);
+  if (ns != null && list[ns].ladderColumnTx >= 0) cand.push(list[ns].ladderColumnTx);
+  let L;
+  if (cand.length === 0) {
+    const ladderMin = 8;
+    const ladderMaxExcl = Math.max(ladderMin + 1, wTiles - 8);
+    const span = ladderMaxExcl - ladderMin;
+    L = ladderMin + (span > 0 ? rng.nextInt(span) : 0);
+  } else {
+    L = Math.round(cand.reduce((a, b) => a + b, 0) / cand.length);
+  }
+  return clamp(L, 3, wTiles - 4);
+}
+
+function addSecretGraphRoom(list, cell, gx, gy, kind, roomWidthTiles, rng){
+  const nw = cell.get(key(gx - 1, gy));
+  const ne = cell.get(key(gx + 1, gy));
+  const nn = cell.get(key(gx, gy - 1));
+  const ns = cell.get(key(gx, gy + 1));
+  const doorW = nw != null;
+  const doorE = ne != null;
+  const ladN = nn != null;
+  const ladS = ns != null;
+  const wTiles = Math.max(24, roomWidthTiles);
+  const ladderTx = pickSecretLadderTx(list, nn, ns, wTiles, rng, ladN || ladS);
+  const newId = list.length;
+  const contentSeed = Number(
+    BigInt(rng.nextInt(0x7fffffff)) ^
+      BigInt(gx) * 0x51c3n ^
+      BigInt(gy) * 0x1b873593n ^
+      BigInt(kind === RoomKind.SECRET ? 1 : 2) * 0x9e3779b97f4a7c15n
+  );
+  list.push({
+    id: newId,
+    gridX: gx,
+    gridY: gy,
+    contentSeed,
+    doorWest: doorW,
+    doorEast: doorE,
+    ladderNorth: ladN,
+    ladderSouth: ladS,
+    ladderColumnTx: ladderTx,
+    kind,
+  });
+  cell.set(key(gx, gy), newId);
+  if (nw != null) list[nw] = withDoorEastRoom(list[nw], true);
+  if (ne != null) list[ne] = withDoorWestRoom(list[ne], true);
+  if (nn != null) list[nn] = withLadderSouthRoom(list[nn], true, ladderTx);
+  if (ns != null) list[ns] = withLadderNorthRoom(list[ns], true, ladderTx);
+}
+
+function placeOneSecretRoom(list, cell, roomWidthTiles, rng){
+  const candidates = rankedSecretCandidates(cell, rng);
+  if (tryPlaceSecretAtDegree(list, cell, roomWidthTiles, rng, candidates, 2)) return true;
+  return tryPlaceSecretAtDegree(list, cell, roomWidthTiles, rng, candidates, 1);
+}
+
+function tryPlaceSecretAtDegree(list, cell, roomWidthTiles, rng, candidates, minDegree){
+  for (const [gx, gy] of candidates) {
+    if (graphDegreeAt(cell, gx, gy) < minDegree) continue;
+    if (!okSecretPlacement(list, cell, gx, gy)) continue;
+    addSecretGraphRoom(list, cell, gx, gy, RoomKind.SECRET, roomWidthTiles, rng);
+    return true;
+  }
+  return false;
+}
+
+function placeOneSuperSecretRoom(list, cell, roomWidthTiles, rng){
+  const candidates = emptyAdjacentCandidates(cell);
+  shuffleInPlace(candidates, rng);
+  for (const [gx, gy] of candidates) {
+    if (!okSuperSecretPlacement(list, cell, gx, gy)) continue;
+    addSecretGraphRoom(list, cell, gx, gy, RoomKind.SUPER_SECRET, roomWidthTiles, rng);
+    return true;
+  }
+  return false;
+}
+
 function key(gx, gy){
   return `${gx},${gy}`;
 }
@@ -744,6 +949,110 @@ function layoutHash(layout){
     h = Math.imul(h, 16777619);
   }
   return (h >>> 0).toString(16);
+}
+
+const MINIMAP_CELL_W = 7;
+const MINIMAP_CELL_H = 5;
+const MINIMAP_CELL_GAP = 2;
+const MINIMAP_ALPHA_VISITED = 230 / 255;
+const MINIMAP_ALPHA_UNVISITED = 130 / 255;
+const MINIMAP_ALPHA_CURRENT = 250 / 255;
+
+function minimapKindRgb(kind){
+  switch (kind) {
+    case RoomKind.START:
+      return [120, 200, 255];
+    case RoomKind.ITEM:
+      return [255, 210, 80];
+    case RoomKind.SHOP:
+      return [180, 140, 255];
+    case RoomKind.BOSS:
+      return [255, 90, 90];
+    case RoomKind.SECRET:
+      return [90, 200, 160];
+    case RoomKind.SUPER_SECRET:
+      return [160, 120, 220];
+    default:
+      return [200, 200, 210];
+  }
+}
+
+function minimapGridMetrics(layout){
+  const rooms = layout.allRooms();
+  let minGx = Infinity;
+  let minGy = Infinity;
+  let maxGx = -Infinity;
+  let maxGy = -Infinity;
+  for (const r of rooms) {
+    minGx = Math.min(minGx, r.gridX);
+    minGy = Math.min(minGy, r.gridY);
+    maxGx = Math.max(maxGx, r.gridX);
+    maxGy = Math.max(maxGy, r.gridY);
+  }
+  const cols = maxGx - minGx + 1;
+  const rows = maxGy - minGy + 1;
+  return {
+    minGx,
+    minGy,
+    cols,
+    rows,
+    totalW: cols * MINIMAP_CELL_W + (cols - 1) * MINIMAP_CELL_GAP,
+    totalH: rows * MINIMAP_CELL_H + (rows - 1) * MINIMAP_CELL_GAP,
+  };
+}
+
+function minimapRoomAdjacentToCurrent(layout, currentRoomId, roomId){
+  if (currentRoomId < 0) return false;
+  return (
+    layout.neighborWest(currentRoomId) === roomId ||
+    layout.neighborEast(currentRoomId) === roomId ||
+    layout.neighborNorth(currentRoomId) === roomId ||
+    layout.neighborSouth(currentRoomId) === roomId
+  );
+}
+
+function drawMinimap(ctx, snap, hudY){
+  const layout = snap.layout;
+  if (!layout || layout.roomCount() === 0) return;
+  const grid = minimapGridMetrics(layout);
+  const x0 = Math.max(6, INTERNAL_WIDTH - grid.totalW - 8);
+  const y0 = hudY + Math.floor((HUD_HEIGHT - grid.totalH) / 2);
+
+  ctx.fillStyle = "rgba(0,0,0,0.47)";
+  ctx.fillRect(x0 - 2, y0 - 2, grid.totalW + 4, grid.totalH + 4);
+
+  for (const n of layout.allRooms()) {
+    const cx = n.gridX - grid.minGx;
+    const cy = n.gridY - grid.minGy;
+    const x = x0 + cx * (MINIMAP_CELL_W + MINIMAP_CELL_GAP);
+    const y = y0 + cy * (MINIMAP_CELL_H + MINIMAP_CELL_GAP);
+    const current = n.id === snap.currentRoomId;
+    const visited = n.id < snap.roomVisited.length && snap.roomVisited[n.id];
+    const adjacentNow =
+      !current && minimapRoomAdjacentToCurrent(layout, snap.currentRoomId, n.id);
+    const secretKind = n.kind === RoomKind.SECRET || n.kind === RoomKind.SUPER_SECRET;
+    const adjacentRemembered =
+      !current &&
+      !secretKind &&
+      n.id < snap.minimapAdjacentSeen.length &&
+      snap.minimapAdjacentSeen[n.id];
+    const showRoom = secretKind
+      ? current || visited
+      : visited || current || adjacentNow || adjacentRemembered;
+    if (!showRoom) continue;
+
+    const [r, g, b] = minimapKindRgb(n.kind);
+    if (current) {
+      ctx.fillStyle = `rgba(${r},${g},${b},${MINIMAP_ALPHA_CURRENT})`;
+      ctx.fillRect(x, y, MINIMAP_CELL_W, MINIMAP_CELL_H);
+      ctx.strokeStyle = "#ffffff";
+      ctx.strokeRect(x + 0.5, y + 0.5, MINIMAP_CELL_W - 1, MINIMAP_CELL_H - 1);
+    } else {
+      const alpha = visited ? MINIMAP_ALPHA_VISITED : MINIMAP_ALPHA_UNVISITED;
+      ctx.fillStyle = `rgba(${r},${g},${b},${alpha})`;
+      ctx.fillRect(x, y, MINIMAP_CELL_W, MINIMAP_CELL_H);
+    }
+  }
 }
 
   // --- world/RoomGenerator.ts ---
@@ -840,12 +1149,545 @@ function gridToAsciiRows(grid){
   return grid.map((row) => row.join(""));
 }
 
+const MAX_TRAVERSAL_LADDER_TOP_ROW = 2;
+const MAX_TRAVERSAL_LADDER_RUNGS = 6;
+
+function clampLadderColumn(mapWidth, layoutL){
+  if (layoutL < 0) return -1;
+  return clamp(layoutL, 3, mapWidth - 4);
+}
+
+function roomLadderColumnTx(node, map){
+  return clampLadderColumn(map.getWidth(), node.ladderColumnTx);
+}
+
+function truncateLadderRunsOnGrid(grid, h, tx, floorRow){
+  let runBottom = -1;
+  let rungs = 0;
+  const flush = () => {
+    if (runBottom < 0) return;
+    if (rungs > MAX_TRAVERSAL_LADDER_RUNGS) {
+      const keepFrom = runBottom + rungs - MAX_TRAVERSAL_LADDER_RUNGS;
+      for (let yy = runBottom; yy < keepFrom; yy++) grid[yy][tx] = ".";
+    }
+    runBottom = -1;
+    rungs = 0;
+  };
+  for (let y = MAX_TRAVERSAL_LADDER_TOP_ROW; y <= floorRow; y++) {
+    if (grid[y][tx] === "H") {
+      if (runBottom < 0) runBottom = y;
+      rungs++;
+    } else {
+      flush();
+    }
+  }
+  flush();
+}
+
+/** Remove decorative procedural ladders that are not the dungeon vertical shaft (Java DungeonVerticalShaftRules). */
+function stripSpuriousLaddersFromGrid(grid, w, h, shaftColumnL, groundY){
+  if (!groundY) return;
+  for (let tx = 1; tx < w - 1; tx++) {
+    if (shaftColumnL >= 1 && tx === shaftColumnL) continue;
+    const lipRow = clamp(groundY[tx], 1, h - 2);
+    for (let y = lipRow + 1; y < h - 1; y++) {
+      if (grid[y][tx] === "H") grid[y][tx] = "#";
+    }
+    if (h > 1 && grid[h - 1][tx] === "H") grid[h - 1][tx] = "#";
+    for (let y = 0; y < MAX_TRAVERSAL_LADDER_TOP_ROW && y < h; y++) {
+      if (grid[y][tx] === "H") grid[y][tx] = "#";
+    }
+    if (lipRow >= 1 && lipRow < h - 1 && grid[lipRow][tx] === "-") {
+      grid[lipRow][tx] = "#";
+    }
+    if (
+      lipRow >= 1 &&
+      lipRow < h - 1 &&
+      grid[lipRow][tx] === "-" &&
+      grid[lipRow + 1][tx] === "H"
+    ) {
+      grid[lipRow][tx] = "#";
+    }
+    truncateLadderRunsOnGrid(grid, h, tx, lipRow);
+  }
+}
+
+/** LADDER-MOUTH-2: south mouth deck at runway row so VERT-TRANS-SOUTH can pass. */
+function finalizeDungeonLadderMouthOnGrid(grid, w, h, ladderTx, mouthRow, conn){
+  const L = ladderTx;
+  if (L < 1 || L >= w - 1 || mouthRow < 1 || mouthRow >= h - 1) return;
+  if (conn.ladderSouth) {
+    if (grid[mouthRow][L] !== "D") grid[mouthRow][L] = "-";
+    for (let y = 1; y < mouthRow; y++) {
+      if (grid[y][L] === "D") continue;
+      if (grid[y][L] === "#" || grid[y][L] === "-") grid[y][L] = "H";
+    }
+    for (let y = mouthRow + 1; y < h - 1; y++) {
+      if (grid[y][L] === "D") continue;
+      if (grid[y][L] === "#" || grid[y][L] === "-") grid[y][L] = "H";
+    }
+    if (grid[h - 1][L] !== "D") grid[h - 1][L] = "H";
+  } else if (conn.ladderNorth) {
+    if (grid[mouthRow][L] !== "D") grid[mouthRow][L] = "#";
+    for (let y = mouthRow + 1; y < h - 1; y++) {
+      if (grid[y][L] === "D") continue;
+      grid[y][L] = "#";
+    }
+  }
+}
+
+const SECRET_RUNWAY_TILES = 8;
+const SECRET_ROOM_ENEMY_CHANCE = 0.08;
+const SEAM_KIND_HORIZONTAL = "HORIZONTAL_DOOR";
+const SEAM_KIND_VERTICAL = "VERTICAL_LADDER";
+const SEAM_ROLE_BREAKABLE = "BREAKABLE";
+const SEAM_ROLE_BUFFER_WEST = "BUFFER_WEST";
+const SEAM_ROLE_BUFFER_EAST = "BUFFER_EAST";
+const SEAM_ROLE_BUFFER = "BUFFER";
+
+function secretRoomSeams(layout, secretRoomId, rooms){
+  const edges = [];
+  const w = layout.neighborWest(secretRoomId);
+  if (w >= 0 && rooms[w] && !isSecretKind(layout.room(w).kind) && rooms[w].rightDoorTopTileY >= 0) {
+    edges.push({ secretEastFace: false, neighborDoorTopY: rooms[w].rightDoorTopTileY });
+  }
+  const e = layout.neighborEast(secretRoomId);
+  if (e >= 0 && rooms[e] && !isSecretKind(layout.room(e).kind) && rooms[e].leftDoorTopTileY >= 0) {
+    edges.push({ secretEastFace: true, neighborDoorTopY: rooms[e].leftDoorTopTileY });
+  }
+  return {
+    edges,
+    superSecretFlatArena: layout.room(secretRoomId).kind === RoomKind.SUPER_SECRET,
+  };
+}
+
+function neighborSecretFaces(layout, roomId){
+  const e = layout.neighborEast(roomId);
+  const w = layout.neighborWest(roomId);
+  return {
+    finishEastFace: e >= 0 && isSecretKind(layout.room(e).kind),
+    finishWestFace: w >= 0 && isSecretKind(layout.room(w).kind),
+  };
+}
+
+function plannedRoomWidths(layout){
+  const n = layout.roomCount();
+  const out = new Array(n);
+  for (let id = 0; id < n; id++) out[id] = plannedRoomWidth(layout, id);
+  return out;
+}
+
+function plannedRoomHeights(layout){
+  const n = layout.roomCount();
+  const out = new Array(n);
+  for (let id = 0; id < n; id++) out[id] = plannedRoomHeight(layout, id);
+  return out;
+}
+
+function plannedRoomWidth(layout, roomId){
+  const kind = layout.room(roomId).kind;
+  let w = kind === RoomKind.SECRET ? WIDE_W : isOneScreenRoomKind(kind) ? SCREEN_W : WIDE_W;
+  const node = layout.room(roomId);
+  if (shouldExpandWest(layout, roomId) || (kind === RoomKind.SECRET && !node.doorWest)) w++;
+  if (shouldExpandEast(layout, roomId) || (kind === RoomKind.SECRET && !node.doorEast)) w++;
+  return w;
+}
+
+function plannedRoomHeight(layout, roomId){
+  const kind = layout.room(roomId).kind;
+  let h = kind === RoomKind.SECRET ? WIDE_H : isOneScreenRoomKind(kind) ? SCREEN_H : WIDE_H;
+  if (shouldExpandNorth(layout, roomId)) h++;
+  if (shouldExpandSouth(layout, roomId)) h++;
+  return h;
+}
+
+function shouldExpandToward(layout, roomId, neighborId){
+  if (neighborId < 0) return false;
+  return isSecretKind(layout.room(roomId).kind) !== isSecretKind(layout.room(neighborId).kind);
+}
+function shouldExpandWest(layout, roomId){
+  return shouldExpandToward(layout, roomId, layout.neighborWest(roomId));
+}
+function shouldExpandEast(layout, roomId){
+  return shouldExpandToward(layout, roomId, layout.neighborEast(roomId));
+}
+function shouldExpandNorth(layout, roomId){
+  return shouldExpandToward(layout, roomId, layout.neighborNorth(roomId));
+}
+function shouldExpandSouth(layout, roomId){
+  return shouldExpandToward(layout, roomId, layout.neighborSouth(roomId));
+}
+
+function seamPlayFloorRow(neighborDoorTopY, mapHeight){
+  return Math.min(mapHeight - 2, neighborDoorTopY + 2);
+}
+
+function alignAsciiGroundYToSeams(groundY, w, h, secretSeams){
+  if (!secretSeams?.edges?.length) return;
+  let maxFloor = -1;
+  for (const e of secretSeams.edges) {
+    const floor = seamPlayFloorRow(e.neighborDoorTopY, h);
+    maxFloor = maxFloor < 0 ? floor : Math.max(maxFloor, floor);
+    const doorX = e.secretEastFace ? w - 2 : 1;
+    const runwayLo = e.secretEastFace ? Math.max(1, doorX - SECRET_RUNWAY_TILES) : doorX;
+    const runwayHi = e.secretEastFace ? doorX : Math.min(w - 2, doorX + SECRET_RUNWAY_TILES);
+    for (let x = runwayLo; x <= runwayHi; x++) groundY[x] = floor;
+  }
+  if (secretSeams.superSecretFlatArena && maxFloor >= 0) groundY.fill(maxFloor);
+}
+
+function carveHorizontalFace(map, doorX, doorTopY, eastFace, ladderTx, breakableDoor){
+  const h = map.getHeight();
+  const w = map.getWidth();
+  const doorTop = clamp(doorTopY, 1, h - 4);
+  const groundY = Math.min(h - 2, doorTop + 2);
+  const runwayLo = eastFace ? Math.max(1, doorX - SECRET_RUNWAY_TILES) : doorX;
+  const runwayHi = eastFace ? doorX : Math.min(w - 2, doorX + SECRET_RUNWAY_TILES);
+  for (let x = runwayLo; x <= runwayHi; x++) {
+    for (let y = 1; y < h - 1; y++) {
+      const t = map.tileAt(x, y);
+      if (t === TILE_DOOR || t === TILE_BREAKABLE) continue;
+      map.setTile(x, y, TILE_EMPTY);
+    }
+    for (let y = groundY; y < h - 1; y++) map.setTile(x, y, TILE_SOLID);
+  }
+  const doorTile = breakableDoor ? TILE_BREAKABLE : TILE_DOOR;
+  map.setTile(doorX, doorTop, doorTile);
+  map.setTile(doorX, doorTop + 1, doorTile);
+  if (breakableDoor) {
+    for (let y = 1; y < h - 1; y++) {
+      if (y === doorTop || y === doorTop + 1) continue;
+      if (ladderTx >= 0 && doorX === ladderTx) continue;
+      map.setTile(doorX, y, TILE_SOLID);
+    }
+  } else {
+    for (let y = 1; y < doorTop; y++) {
+      if (ladderTx >= 0 && doorX === ladderTx) continue;
+      map.setTile(doorX, y, TILE_SOLID);
+    }
+  }
+}
+
+function sealUnusedHorizontalEdges(map, conn){
+  const w = map.getWidth();
+  const h = map.getHeight();
+  if (!conn.doorWest) sealSecretColumn(map, 1, -1, h);
+  if (!conn.doorEast) sealSecretColumn(map, w - 2, -1, h);
+}
+
+function sealSecretColumn(map, edgeX, ladderTx, h){
+  for (let y = 1; y < h - 1; y++) {
+    if (ladderTx >= 0 && edgeX === ladderTx) continue;
+    map.setTile(edgeX, y, TILE_SOLID);
+  }
+}
+
+function alignLeftDoorTopY(gen, doorX, neighborRightDoorTopY){
+  if (doorX < 0 || neighborRightDoorTopY < 0) return gen;
+  const map = gen.map;
+  const doorTop = clamp(neighborRightDoorTopY, 1, map.getHeight() - 4);
+  carveHorizontalFace(map, doorX, doorTop, false, gen.ladderColumnTx, true);
+  return { ...gen, leftDoorTileX: doorX, leftDoorTopTileY: doorTop };
+}
+
+function alignRightDoorTopY(gen, doorX, neighborLeftDoorTopY){
+  if (doorX < 0 || neighborLeftDoorTopY < 0) return gen;
+  const map = gen.map;
+  const doorTop = clamp(neighborLeftDoorTopY, 1, map.getHeight() - 4);
+  carveHorizontalFace(map, doorX, doorTop, true, gen.ladderColumnTx, true);
+  return { ...gen, rightDoorTileX: doorX, rightDoorTopTileY: doorTop };
+}
+
+function secretRoomMapBuildFinish(gen, kind, conn, secretSeams, neighborFaces){
+  let room = gen;
+  const map = room.map;
+  const ladderTx = room.ladderColumnTx;
+  if (neighborFaces?.finishEastFace && conn.doorEast && room.rightDoorTileX >= 0) {
+    carveHorizontalFace(map, room.rightDoorTileX, room.rightDoorTopTileY, true, ladderTx, true);
+  }
+  if (neighborFaces?.finishWestFace && conn.doorWest && room.leftDoorTileX >= 0) {
+    carveHorizontalFace(map, room.leftDoorTileX, room.leftDoorTopTileY, false, ladderTx, true);
+  }
+  if (secretSeams?.edges?.length) {
+    for (const edge of secretSeams.edges) {
+      const doorX = edge.secretEastFace
+        ? conn.doorEast
+          ? room.rightDoorTileX
+          : map.getWidth() - 2
+        : conn.doorWest
+          ? room.leftDoorTileX
+          : 1;
+      const doorTop = clamp(edge.neighborDoorTopY, 1, map.getHeight() - 4);
+      carveHorizontalFace(map, doorX, doorTop, edge.secretEastFace, -1, true);
+      room = edge.secretEastFace
+        ? { ...room, rightDoorTileX: doorX, rightDoorTopTileY: doorTop }
+        : { ...room, leftDoorTileX: doorX, leftDoorTopTileY: doorTop };
+    }
+    if (kind === RoomKind.SECRET) sealUnusedHorizontalEdges(map, conn);
+  }
+  return room;
+}
+
+function makeGeneratedRoom(map, meta){
+  return {
+    map,
+    leftDoorTileX: meta.leftDoorTileX ?? -1,
+    leftDoorTopTileY: meta.leftDoorTopTileY ?? -1,
+    rightDoorTileX: meta.rightDoorTileX ?? -1,
+    rightDoorTopTileY: meta.rightDoorTopTileY ?? -1,
+    ladderColumnTx: meta.ladderColumnTx ?? -1,
+    contentSeed: meta.contentSeed ?? 0,
+    kind: meta.kind ?? RoomKind.NORMAL,
+    enemyCount: meta.enemyCount ?? 2,
+  };
+}
+
+function rollRoomEnemyCount(kind, contentSeed){
+  if (kind === RoomKind.BOSS || kind === RoomKind.SUPER_SECRET) return 0;
+  if (kind === RoomKind.SECRET) {
+    const rng = javaRandom(Number(BigInt(contentSeed) ^ 0x5ec7e701n));
+    return rng.nextDouble() < SECRET_ROOM_ENEMY_CHANCE ? 2 : 0;
+  }
+  return 2;
+}
+
+class SecretSeam {
+  constructor(kind, roomA, roomB, ladderTx, cells){
+    this.kind = kind;
+    this.roomA = roomA;
+    this.roomB = roomB;
+    this.ladderTx = ladderTx;
+    this.cells = cells;
+    this.breakablesRemaining = cells.filter((c) => c.role === SEAM_ROLE_BREAKABLE).length;
+    this.done = false;
+  }
+
+  linksRooms(a, b){
+    return (this.roomA === a && this.roomB === b) || (this.roomA === b && this.roomB === a);
+  }
+
+  isDone(){
+    return this.done || this.breakablesRemaining <= 0;
+  }
+
+  isHiddenBreakable(roomId, tx, ty){
+    if (this.isDone()) return false;
+    return this.cells.some(
+      (c) => c.role === SEAM_ROLE_BREAKABLE && !c.cleared && c.roomId === roomId && c.tx === tx && c.ty === ty
+    );
+  }
+
+  markBreakableCleared(rooms, roomId, tx, ty){
+    for (const c of this.cells) {
+      if (c.role !== SEAM_ROLE_BREAKABLE || c.cleared || c.roomId !== roomId || c.tx !== tx || c.ty !== ty) continue;
+      c.cleared = true;
+      this.breakablesRemaining--;
+      rooms[roomId].map.setTile(tx, ty, c.restore);
+      return true;
+    }
+    return false;
+  }
+
+  openRoomFaceInstant(rooms, roomId){
+    for (const c of this.cells) {
+      if (c.role !== SEAM_ROLE_BREAKABLE || c.cleared || c.roomId !== roomId) continue;
+      c.cleared = true;
+      this.breakablesRemaining--;
+      rooms[roomId].map.setTile(c.tx, c.ty, c.restore);
+    }
+    if (this.kind === SEAM_KIND_VERTICAL) {
+      const g = rooms[roomId];
+      const L = clampLadderColumn(g.map.getWidth(), this.ladderTx);
+      if (L >= 0) {
+        const t0 = g.map.tileAt(L, 0);
+        if (t0 !== TILE_DOOR && t0 !== TILE_BREAKABLE) g.map.setTile(L, 0, TILE_LADDER);
+      }
+    }
+    if (this.breakablesRemaining <= 0) this.done = true;
+  }
+
+  seamMatchesTraverseDir(fromRoom, toRoom, dir){
+    if (this.kind === SEAM_KIND_HORIZONTAL) {
+      if (dir === "east") return this.roomA === fromRoom && this.roomB === toRoom;
+      if (dir === "west") return this.roomA === toRoom && this.roomB === fromRoom;
+    } else {
+      if (dir === "south") return this.roomA === fromRoom && this.roomB === toRoom;
+      if (dir === "north") return this.roomA === toRoom && this.roomB === fromRoom;
+    }
+    return false;
+  }
+}
+
+function northRoomSouthSealY(map, ladderTx){
+  const mouth = resolvedLadderRunwayRow(map, ladderTx, true);
+  return Math.max(1, mouth - 1);
+}
+
+function placeSecretEntranceSeams(layout, rooms){
+  const out = [];
+  const horizontalEdges = new Set();
+  const verticalEdges = new Set();
+  const n = layout.roomCount();
+  for (let id = 0; id < n; id++) {
+    if (!isSecretKind(layout.room(id).kind)) continue;
+    const e = layout.neighborEast(id);
+    if (e >= 0) {
+      const ek = `${id}|${e}`;
+      if (!horizontalEdges.has(ek)) {
+        horizontalEdges.add(ek);
+        tryAddHorizontalSeam(layout, rooms, out, id, e);
+      }
+    }
+    const w = layout.neighborWest(id);
+    if (w >= 0) {
+      const ek = `${w}|${id}`;
+      if (!horizontalEdges.has(ek)) {
+        horizontalEdges.add(ek);
+        tryAddHorizontalSeam(layout, rooms, out, w, id);
+      }
+    }
+    const north = layout.neighborNorth(id);
+    if (north >= 0) {
+      const vk = `${north}|${id}`;
+      if (!verticalEdges.has(vk)) {
+        verticalEdges.add(vk);
+        tryAddVerticalSeam(layout, rooms, out, north, id);
+      }
+    }
+    const south = layout.neighborSouth(id);
+    if (south >= 0) {
+      const vk = `${id}|${south}`;
+      if (!verticalEdges.has(vk)) {
+        verticalEdges.add(vk);
+        tryAddVerticalSeam(layout, rooms, out, id, south);
+      }
+    }
+  }
+  return out;
+}
+
+function tryAddHorizontalSeam(layout, rooms, out, westRoomId, eastRoomId){
+  let gW = rooms[westRoomId];
+  let gE = rooms[eastRoomId];
+  if (!gW || !gE) return;
+  let rx = gW.rightDoorTileX;
+  let ry = gW.rightDoorTopTileY;
+  let lx = gE.leftDoorTileX;
+  let ly = gE.leftDoorTopTileY;
+  if (rx < 0 || ry < 0 || lx < 0 || ly < 0) return;
+  if (ry !== ly) {
+    const westSecret = isSecretKind(layout.room(westRoomId).kind);
+    const eastSecret = isSecretKind(layout.room(eastRoomId).kind);
+    if (westSecret && !eastSecret) {
+      rooms[eastRoomId] = alignLeftDoorTopY(gE, lx, ry);
+      gE = rooms[eastRoomId];
+      ly = gE.leftDoorTopTileY;
+    } else if (eastSecret && !westSecret) {
+      rooms[westRoomId] = alignRightDoorTopY(gW, rx, ly);
+      gW = rooms[westRoomId];
+      ry = gW.rightDoorTopTileY;
+    } else {
+      rooms[eastRoomId] = alignLeftDoorTopY(gE, lx, ry);
+      gE = rooms[eastRoomId];
+      ly = gE.leftDoorTopTileY;
+    }
+  }
+  if (ry !== ly) return;
+  const cells = [];
+  const addBreakable = (roomId, tx, ty, restore, map) => {
+    cells.push({ roomId, tx, ty, restore, role: SEAM_ROLE_BREAKABLE, cleared: false });
+    map.setTile(tx, ty, TILE_BREAKABLE);
+  };
+  const addBuffer = (roomId, tx, ty, role) => {
+    cells.push({ roomId, tx, ty, restore: TILE_SOLID, role, cleared: false });
+  };
+  for (let dy = 0; dy <= 1; dy++) {
+    addBreakable(westRoomId, rx, ry + dy, TILE_DOOR, gW.map);
+    addBreakable(eastRoomId, lx, ly + dy, TILE_DOOR, gE.map);
+  }
+  const hW = gW.map.getHeight();
+  const hE = gE.map.getHeight();
+  for (let y = 1; y < hW - 1; y++) addBuffer(westRoomId, Math.min(gW.map.getWidth() - 1, rx + 1), y, SEAM_ROLE_BUFFER_EAST);
+  for (let y = 1; y < hE - 1; y++) addBuffer(eastRoomId, Math.max(0, lx - 1), y, SEAM_ROLE_BUFFER_WEST);
+  out.push(new SecretSeam(SEAM_KIND_HORIZONTAL, westRoomId, eastRoomId, -1, cells));
+}
+
+function tryAddVerticalSeam(layout, rooms, out, northRoomId, southRoomId){
+  const northNode = layout.room(northRoomId);
+  const southNode = layout.room(southRoomId);
+  if (!northNode.ladderSouth || !southNode.ladderNorth) return;
+  const gN = rooms[northRoomId];
+  const gS = rooms[southRoomId];
+  if (!gN || !gS) return;
+  let layoutL = northNode.ladderColumnTx;
+  if (layoutL < 0) layoutL = southNode.ladderColumnTx;
+  if (layoutL < 0) return;
+  const lN = clampLadderColumn(gN.map.getWidth(), layoutL);
+  const lS = clampLadderColumn(gS.map.getWidth(), layoutL);
+  const northY = northRoomSouthSealY(gN.map, lN);
+  const southY = 1;
+  const cells = [];
+  const addBreakable = (roomId, tx, y, restore, map) => {
+    if (y < 1 || y >= map.getHeight() - 1) return false;
+    cells.push({ roomId, tx, ty: y, restore, role: SEAM_ROLE_BREAKABLE, cleared: false });
+    map.setTile(tx, y, TILE_BREAKABLE);
+    return true;
+  };
+  if (!addBreakable(northRoomId, lN, northY, TILE_LADDER, gN.map)) return;
+  if (!addBreakable(southRoomId, lS, southY, TILE_LADDER, gS.map)) return;
+  const hN = gN.map.getHeight();
+  for (let y = 1; y < hN - 1; y++) {
+    if (y === northY) continue;
+    cells.push({ roomId: northRoomId, tx: lN, ty: y, restore: TILE_SOLID, role: SEAM_ROLE_BUFFER, cleared: false });
+  }
+  if (gS.map.tileAt(lS, 0) !== TILE_DOOR && gS.map.tileAt(lS, 0) !== TILE_BREAKABLE) {
+    gS.map.setTile(lS, 0, TILE_EMPTY);
+  }
+  out.push(new SecretSeam(SEAM_KIND_VERTICAL, northRoomId, southRoomId, layoutL, cells));
+}
+
+function findSeamForTransition(seams, fromRoom, toRoom, dir){
+  if (!seams) return null;
+  for (const seam of seams) {
+    if (seam.isDone() || !seam.linksRooms(fromRoom, toRoom)) continue;
+    if (seam.seamMatchesTraverseDir(fromRoom, toRoom, dir)) return seam;
+  }
+  return null;
+}
+
+function openEnteredFaceForTransition(layout, rooms, seams, fromRoom, toRoom, dir){
+  const seam = findSeamForTransition(seams, fromRoom, toRoom, dir);
+  if (seam && !seam.isDone()) seam.openRoomFaceInstant(rooms, toRoom);
+}
+
+function buildDungeonContent(layout){
+  const n = layout.roomCount();
+  const plannedW = plannedRoomWidths(layout);
+  const plannedH = plannedRoomHeights(layout);
+  const rooms = new Array(n);
+  for (let i = 0; i < n; i++) {
+    const kind = layout.room(i).kind;
+    if (isSecretKind(kind)) continue;
+    rooms[i] = generateRoomContent(layout.room(i), plannedW[i], plannedH[i], {
+      neighborFaces: neighborSecretFaces(layout, i),
+    });
+  }
+  for (let i = 0; i < n; i++) {
+    const kind = layout.room(i).kind;
+    if (!isSecretKind(kind)) continue;
+    rooms[i] = generateRoomContent(layout.room(i), plannedW[i], plannedH[i], {
+      secretSeams: secretRoomSeams(layout, i, rooms),
+    });
+  }
+  const seams = placeSecretEntranceSeams(layout, rooms);
+  return { rooms, seams };
+}
+
 /** Procedural room generator (port of Java RoomGenerator core terrain pass). */
-function generateRoom(node){
+function generateRoomContent(node, plannedW, plannedH, secretFinish = null){
   const kind = node.kind;
-  const largeArena = kind === RoomKind.NORMAL || kind === RoomKind.SECRET;
-  const w = largeArena ? WIDE_W : SCREEN_W;
-  const h = largeArena ? WIDE_H : SCREEN_H;
+  const w = plannedW;
+  const h = plannedH;
   const seed = Number(BigInt(node.contentSeed) ^ 0x9e3779b97f4a7c15n);
   const rng = javaRandom(seed);
   const conn = {
@@ -896,7 +1738,7 @@ function generateRoom(node){
     grid[y][w - 1] = "#";
   }
 
-  const entryPadStartX = 1;
+  const entryPadStartX = kind === RoomKind.SECRET && !conn.doorWest ? 2 : 1;
   const entryX = Math.min(entryPadStartX + 1, w - 2);
   const entryY = groundY[entryX];
   const entryPadEndX = Math.min(entryPadStartX + 5, w - 2);
@@ -950,9 +1792,13 @@ function generateRoom(node){
   const leftDoorTopY = conn.doorWest ? clamp(leftGroundY - 2, 1, h - 3) : -1;
   const rightDoorTopY = conn.doorEast ? clamp(rightGroundY - 2, 1, h - 3) : -1;
 
+  if (secretFinish?.secretSeams) {
+    alignAsciiGroundYToSeams(groundY, w, h, secretFinish.secretSeams);
+  }
+
   if (
-    dungeonLadderTx >= 7 &&
-    dungeonLadderTx < w - 2 &&
+    dungeonLadderTx >= 3 &&
+    dungeonLadderTx < w - 3 &&
     (conn.ladderNorth || conn.ladderSouth) &&
     !usesFlatLadderFloorKind(kind)
   ) {
@@ -1040,6 +1886,24 @@ function generateRoom(node){
       }
     }
     if (grid[0][L] !== "D") grid[0][L] = conn.ladderNorth ? "." : "#";
+    finalizeDungeonLadderMouthOnGrid(grid, w, h, L, mouthRow, conn);
+  }
+
+  if (dungeonVerticalLink) {
+    const mouthRow = resolvedLadderRunwayRowOnGrid(
+      grid,
+      w,
+      h,
+      groundY,
+      dungeonLadderTx,
+      conn.ladderSouth
+    );
+    stripSpuriousLaddersFromGrid(grid, w, h, dungeonLadderTx, groundY);
+    if (dungeonLadderTx >= 3 && dungeonLadderTx < w - 3) {
+      finalizeDungeonLadderMouthOnGrid(grid, w, h, dungeonLadderTx, mouthRow, conn);
+    }
+  } else if (kind === RoomKind.NORMAL || kind === RoomKind.BOSS) {
+    stripSpuriousLaddersFromGrid(grid, w, h, -1, groundY);
   }
 
   if (kind === RoomKind.BOSS) {
@@ -1050,7 +1914,36 @@ function generateRoom(node){
     }
   }
 
-  return TileMap.fromAscii(gridToAsciiRows(grid));
+  let map = TileMap.fromAscii(gridToAsciiRows(grid));
+  let gen = makeGeneratedRoom(map, {
+    leftDoorTileX: conn.doorWest ? leftDoorX : -1,
+    leftDoorTopTileY: leftDoorTopY,
+    rightDoorTileX: conn.doorEast ? rightDoorX : -1,
+    rightDoorTopTileY: rightDoorTopY,
+    ladderColumnTx: dungeonLadderTx,
+    contentSeed: node.contentSeed,
+    kind,
+    enemyCount: rollRoomEnemyCount(kind, node.contentSeed),
+  });
+  if (secretFinish?.secretSeams || secretFinish?.neighborFaces) {
+    gen = secretRoomMapBuildFinish(
+      gen,
+      kind,
+      conn,
+      secretFinish.secretSeams ?? null,
+      secretFinish.neighborFaces ?? null
+    );
+  }
+  return gen;
+}
+
+function generateRoom(node){
+  const largeArena = node.kind === RoomKind.NORMAL || node.kind === RoomKind.SECRET;
+  return generateRoomContent(
+    node,
+    largeArena ? WIDE_W : SCREEN_W,
+    largeArena ? WIDE_H : SCREEN_H
+  ).map;
 }
 
 function playFloorRowAt(map, tx){
@@ -1079,13 +1972,13 @@ function roomSpawnTx(node, map, fromWest, fromEast){
 }
 
 function ladderSpawnFromNorth(node, map){
-  const L = node.ladderColumnTx;
+  const L = roomLadderColumnTx(node, map);
   if (L < 0) return null;
   return { x: L * TILE_SIZE + TILE_SIZE / 2 - 5, y: 3 * TILE_SIZE - 32 };
 }
 
 function ladderSpawnFromSouth(node, map){
-  const L = node.ladderColumnTx;
+  const L = roomLadderColumnTx(node, map);
   if (L < 0) return null;
   return { x: L * TILE_SIZE + TILE_SIZE / 2 - 5, y: map.getHeight() * TILE_SIZE - 32 };
 }
@@ -2118,13 +3011,72 @@ class GameSim {
     this.transitionDir = null;
     this.currentRoomId = 0;
     this.layout = DungeonLayout.generate(this.seed, 12, 24);
-    const node = this.layout.room(0);
-    this.map = generateRoom(node);
-    this.enemies = spawnEnemiesForRoom(this.map, node.contentSeed, 2);
+    const built = buildDungeonContent(this.layout);
+    this.cachedRooms = built.rooms;
+    this.secretEntranceSeams = built.seams;
+    const n = this.layout.roomCount();
+    this.roomVisited = new Array(n).fill(false);
+    this.minimapAdjacentSeen = new Array(n).fill(false);
+    this.roomVisited[0] = true;
+    this.revealMinimapAdjacentNeighbors(0);
+    this.loadRoom(0);
     this.player = new Player();
-    const spawn = spawnAtFloor(this.map, roomSpawnTx(node, this.map, false, false));
+    const spawn = spawnAtFloor(this.map, roomSpawnTx(this.layout.room(0), this.map, false, false));
     this.player.resetAt(spawn.x, spawn.y);
     this.camera.reset(this.cameraAnchorX(), this.cameraAnchorY());
+  }
+
+  loadRoom(roomId){
+    const gen = this.cachedRooms[roomId];
+    this.map = gen.map;
+    this.enemies = spawnEnemiesForRoom(this.map, gen.contentSeed, gen.enemyCount);
+  }
+
+  currentGeneratedRoom(){
+    return this.cachedRooms[this.currentRoomId];
+  }
+
+  isHiddenShellBreakable(tx, ty){
+    if (!this.secretEntranceSeams) return false;
+    for (const seam of this.secretEntranceSeams) {
+      if (seam.isHiddenBreakable(this.currentRoomId, tx, ty)) return true;
+    }
+    return false;
+  }
+
+  tryStrikeSeamBreakables(hit){
+    if (!hit || !this.secretEntranceSeams) return;
+    const x0 = Math.floor(hit.x / TILE_SIZE);
+    const x1 = Math.floor((hit.x + hit.w) / TILE_SIZE);
+    const y0 = Math.floor(hit.y / TILE_SIZE);
+    const y1 = Math.floor((hit.y + hit.h) / TILE_SIZE);
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (!this.map.isBreakableTile(tx, ty)) continue;
+        for (const seam of this.secretEntranceSeams) {
+          if (seam.markBreakableCleared(this.cachedRooms, this.currentRoomId, tx, ty)) break;
+        }
+      }
+    }
+  }
+
+  seamBlocksTransition(fromRoom, toRoom, dir){
+    const seam = findSeamForTransition(this.secretEntranceSeams, fromRoom, toRoom, dir);
+    return seam != null && !seam.isDone();
+  }
+
+  revealMinimapAdjacentNeighbors(roomId){
+    this.revealMinimapAdjacentRoom(this.layout.neighborWest(roomId));
+    this.revealMinimapAdjacentRoom(this.layout.neighborEast(roomId));
+    this.revealMinimapAdjacentRoom(this.layout.neighborNorth(roomId));
+    this.revealMinimapAdjacentRoom(this.layout.neighborSouth(roomId));
+  }
+
+  revealMinimapAdjacentRoom(neighborId){
+    if (neighborId < 0 || neighborId >= this.minimapAdjacentSeen.length) return;
+    const kind = this.layout.room(neighborId).kind;
+    if (kind === RoomKind.SECRET || kind === RoomKind.SUPER_SECRET) return;
+    this.minimapAdjacentSeen[neighborId] = true;
   }
 
   restartRun(seed){
@@ -2161,6 +3113,7 @@ class GameSim {
     // Sword hits
     const hit = this.player.attackHitbox();
     if (hit) {
+      this.tryStrikeSeamBreakables(hit);
       for (const e of this.enemies) {
         if (e.dead) continue;
         const hb = e.hitbox();
@@ -2233,16 +3186,20 @@ class GameSim {
 
     if (touchedRight && node.doorEast) {
       const east = this.layout.neighborEast(this.currentRoomId);
-      if (east >= 0) this.beginTransition(east, "east", input);
+      if (east >= 0 && !this.seamBlocksTransition(this.currentRoomId, east, "east")) {
+        this.beginTransition(east, "east", input);
+      }
     } else if (touchedLeft && node.doorWest) {
       const west = this.layout.neighborWest(this.currentRoomId);
-      if (west >= 0) this.beginTransition(west, "west", input);
+      if (west >= 0 && !this.seamBlocksTransition(this.currentRoomId, west, "west")) {
+        this.beginTransition(west, "west", input);
+      }
     }
   }
 
   tryLadderTransition(input){
     const node = this.layout.room(this.currentRoomId);
-    const L = node.ladderColumnTx;
+    const L = roomLadderColumnTx(node, this.map);
     if (L < 0) return;
     if (!this.playerOverlapsLadderColumn(L)) return;
 
@@ -2253,13 +3210,17 @@ class GameSim {
     if (wantDown && node.ladderSouth && this.playerNearRoomSouthEdge()) {
       if (!this.southLadderMouthAllowsTransition(L)) return;
       const south = this.layout.neighborSouth(this.currentRoomId);
-      if (south >= 0) this.beginTransition(south, "south", input);
+      if (south >= 0 && !this.seamBlocksTransition(this.currentRoomId, south, "south")) {
+        this.beginTransition(south, "south", input);
+      }
       return;
     }
     if (wantUp && node.ladderNorth && this.playerNearRoomNorthEdge()) {
       if (!this.northLadderSeamOpenAtTop(L)) return;
       const north = this.layout.neighborNorth(this.currentRoomId);
-      if (north >= 0) this.beginTransition(north, "north", input);
+      if (north >= 0 && !this.seamBlocksTransition(this.currentRoomId, north, "north")) {
+        this.beginTransition(north, "north", input);
+      }
     }
   }
 
@@ -2298,14 +3259,23 @@ class GameSim {
   }
 
   beginTransition(roomId, dir, input) {
+    const fromRoom = this.currentRoomId;
     this.currentRoomId = roomId;
-    const node = this.layout.room(roomId);
-    this.map = generateRoom(node);
-    this.enemies = spawnEnemiesForRoom(
-      this.map,
-      node.contentSeed,
-      node.kind === RoomKind.BOSS ? 0 : 2
+    if (roomId >= 0 && roomId < this.roomVisited.length) {
+      this.roomVisited[roomId] = true;
+    }
+    this.revealMinimapAdjacentNeighbors(roomId);
+    openEnteredFaceForTransition(
+      this.layout,
+      this.cachedRooms,
+      this.secretEntranceSeams,
+      fromRoom,
+      roomId,
+      dir
     );
+    this.loadRoom(roomId);
+    const node = this.layout.room(roomId);
+    const gen = this.currentGeneratedRoom();
 
     let spawn;
     if (dir === "south") {
@@ -2318,6 +3288,18 @@ class GameSim {
       spawn = p ? { x: p.x, y: p.y } : spawnAtFloor(this.map, roomSpawnTx(node, this.map, false, false));
       this.player.resetAt(spawn.x, spawn.y);
       this.player.onGround = false;
+    } else if (dir === "west" && gen.leftDoorTileX >= 0) {
+      spawn = {
+        x: (gen.leftDoorTileX + 1) * TILE_SIZE,
+        y: (gen.leftDoorTopTileY + 2) * TILE_SIZE - 32,
+      };
+      this.player.resetAt(spawn.x, spawn.y);
+    } else if (dir === "east" && gen.rightDoorTileX >= 0) {
+      spawn = {
+        x: (gen.rightDoorTileX - 1) * TILE_SIZE,
+        y: (gen.rightDoorTopTileY + 2) * TILE_SIZE - 32,
+      };
+      this.player.resetAt(spawn.x, spawn.y);
     } else {
       const spawnTx = roomSpawnTx(node, this.map, dir === "west", dir === "east");
       spawn = spawnAtFloor(this.map, spawnTx);
@@ -2400,6 +3382,10 @@ class GameSim {
       displaySalt: this.layout.room(this.currentRoomId).contentSeed >>> 0,
       seed: this.seed,
       gameOver: this.gameOver,
+      layout: this.layout,
+      currentRoomId: this.currentRoomId,
+      roomVisited: this.roomVisited,
+      minimapAdjacentSeen: this.minimapAdjacentSeen,
     };
   }
 }
@@ -2607,7 +3593,7 @@ class RenderPipeline {
 
     // Always paint forest/underground sprite terrain first so floors stay visible even
     // when tileset v3 only manages partial draws (e.g. grass without solids).
-    this.drawTilesSpriteLayer(ctx, map, x0, y0, x1, y1, sheet);
+    this.drawTilesSpriteLayer(ctx, sim, map, x0, y0, x1, y1, sheet);
 
     if (tilesetRuntime) {
       try {
@@ -2635,7 +3621,7 @@ class RenderPipeline {
     }
   }
 
-  drawTilesSpriteLayer(ctx, map, x0, y0, x1, y1, sheet) {
+  drawTilesSpriteLayer(ctx, sim, map, x0, y0, x1, y1, sheet) {
     const forest = sheet;
     const canSprite = imageDrawable(forest);
     for (let ty = y0; ty <= y1; ty++) {
@@ -2654,9 +3640,12 @@ class RenderPipeline {
 
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
-        const t = map.tileAt(tx, ty);
+        let t = map.tileAt(tx, ty);
         const px = tx * TILE_SIZE;
         const py = ty * TILE_SIZE;
+        if (t === TILE_BREAKABLE && sim.isHiddenShellBreakable(tx, ty)) {
+          t = TILE_SOLID;
+        }
         if (t === TILE_SOLID || t === TILE_BREAKABLE) {
           const [col, row] = solidAutotileCell(map, tx, ty);
           if (!canSprite || !drawForestTile(ctx, forest, col, row, px, py)) {
@@ -2803,7 +3792,10 @@ class RenderPipeline {
     ctx.fillStyle = "#aaa";
     ctx.font = "8px monospace";
     ctx.fillText(`Keys:${snap.keys} $:${snap.money}`, 8, hudY + 28);
-    ctx.fillText(`${snap.roomKind} seed:${snap.seed}`, INTERNAL_WIDTH - 120, hudY + 28);
+    drawMinimap(ctx, snap, hudY);
+    const grid = snap.layout ? minimapGridMetrics(snap.layout) : null;
+    const roomLabelX = grid ? Math.max(8, INTERNAL_WIDTH - grid.totalW - 90) : INTERNAL_WIDTH - 120;
+    ctx.fillText(snap.roomKind, roomLabelX, hudY + 28);
   }
 
   drawGameOverOverlay(ctx){
