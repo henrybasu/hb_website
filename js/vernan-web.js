@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.38";
+const WEB_CLIENT_VERSION_STR = "0.1.39";
 
   // --- math/util.ts ---
 
@@ -5132,7 +5132,7 @@ class GameSim {
       money: this.player.stats.money,
       roomKind: this.layout.room(this.currentRoomId).kind,
       backgroundPresetId: this.getBackgroundPresetId(this.currentRoomId),
-      displaySalt: this.layout.room(this.currentRoomId).contentSeed >>> 0,
+      displaySalt: this.layout.room(this.currentRoomId).contentSeed,
       seed: this.seed,
       gameOver: this.gameOver,
       layout: this.layout,
@@ -5432,11 +5432,16 @@ class RenderPipeline {
       try {
         tilesetRuntime.drawRoom(ctx, map, {
           roomKind: snap.roomKind,
-          displaySalt: snap.displaySalt >>> 0,
+          displaySalt: snap.displaySalt,
           x0,
           y0,
           x1,
           y1,
+          terrainAt: (tx, ty) => {
+            let t = map.tileAt(tx, ty);
+            if (t === TILE_BREAKABLE && sim.isHiddenShellBreakable(tx, ty)) t = TILE_SOLID;
+            return t;
+          },
         });
       } catch (err) {
         console.error("[Vernan] tileset draw failed:", err);

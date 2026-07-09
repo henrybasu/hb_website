@@ -62,11 +62,25 @@
     );
   }
 
+  function splitMix64(x) {
+    let v = BigInt.asUintN(64, BigInt(x));
+    v ^= v >> 33n;
+    v = (v * 0xff51afd7ed558ccdn) & ((1n << 64n) - 1n);
+    v ^= v >> 33n;
+    v = (v * 0xc4ceb9fe1a85ec53n) & ((1n << 64n) - 1n);
+    v ^= v >> 33n;
+    return v;
+  }
+
+  function pickWeightedIndex(choiceCount, tx, ty, salt) {
+    if (choiceCount <= 0) return 0;
+    const mix = BigInt(salt) ^ BigInt(tx) * 0xc2b2ae3dn ^ BigInt(ty) * 0x165667b1n;
+    const x = splitMix64(mix);
+    return Number(x % BigInt(choiceCount));
+  }
+
   function hashPick(seed, tx, ty, count) {
-    if (count <= 0) return 0;
-    let h = (seed ^ (tx * 374761393) ^ (ty * 668265263)) >>> 0;
-    h = Math.imul(h ^ (h >>> 13), 1274126177);
-    return (h >>> 0) % count;
+    return pickWeightedIndex(count, tx, ty, seed);
   }
 
   class TerrainBridge {
@@ -192,14 +206,16 @@
 
   function pickWeighted(terrainInt, tx, ty, salt, choices) {
     if (!choices?.length) return null;
+    if (choices.length === 1) return choices[0].tileId;
     let total = 0;
     for (const c of choices) total += c.weight;
-    if (total <= 0) return null;
+    if (total <= 0) return choices[0].tileId;
     const useTy = terrainInt === TILE_LADDER ? 0 : ty;
-    let roll = hashPick(salt ^ tx ^ useTy, tx, useTy, total);
+    const roll = pickWeightedIndex(total, tx, useTy, salt);
+    let acc = 0;
     for (const c of choices) {
-      if (roll < c.weight) return c.tileId;
-      roll -= c.weight;
+      acc += c.weight;
+      if (roll < acc) return c.tileId;
     }
     return choices[choices.length - 1].tileId;
   }
@@ -339,6 +355,8 @@
 
   function stripConnects(selfId, neighborId, islandFoot, tileDefById) {
     if (!neighborId || !selfId || selfId === neighborId) return false;
+    const selfDef = tileDefById(selfId);
+    if (selfDef && autotileConnects(selfId, selfDef, neighborId)) return true;
     const selfCell = islandFoot.find((c) => c.tileId === selfId);
     if (!selfCell) return false;
     for (const c of islandFoot) {
@@ -347,8 +365,61 @@
       if (c.dTx === selfCell.dTx && c.dTy === selfCell.dTy + 1 && neighborId === c.tileId) return true;
       if (c.dTx === selfCell.dTx - 1 && c.dTy === selfCell.dTy && neighborId === c.tileId) return true;
     }
-    const def = tileDefById(selfId);
-    return def ? autotileConnects(selfId, def, neighborId) : false;
+    return false;
+  }
+
+  function massOpenEdgeMask(north, east, south, west) {
+    let mask = 0;
+    if (!north) mask |= 1;
+    if (!east) mask |= 2;
+    if (!south) mask |= 4;
+    if (!west) mask |= 8;
+    return mask;
+  }
+
+  function layoutHasCell(islandFoot, dTx, dTy) {
+    return islandFoot.some((c) => c.dTx === dTx && c.dTy === dTy);
+  }
+
+  function layoutOpenEdgeMaskForTile(tileId, islandFoot) {
+    const cell = islandFoot.find((c) => c.tileId === tileId);
+    if (!cell) return 0;
+    return massOpenEdgeMask(
+      layoutHasCell(islandFoot, cell.dTx, cell.dTy - 1),
+      layoutHasCell(islandFoot, cell.dTx + 1, cell.dTy),
+      layoutHasCell(islandFoot, cell.dTx, cell.dTy + 1),
+      layoutHasCell(islandFoot, cell.dTx - 1, cell.dTy)
+    );
+  }
+
+  function pickMemberFromTerrainLayout(
+    map,
+    tx,
+    ty,
+    terrainCode,
+    islandFoot,
+    massCtx,
+    objects,
+    bridge,
+    salt,
+    roomKind
+  ) {
+    const rn = terrainConnectsMass(map, tx, ty - 1, terrainCode, massCtx, objects, bridge, salt, roomKind);
+    const re = terrainConnectsMass(map, tx + 1, ty, terrainCode, massCtx, objects, bridge, salt, roomKind);
+    const rs = terrainConnectsMass(map, tx, ty + 1, terrainCode, massCtx, objects, bridge, salt, roomKind);
+    const rw = terrainConnectsMass(map, tx - 1, ty, terrainCode, massCtx, objects, bridge, salt, roomKind);
+    const mapOpenMask = massOpenEdgeMask(rn, re, rs, rw);
+    let bestId = null;
+    let bestMaskDist = Infinity;
+    for (const cell of islandFoot) {
+      const layoutMask = layoutOpenEdgeMaskForTile(cell.tileId, islandFoot);
+      const dist = (mapOpenMask ^ layoutMask).toString(2).replace(/0/g, "").length;
+      if (dist < bestMaskDist) {
+        bestMaskDist = dist;
+        bestId = cell.tileId;
+      }
+    }
+    return bestId;
   }
 
   function scoreGridMember(islandFoot, n, e, s, w, tileDefById) {
@@ -619,6 +690,21 @@
     }
     if (horizontal) return pickHorizontalStrip(sorted, e, w, foot, tileDefById);
     if (vertical) return pickVerticalStrip(sorted, n, s, foot, tileDefById);
+    if (map && tx >= 0 && ty >= 0 && stackableTerrain(terrainCode)) {
+      const fromLayout = pickMemberFromTerrainLayout(
+        map,
+        tx,
+        ty,
+        terrainCode,
+        foot,
+        massCtx,
+        objects,
+        bridge,
+        salt,
+        roomKind
+      );
+      if (fromLayout) return fromLayout;
+    }
     return scoreGridMember(foot, n, e, s, w, tileDefById) || pooledId;
   }
 
@@ -642,11 +728,188 @@
     return objectOwnsTile(selfObj, pick);
   }
 
+  function layoutContainsTileId(obj, tileId) {
+    const cells = asList(asMap(obj?.memberGraphLayout)?.cells);
+    if (!cells) return false;
+    const want = String(tileId).trim();
+    for (const raw of cells) {
+      if (str(asMap(raw), "tileId", "").trim() === want) return true;
+    }
+    return false;
+  }
+
   function pickBelongsToConnectObject(connectObj, displayId, objects) {
     if (!connectObj || !displayId) return false;
-    if (objectOwnsTile(connectObj, displayId)) return true;
-    const owner = findObjectRowOwningTileId(objects, displayId);
-    return owner != null && str(owner, "id", "") === str(connectObj, "id", "");
+    const pick = String(displayId).trim();
+    if (objectOwnsTile(connectObj, pick)) return true;
+    const owner = findObjectRowOwningTileId(objects, pick);
+    if (owner && str(owner, "id", "") === str(connectObj, "id", "")) return true;
+    return layoutContainsTileId(connectObj, pick);
+  }
+
+  function resolveConnectAnchor(obj, bridge, terrainCode, roomKind, explicitAnchor) {
+    if (explicitAnchor) return String(explicitAnchor).trim();
+    const members = memberTileIdsOrdered(obj);
+    if (!members.length) return "";
+    if (bridge) {
+      const bridgeConnect = bridge.connectTileIdForRoomKind(terrainCode, roomKind);
+      if (bridgeConnect && members.includes(bridgeConnect.trim())) return bridgeConnect.trim();
+    }
+    const objectAnchor = str(obj, "anchorTileId", "").trim();
+    if (objectAnchor && members.includes(objectAnchor)) return objectAnchor;
+    return members[0];
+  }
+
+  function isAutotileObject(obj) {
+    return str(obj, "objectType", "") === "autotile";
+  }
+
+  function isFullObject(obj) {
+    return str(obj, "objectType", "") === "full object";
+  }
+
+  function resolveAutotileObjectMemberAt(
+    pooledDisplayId,
+    connectAnchorId,
+    map,
+    tx,
+    ty,
+    terrainCode,
+    bridge,
+    salt,
+    roomKind,
+    objects,
+    tileDefById
+  ) {
+    if (!pooledDisplayId || !objects || !tileDefById) return null;
+    const obj = findObjectRowOwningTileId(objects, pooledDisplayId);
+    if (!obj || !isAutotileObject(obj) || isFullObject(obj)) return null;
+    const anchor = resolveConnectAnchor(obj, bridge, terrainCode, roomKind, connectAnchorId);
+    if (!anchor) return null;
+    const tileIdAllowed = (id) => {
+      const def = tileDefById(id);
+      return !def || tileAllowedInRoomKind(def, roomKind);
+    };
+    const massCtx = makeMassContext(
+      findObjectRowOwningTileId(objects, anchor) || obj,
+      bridge,
+      salt,
+      roomKind,
+      tileIdAllowed
+    );
+    const connectObj = findObjectRowOwningTileId(objects, anchor);
+    const nb = orthoTerrainConnectNeighbors(
+      map,
+      tx,
+      ty,
+      terrainCode,
+      anchor,
+      massCtx,
+      objects,
+      bridge,
+      salt,
+      roomKind
+    );
+    const displayId = resolveTerrainDisplayTileId(
+      anchor,
+      nb.n,
+      nb.e,
+      nb.s,
+      nb.w,
+      objects,
+      tileDefById,
+      connectObj,
+      map,
+      tx,
+      ty,
+      terrainCode,
+      massCtx,
+      bridge,
+      salt,
+      roomKind
+    );
+    return displayId || anchor;
+  }
+
+  function resolvePaintedCell(
+    displayId,
+    map,
+    tx,
+    ty,
+    terrainCode,
+    bridge,
+    salt,
+    roomKind,
+    objects,
+    tileDefById
+  ) {
+    if (!displayId) return null;
+    const fromObject = resolveAutotileObjectMemberAt(
+      displayId,
+      null,
+      map,
+      tx,
+      ty,
+      terrainCode,
+      bridge,
+      salt,
+      roomKind,
+      objects,
+      tileDefById
+    );
+    if (fromObject) return fromObject;
+    return displayId;
+  }
+
+  function resolveTerrainMassCell(
+    map,
+    tx,
+    ty,
+    terrainCode,
+    bridge,
+    salt,
+    roomKind,
+    objects,
+    tileDefById
+  ) {
+    const displayId = bridgeDisplayTileId(map, tx, ty, terrainCode, bridge, salt, roomKind);
+    if (!displayId) return null;
+    if (terrainCode === TILE_SOLID || terrainCode === TILE_BREAKABLE) {
+      const connectId = bridge.connectTileIdForRoomKind(terrainCode, roomKind);
+      const connectObj = connectId ? findObjectRowOwningTileId(objects, connectId) : null;
+      if (
+        connectObj &&
+        isAutotileObject(connectObj) &&
+        pickBelongsToConnectObject(connectObj, displayId, objects)
+      ) {
+        const member = resolveAutotileObjectMemberAt(
+          displayId,
+          connectId,
+          map,
+          tx,
+          ty,
+          terrainCode,
+          bridge,
+          salt,
+          roomKind,
+          objects,
+          tileDefById
+        );
+        if (member) return member;
+      }
+    }
+    return resolvePaintedCell(
+      displayId,
+      map,
+      tx,
+      ty,
+      terrainCode,
+      bridge,
+      salt,
+      roomKind,
+      objects,
+      tileDefById
+    );
   }
 
   function resolveTerrainDisplayTileId(
@@ -744,54 +1007,17 @@
   }
 
   function resolveTerrainCell(map, tx, ty, terrainCode, bridge, salt, roomKind, objects, tileDefById) {
-    const tileIdAllowed = (id) => {
-      const def = tileDefById(id);
-      return !def || tileAllowedInRoomKind(def, roomKind);
-    };
-    const displayId = bridgeDisplayTileId(map, tx, ty, terrainCode, bridge, salt, roomKind);
-    if (!displayId) return null;
-    const connectId = bridge.connectTileIdForRoomKind(terrainCode, roomKind);
-    const connectObj = connectId ? findObjectRowOwningTileId(objects, connectId) : null;
-    const massCtx = makeMassContext(connectObj, bridge, salt, roomKind, tileIdAllowed);
-    if (
-      connectObj &&
-      str(connectObj, "objectType", "") === "autotile" &&
-      pickBelongsToConnectObject(connectObj, displayId, objects)
-    ) {
-      const anchor = connectId;
-      const nb = orthoTerrainConnectNeighbors(
-        map,
-        tx,
-        ty,
-        terrainCode,
-        anchor,
-        massCtx,
-        objects,
-        bridge,
-        salt,
-        roomKind
-      );
-      const resolved = resolveTerrainDisplayTileId(
-        anchor,
-        nb.n,
-        nb.e,
-        nb.s,
-        nb.w,
-        objects,
-        tileDefById,
-        connectObj,
-        map,
-        tx,
-        ty,
-        terrainCode,
-        massCtx,
-        bridge,
-        salt,
-        roomKind
-      );
-      return resolved || displayId;
-    }
-    return displayId;
+    return resolveTerrainMassCell(
+      map,
+      tx,
+      ty,
+      terrainCode,
+      bridge,
+      salt,
+      roomKind,
+      objects,
+      tileDefById
+    );
   }
 
   let runtimeRef = null;
@@ -919,7 +1145,9 @@
         y0 = 0,
         x1 = map.getWidth() - 1,
         y1 = map.getHeight() - 1,
+        terrainAt = null,
       } = opts || {};
+      const tileAt = (tx, ty) => (terrainAt ? terrainAt(tx, ty) : map.tileAt(tx, ty));
       const tileDefById = (id) => this.tileById(id);
       let drawn = 0;
       const kind = String(roomKind || "").toUpperCase();
@@ -927,7 +1155,7 @@
       // Pass 1: background grass / empty underlay above solid
       for (let ty = y0; ty <= y1; ty++) {
         for (let tx = x0; tx <= x1; tx++) {
-          const t = map.tileAt(tx, ty);
+          const t = tileAt(tx, ty);
           if (t === TILE_SOLID || t === TILE_BREAKABLE || t === TILE_DOOR) continue;
           if (t === TILE_LADDER || t === TILE_PLATFORM) continue;
           if (t !== TILE_EMPTY) continue;
@@ -950,7 +1178,7 @@
       // Pass 2: solids, breakables, platforms, ladders, doors
       for (let ty = y0; ty <= y1; ty++) {
         for (let tx = x0; tx <= x1; tx++) {
-          const t = map.tileAt(tx, ty);
+          const t = tileAt(tx, ty);
           if (
             t !== TILE_SOLID &&
             t !== TILE_BREAKABLE &&
