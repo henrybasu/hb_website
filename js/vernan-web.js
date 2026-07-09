@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.45";
+const WEB_CLIENT_VERSION_STR = "0.1.53";
 
   // --- math/util.ts ---
 
