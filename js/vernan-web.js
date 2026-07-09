@@ -30,7 +30,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.8";
+const WEB_CLIENT_VERSION_STR = "0.1.9";
 
   // --- math/util.ts ---
 
@@ -650,10 +650,14 @@ function defaultPlayerRect(x, y){
   return rect(x, y, PLAYER_STAND_W, PLAYER_STAND_H);
 }
 
-function spawnAtFloor(map, spawnTx){
+function spawnAtFloor(map, spawnTx, bodyHeight = PLAYER_STAND_H){
   const groundTop = map.groundTopWorldYAtColumn(spawnTx);
-  return { x: spawnTx * TILE_SIZE, y: groundTop - PLAYER_STAND_H };
+  return { x: spawnTx * TILE_SIZE, y: groundTop - bodyHeight };
 }
+
+const ENEMY_CRAWLER_HITBOX_H = 12;
+const ENEMY_CRAWLER_SPRITE_W = 16;
+const ENEMY_CRAWLER_SPRITE_H = 16;
 
   // --- input/Input.ts ---
 /** Keyboard input with edge detection (ported from game.input.Input). */
@@ -1085,7 +1089,11 @@ class CrawlerEnemy {
   }
 
   w = 8;
-  h = 12;
+  h = ENEMY_CRAWLER_HITBOX_H;
+
+  feetY(){
+    return this.y + this.h;
+  }
 
   update(dt, map, player){
     if (this.dead || !this.health.isAlive()) {
@@ -1159,11 +1167,10 @@ function moveToward(c, t, d){
 
 function spawnEnemiesForRoom(map, seed, count = 2){
   const enemies = [];
-  const gy = map.getHeight() - 2;
   for (let i = 0; i < count; i++) {
     const tx = 4 + ((seed + i * 7) % Math.max(1, map.getWidth() - 8));
-    const groundY = map.groundTopWorldYAtColumn(tx);
-    enemies.push(new CrawlerEnemy(tx * TILE_SIZE, groundY - 12));
+    const spawn = spawnAtFloor(map, tx, ENEMY_CRAWLER_HITBOX_H);
+    enemies.push(new CrawlerEnemy(spawn.x, spawn.y));
   }
   return enemies;
 }
@@ -1843,10 +1850,23 @@ class RenderPipeline {
     for (const e of snap.enemies) {
       if (e.dead) continue;
       if (sheet) {
-        ctx.drawImage(sheet, e.animFrame * 16, 0, 16, 16, e.x - 4, e.y, 16, 16);
+        const feetY = e.y + ENEMY_CRAWLER_HITBOX_H;
+        const drawX = e.x + 4 - ENEMY_CRAWLER_SPRITE_W / 2;
+        const drawY = feetY - ENEMY_CRAWLER_SPRITE_H;
+        ctx.drawImage(
+          sheet,
+          e.animFrame * ENEMY_CRAWLER_SPRITE_W,
+          0,
+          ENEMY_CRAWLER_SPRITE_W,
+          ENEMY_CRAWLER_SPRITE_H,
+          drawX,
+          drawY,
+          ENEMY_CRAWLER_SPRITE_W,
+          ENEMY_CRAWLER_SPRITE_H
+        );
       } else {
         ctx.fillStyle = e.hurtTint > 0 ? "#ff8888" : "#88ff88";
-        ctx.fillRect(e.x, e.y, 8, 12);
+        ctx.fillRect(e.x, e.y, 8, ENEMY_CRAWLER_HITBOX_H);
       }
     }
   }
