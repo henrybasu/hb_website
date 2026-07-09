@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.39";
+const WEB_CLIENT_VERSION_STR = "0.1.40";
 
   // --- math/util.ts ---
 
@@ -2732,10 +2732,15 @@ class Player {
         if (down) this.y += this.stats.climbSpeed * dt;
         if (left) this.facing = -1;
         if (right) this.facing = 1;
-        this.animAccum += dt;
-        if (this.animAccum > 0.12) {
+        if (up || down) {
+          this.animAccum += dt;
+          if (this.animAccum > 0.2) {
+            this.animAccum = 0;
+            this.animFrame = (this.animFrame + 1) % 2;
+          }
+        } else {
           this.animAccum = 0;
-          this.animFrame = (this.animFrame + 1) % 2;
+          this.animFrame = 0;
         }
         return;
       }
