@@ -30,7 +30,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.6";
+const WEB_CLIENT_VERSION_STR = "0.1.7";
 
   // --- math/util.ts ---
 
@@ -609,7 +609,16 @@ function moveAndCollide(
     }
   }
 
+  if (!grounded && nvy <= 0) {
+    grounded = probeGrounded(map, x, y, w, h, onPlatform);
+  }
+
   return { x, y, vx: nvx, vy: nvy, onGround: grounded };
+}
+
+function probeGrounded(map, x, y, w, h, onPlatform = false){
+  const feet = y + h;
+  return overlapsSolids(map, rect(x, feet, w, 2), onPlatform, true);
 }
 
 function overlapsSolids(
@@ -774,6 +783,7 @@ class Player {
   attackTimer = 0;
   animFrame = 0;
   animAccum = 0;
+  hurtTint = 0;
   health = new Health(6);
   stats = {
     maxGroundSpeed: 85,
@@ -838,6 +848,7 @@ class Player {
     this.prevY = this.y;
     this.wasOnGround = this.onGround;
     this.health.tickInvuln(dt);
+    if (this.hurtTint > 0) this.hurtTint = Math.max(0, this.hurtTint - dt);
 
     const left = anyDown(input, Keys.left);
     const right = anyDown(input, Keys.right);
@@ -847,14 +858,13 @@ class Player {
     const jumpPressed = anyPressed(input, Keys.jump);
     const attackPressed = anyPressed(input, Keys.attack);
 
-    // Attack state machine
+    // Attack state machine (phase 1 windup, 2 active, 3 early recover, 4 late recover)
     if (this.attackPhase > 0) {
       this.attackTimer -= dt;
       const frameSec = 1 / FIXED_STEP_HZ;
       if (this.attackTimer <= 0) {
         this.attackPhase++;
-        if (this.attackPhase === 1) this.attackTimer = this.stats.attackWindupFrames * frameSec;
-        else if (this.attackPhase === 2) this.attackTimer = this.stats.attackActiveFrames * frameSec;
+        if (this.attackPhase === 2) this.attackTimer = this.stats.attackActiveFrames * frameSec;
         else if (this.attackPhase === 3) this.attackTimer = this.stats.attackRecoverEarlyFrames * frameSec;
         else if (this.attackPhase === 4) this.attackTimer = this.stats.attackRecoverLateFrames * frameSec;
         else {
@@ -864,10 +874,11 @@ class Player {
       }
     } else if (attackPressed && !this.climbing) {
       this.attackPhase = 1;
-      this.attackTimer = (this.stats.attackWindupFrames * 1) / FIXED_STEP_HZ;
+      this.attackTimer = this.stats.attackWindupFrames / FIXED_STEP_HZ;
     }
 
     const blocksJump = this.attackPhase > 0 && this.attackPhase < 4;
+    const inAttack = this.attackPhase > 0;
 
     // Ladder
     const tx = Math.floor((this.x + this.w() / 2) / TILE_SIZE);
@@ -894,12 +905,18 @@ class Player {
 
     // Horizontal movement
     let targetVx = 0;
-    if (left) {
+    if (!inAttack || this.attackPhase >= 3) {
+      if (left) {
+        this.facing = -1;
+        targetVx = -this.stats.maxGroundSpeed;
+      } else if (right) {
+        this.facing = 1;
+        targetVx = this.stats.maxGroundSpeed;
+      }
+    } else if (left) {
       this.facing = -1;
-      targetVx = -this.stats.maxGroundSpeed;
     } else if (right) {
       this.facing = 1;
-      targetVx = this.stats.maxGroundSpeed;
     }
 
     const maxSpd = this.onGround ? this.stats.maxGroundSpeed : this.stats.maxAirSpeed;
@@ -957,21 +974,28 @@ class Player {
   }
 
   isAttackActive(){
-    return this.attackPhase === 2;
+    return this.attackPhase === 2 || this.attackPhase === 3;
   }
 
   attackHitbox(){
     if (!this.isAttackActive()) return null;
-    const reach = 14;
+    const reach = 18;
     if (this.facing > 0) {
       return { x: this.x + this.w(), y: this.y + 2, w: reach, h: this.h() - 4 };
     }
     return { x: this.x - reach, y: this.y + 2, w: reach, h: this.h() - 4 };
   }
 
+  isGroundedForSprite(){
+    return this.onGround || (this.wasOnGround && this.vy >= -2);
+  }
+
   spriteName(){
+    if (this.attackPhase > 0) {
+      return this.isGroundedForSprite() ? "vernan attack.png" : "vernan air attack.png";
+    }
     if (this.climbing) return "vernan climb.png";
-    if (!this.onGround) return "vernan jump.png";
+    if (!this.isGroundedForSprite()) return "vernan jump.png";
     if (this.crouching) return "vernan crouch.png";
     if (Math.abs(this.vx) > 5) return "vernan walk.png";
     return "vernan idle.png";
@@ -979,6 +1003,12 @@ class Player {
 
   spriteFrameIndex(){
     const name = this.spriteName();
+    if (name.includes("attack")) {
+      if (this.attackPhase <= 1) return 0;
+      if (this.attackPhase === 2) return 1;
+      if (this.attackPhase === 3) return 2;
+      return 3;
+    }
     if (name.includes("walk")) return this.animFrame;
     if (name.includes("jump") || name.includes("climb")) return this.animFrame % 2;
     return 0;
@@ -1074,10 +1104,13 @@ class CrawlerEnemy {
   }
 
   contactDamage(player){
-    const pr = { x: player.x, y: player.y, w: player.w(), h: player.h() };
-    const er = { x: this.x, y: this.y, w: this.w, h: this.h };
+    const pad = 2;
+    const pr = { x: player.x - pad, y: player.y - pad, w: player.w() + pad * 2, h: player.h() + pad * 2 };
+    const er = { x: this.x - pad, y: this.y - pad, w: this.w + pad * 2, h: this.h + pad * 2 };
     if (rectsOverlap(pr, er)) {
-      player.health.tryDamage(1, 1.125);
+      if (player.health.tryDamage(1, 1.125)) {
+        player.hurtTint = 0.35;
+      }
     }
   }
 
@@ -1295,6 +1328,8 @@ class AssetLoader {
       "sprites/vernan crouch.png",
       "sprites/vernan jump.png",
       "sprites/vernan climb.png",
+      "sprites/vernan attack.png",
+      "sprites/vernan air attack.png",
       "sprites/crawler.png",
       "sprites/UI health.png",
     ];
@@ -1534,6 +1569,7 @@ class GameSim {
       })),
       transitionFade: this.transitionFade,
       debugOverlay: this.debugOverlay,
+      playerHurtTint: this.player.hurtTint,
       hp: this.player.health.getCurrent(),
       hpMax: this.player.health.getMax(),
       keys: this.player.stats.keys,
@@ -1746,6 +1782,9 @@ class RenderPipeline {
     if (sheet) {
       const frame = snap.spriteFrame;
       const fw = SPRITE_FRAME_W;
+      if (snap.playerHurtTint > 0) {
+        ctx.globalAlpha = 0.65 + 0.35 * (snap.playerHurtTint / 0.35);
+      }
       ctx.save();
       if (snap.facing < 0) {
         ctx.translate(drawX + fw, drawY);
@@ -1755,8 +1794,9 @@ class RenderPipeline {
         ctx.drawImage(sheet, frame * fw, 0, fw, SPRITE_FRAME_H, drawX, drawY, fw, SPRITE_FRAME_H);
       }
       ctx.restore();
+      ctx.globalAlpha = 1;
     } else {
-      ctx.fillStyle = "#e8a87c";
+      ctx.fillStyle = snap.playerHurtTint > 0 ? "#ffaaaa" : "#e8a87c";
       ctx.fillRect(snap.playerX, snap.playerY, 10, 18);
     }
   }
