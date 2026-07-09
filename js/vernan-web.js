@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.36";
+const WEB_CLIENT_VERSION_STR = "0.1.37";
 
   // --- math/util.ts ---
 
@@ -4900,6 +4900,7 @@ class GameSim {
     if (this.itemPickupOverlay.timer <= 0) this.itemPickupOverlay = null;
   }
 
+  tryDoorTransition(input){
     if (!anyPressed(input, Keys.up)) return;
     if (!this.player.onGround) return;
 
