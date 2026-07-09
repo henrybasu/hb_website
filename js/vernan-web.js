@@ -35,7 +35,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.21";
+const WEB_CLIENT_VERSION_STR = "0.1.22";
 
   // --- math/util.ts ---
 
@@ -1125,6 +1125,10 @@ class Health {
     return this.redCurrent + this.soul > 1e-9;
   }
 
+  isDead(){
+    return !this.isAlive();
+  }
+
   isInvulnerable(){
     return this.invulnRemaining > 0;
   }
@@ -2101,16 +2105,30 @@ class GameSim {
   debugOverlay = false;
   fps = 0;
   ups = 0;
+  gameOver = false;
 
   constructor(opts) {
-    this.seed = opts.seed;
-    this.layout = DungeonLayout.generate(opts.seed, 12, 24);
+    this.initRun(opts.seed);
+  }
+
+  initRun(seed){
+    this.seed = seed >>> 0;
+    this.gameOver = false;
+    this.transitionFade = 0;
+    this.transitionDir = null;
+    this.currentRoomId = 0;
+    this.layout = DungeonLayout.generate(this.seed, 12, 24);
     const node = this.layout.room(0);
     this.map = generateRoom(node);
     this.enemies = spawnEnemiesForRoom(this.map, node.contentSeed, 2);
+    this.player = new Player();
     const spawn = spawnAtFloor(this.map, roomSpawnTx(node, this.map, false, false));
     this.player.resetAt(spawn.x, spawn.y);
     this.camera.reset(this.cameraAnchorX(), this.cameraAnchorY());
+  }
+
+  restartRun(seed){
+    this.initRun(seed);
   }
 
   getSeed(){
@@ -2120,6 +2138,16 @@ class GameSim {
   update(dt, input){
     if (this.transitionFade > 0) {
       this.transitionFade = Math.max(0, this.transitionFade - dt * 2);
+      return;
+    }
+
+    if (!this.gameOver && this.player.health.isDead()) {
+      this.gameOver = true;
+      input?.clearHardwareState?.();
+      return;
+    }
+
+    if (this.gameOver) {
       return;
     }
 
@@ -2371,6 +2399,7 @@ class GameSim {
       roomKind: this.layout.room(this.currentRoomId).kind,
       displaySalt: this.layout.room(this.currentRoomId).contentSeed >>> 0,
       seed: this.seed,
+      gameOver: this.gameOver,
     };
   }
 }
@@ -2496,6 +2525,8 @@ class RenderPipeline {
     if (!ctx) throw new Error("2d context unavailable");
     this.ctx = ctx;
     this.ctx.imageSmoothingEnabled = false;
+    this.gameOverRestartRect = null;
+    this.gameOverRetryRect = null;
   }
 
   draw(sim, snap, assets, tilesetRuntime){
@@ -2530,6 +2561,10 @@ class RenderPipeline {
     if (snap.transitionFade > 0) {
       ctx.fillStyle = `rgba(0,0,0,${snap.transitionFade * 0.85})`;
       ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    }
+
+    if (snap.gameOver) {
+      this.drawGameOverOverlay(ctx);
     }
 
     // Blit to display
@@ -2771,6 +2806,58 @@ class RenderPipeline {
     ctx.fillText(`${snap.roomKind} seed:${snap.seed}`, INTERNAL_WIDTH - 120, hudY + 28);
   }
 
+  drawGameOverOverlay(ctx){
+    ctx.fillStyle = "rgba(0,0,0,0.74)";
+    ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.font = "bold 16px monospace";
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("GAME OVER", INTERNAL_WIDTH / 2, INTERNAL_HEIGHT / 2 - 22);
+
+    ctx.font = "12px monospace";
+    ctx.fillStyle = "rgba(255,255,255,0.63)";
+    ctx.fillText("Restart with a new seed", INTERNAL_WIDTH / 2, INTERNAL_HEIGHT / 2 - 6);
+
+    const bw = 210;
+    const bh = 22;
+    const bx = Math.floor(INTERNAL_WIDTH / 2 - bw / 2);
+    const by = Math.floor(INTERNAL_HEIGHT / 2 + 10);
+    this.gameOverRestartRect = { x: bx, y: by, w: bw, h: bh };
+    ctx.strokeStyle = "rgba(255,255,255,0.78)";
+    ctx.strokeRect(bx, by, bw, bh);
+    ctx.fillStyle = "rgba(255,255,255,0.24)";
+    ctx.fillRect(bx + 1, by + 1, bw - 2, bh - 2);
+    ctx.fillStyle = "#ffffff";
+    ctx.fillText("RESTART (NEW SEED)", INTERNAL_WIDTH / 2, by + bh / 2);
+
+    const retryBw = 170;
+    const retryBh = 18;
+    const retryBx = Math.floor(INTERNAL_WIDTH / 2 - retryBw / 2);
+    const retryBy = by + bh + 12;
+    this.gameOverRetryRect = { x: retryBx, y: retryBy, w: retryBw, h: retryBh };
+    ctx.strokeStyle = "rgba(255,255,255,0.7)";
+    ctx.strokeRect(retryBx, retryBy, retryBw, retryBh);
+    ctx.fillStyle = "rgba(255,255,255,0.18)";
+    ctx.fillRect(retryBx + 1, retryBy + 1, retryBw - 2, retryBh - 2);
+    ctx.fillStyle = "rgba(255,255,255,0.86)";
+    ctx.fillText("RETRY (SAME SEED)", INTERNAL_WIDTH / 2, retryBy + retryBh / 2);
+
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+
+  hitGameOverRestart(ix, iy){
+    const r = this.gameOverRestartRect;
+    return r && ix >= r.x && ix < r.x + r.w && iy >= r.y && iy < r.y + r.h;
+  }
+
+  hitGameOverRetry(ix, iy){
+    const r = this.gameOverRetryRect;
+    return r && ix >= r.x && ix < r.x + r.w && iy >= r.y && iy < r.y + r.h;
+  }
+
   drawDebugGrid(ctx, sim){
     const map = sim.map;
     ctx.strokeStyle = "rgba(0,255,0,0.25)";
@@ -2952,6 +3039,10 @@ function parseSeed(options){
   return (Date.now() & 0xffffffff) >>> 0;
 }
 
+function newRandomSeed(){
+  return ((Date.now() ^ Math.floor(Math.random() * 0x100000000)) >>> 0);
+}
+
 async function mount(selector, options = {}){
   const root =
     typeof selector === "string"
@@ -3038,7 +3129,27 @@ async function mount(selector, options = {}){
   const input = new Input();
   const unbindInput = input.bind(canvas);
 
-  statusEl.textContent = `v${WEB_CLIENT_VERSION_STR} · seed ${seed} · layout ${layoutHash(sim.layout)}`;
+  const updateStatus = () => {
+    statusEl.textContent = `v${WEB_CLIENT_VERSION_STR} · seed ${sim.getSeed()} · layout ${layoutHash(sim.layout)}`;
+  };
+  updateStatus();
+
+  const onGameOverClick = (e) => {
+    if (!sim.gameOver) return;
+    const rect = canvas.getBoundingClientRect();
+    const ix = ((e.clientX - rect.left) / rect.width) * INTERNAL_WIDTH;
+    const iy = ((e.clientY - rect.top) / rect.height) * INTERNAL_HEIGHT;
+    if (pipeline.hitGameOverRestart(ix, iy)) {
+      sim.restartRun(newRandomSeed());
+      input.clearHardwareState();
+      updateStatus();
+    } else if (pipeline.hitGameOverRetry(ix, iy)) {
+      sim.restartRun(sim.getSeed());
+      input.clearHardwareState();
+      updateStatus();
+    }
+  };
+  canvas.addEventListener("click", onGameOverClick);
 
   // Touch controls
   const touchDown = new Set();
@@ -3122,6 +3233,7 @@ async function mount(selector, options = {}){
   return () => {
     loop.stop();
     unbindInput();
+    canvas.removeEventListener("click", onGameOverClick);
     touchRoot?.removeEventListener("touchstart", onTouchStart);
     touchRoot?.removeEventListener("touchend", onTouchEnd);
     touchRoot?.removeEventListener("click", onTouchTap);
