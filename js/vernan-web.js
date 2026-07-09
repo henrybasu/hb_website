@@ -30,7 +30,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.7";
+const WEB_CLIENT_VERSION_STR = "0.1.8";
 
   // --- math/util.ts ---
 
@@ -609,7 +609,7 @@ function moveAndCollide(
     }
   }
 
-  if (!grounded && nvy <= 0) {
+  if (!grounded && nvy <= 0 && vy >= 0) {
     grounded = probeGrounded(map, x, y, w, h, onPlatform);
   }
 
@@ -657,6 +657,11 @@ function spawnAtFloor(map, spawnTx){
 
   // --- input/Input.ts ---
 /** Keyboard input with edge detection (ported from game.input.Input). */
+const GAME_KEY_CODES = new Set([
+  "ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown",
+  "KeyA", "KeyD", "KeyW", "KeyS", "KeyZ", "KeyX", "KeyC", "Space",
+]);
+
 class Input {
   down = new Set();
   pressedThisFrame = new Set();
@@ -665,6 +670,7 @@ class Input {
 
   bind(root) {
     const onDown = (e) => {
+      if (GAME_KEY_CODES.has(e.code)) e.preventDefault();
       if (e.repeat) return;
       const code = e.code;
       if (!this.down.has(code)) this.pressedThisFrame.add(code);
@@ -779,6 +785,8 @@ class Player {
   climbing = false;
   crouching = false;
   jumpSquatFrames = 0;
+  coyoteTimer = 0;
+  jumpBufferTimer = 0;
   attackPhase = 0;
   attackTimer = 0;
   animFrame = 0;
@@ -819,8 +827,11 @@ class Player {
     this.wasOnGround = false;
     this.climbing = false;
     this.jumpSquatFrames = 0;
+    this.coyoteTimer = 0;
+    this.jumpBufferTimer = 0;
     this.attackPhase = 0;
     this.attackTimer = 0;
+    this.hurtTint = 0;
   }
 
   w(){
@@ -855,7 +866,8 @@ class Player {
     const up = anyDown(input, Keys.up);
     const down = anyDown(input, Keys.down);
     this.crouching = down && this.onGround && !this.climbing;
-    const jumpPressed = anyPressed(input, Keys.jump);
+    const jumpEdge = anyPressed(input, Keys.jump);
+    const jumpHeld = anyDown(input, Keys.jump);
     const attackPressed = anyPressed(input, Keys.attack);
 
     // Attack state machine (phase 1 windup, 2 active, 3 early recover, 4 late recover)
@@ -935,11 +947,28 @@ class Player {
     }
     this.vx = clamp(this.vx, -maxSpd, maxSpd);
 
+    if (this.onGround) {
+      this.coyoteTimer = 6 / FIXED_STEP_HZ;
+    } else {
+      this.coyoteTimer = Math.max(0, this.coyoteTimer - dt);
+    }
+    if (jumpEdge) {
+      this.jumpBufferTimer = 8 / FIXED_STEP_HZ;
+    } else {
+      this.jumpBufferTimer = Math.max(0, this.jumpBufferTimer - dt);
+    }
+
+    const canJump = this.onGround || this.coyoteTimer > 0;
+    const wantsJump = jumpHeld || this.jumpBufferTimer > 0;
+
     // Jump squat
-    if (!blocksJump && jumpPressed && this.onGround && this.jumpSquatFrames === 0) {
+    if (!blocksJump && wantsJump && canJump && this.jumpSquatFrames === 0) {
       this.jumpSquatFrames = this.stats.jumpSquatFrames;
+      this.jumpBufferTimer = 0;
+      this.coyoteTimer = 0;
     }
     if (this.jumpSquatFrames > 0) {
+      this.vy = 0;
       this.jumpSquatFrames--;
       if (this.jumpSquatFrames === 0) {
         this.vy = -this.stats.jumpVel;
@@ -957,7 +986,11 @@ class Player {
     this.y = result.y;
     this.vx = result.vx;
     this.vy = result.vy;
-    this.onGround = result.onGround;
+    if (this.vy < -1) {
+      this.onGround = false;
+    } else {
+      this.onGround = result.onGround;
+    }
 
     // Walk anim
     if (this.onGround && Math.abs(this.vx) > 5) {
@@ -2083,6 +2116,7 @@ async function mount(selector, options = {}){
 
   loadingEl.style.display = "none";
   canvas.focus();
+  canvas.addEventListener("click", () => canvas.focus());
 
   const sim = new GameSim({ seed, assetLoader: loader, itemCatalog });
   const pipeline = new RenderPipeline(canvas);
@@ -2106,7 +2140,13 @@ async function mount(selector, options = {}){
     const btn = (e.target).closest("[data-touch]");
     if (!btn) return;
     const action = btn.getAttribute("data-touch");
-    if (!action || action === "jump" || action === "attack") return;
+    if (action === "jump" || action === "attack") {
+      e.preventDefault();
+      const codes = touchMap[action];
+      if (codes) for (const c of codes) input.injectPress(c);
+      return;
+    }
+    if (!action) return;
     touchDown.add(action);
     e.preventDefault();
   };
