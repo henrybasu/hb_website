@@ -73,6 +73,17 @@
     terrainBrickRng(runSeed, roomId, tx, ty, javaRandom) {
       return javaRandom(terrainBrickRngSeed(runSeed, roomId, tx, ty));
     },
+    decoLootKind(runSeed, roomId, deco, javaRandom) {
+      if (!deco?.decoTileId || !global.VernanBreakables?.decoRngSeed) return null;
+      const LOOT_SALT = 0x1007ab1e10adn;
+      return rollKind(javaRandom(global.VernanBreakables.decoRngSeed(runSeed, roomId, deco, LOOT_SALT)));
+    },
+    decoBrickRng(runSeed, roomId, deco, javaRandom) {
+      if (!deco || !global.VernanBreakables?.decoRngSeed) {
+        return javaRandom(Number(BigInt(runSeed >>> 0) ^ 1n));
+      }
+      return javaRandom(global.VernanBreakables.decoRngSeed(runSeed, roomId, deco, 0n));
+    },
   };
 
   function rollRoomClearPickupKind(rnd) {

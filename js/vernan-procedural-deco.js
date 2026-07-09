@@ -251,9 +251,13 @@
       objects,
       biomeRow,
       rng,
+      tilesetRuntime = null,
     } = opts;
     const kind = String(roomKind || "NORMAL").toUpperCase();
     if (kind === "SECRET" || kind === "SUPER_SECRET") return [];
+
+    const breakableChanceMap =
+      global.VernanBreakables?.buildDecoBreakableChanceMap(tilesetRuntime) ?? null;
 
     const prg = asMap(tilesetRoot?.proceduralRoomGen) || {};
     const tunablesByKind = asMap(prg.tunablesByRoomKind);
@@ -284,7 +288,11 @@
         if (fid) decoTileId = fid;
       }
       const groundHug = blobCellGroundHugging(grid, tx, ty);
-      deco.push({ tx, ty, argb, decoTileId, groundHug });
+      const breakableDeco =
+        decoTileId && breakableChanceMap
+          ? global.VernanBreakables.rollBreakableDeco(decoTileId, breakableChanceMap, rng)
+          : false;
+      deco.push({ tx, ty, argb, decoTileId, breakableDeco, groundHug });
       occupied.add(key);
     };
 

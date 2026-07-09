@@ -1532,6 +1532,63 @@ function applyFinalShaftPass(layout, rooms, seams){
     fillShaftColumnGaps(map, l, footRow, conn);
   }
   stripSpuriousVerticalShafts(layout, rooms);
+  for (let id = 0; id < n; id++) {
+    const gen = rooms[id];
+    if (!gen?.map) continue;
+    restoreConnectedDoorRunwayFloors(
+      gen.map,
+      gen.leftDoorTileX,
+      gen.leftDoorTopTileY,
+      gen.rightDoorTileX,
+      gen.rightDoorTopTileY,
+      gen.ladderColumnTx
+    );
+    restoreHorizontalDoorShellColumns(
+      gen.map,
+      gen.leftDoorTileX,
+      gen.leftDoorTopTileY,
+      gen.rightDoorTileX,
+      gen.rightDoorTopTileY,
+      gen.ladderColumnTx
+    );
+  }
+  if (typeof VernanTerrainRules !== "undefined") {
+    for (let id = 0; id < n; id++) {
+      const node = layout.room(id);
+      if (
+        node.kind !== RoomKind.NORMAL &&
+        node.kind !== RoomKind.BOSS &&
+        node.kind !== RoomKind.SECRET
+      ) {
+        continue;
+      }
+      const gen = rooms[id];
+      if (!gen?.map) continue;
+      const maxReach = maxVerticalReachTilesForGridY(node.gridY);
+      const ladderTx =
+        node.ladderNorth || node.ladderSouth
+          ? clampLadderColumn(gen.map.getWidth(), gen.ladderColumnTx ?? node.ladderColumnTx)
+          : -1;
+      VernanTerrainRules.enforceOnMap(gen.map);
+      VernanTerrainRules.enforceInteriorPlayFloorSteps(
+        gen.map,
+        gen.leftDoorTileX ?? -1,
+        gen.rightDoorTileX ?? -1,
+        ladderTx,
+        maxReach
+      );
+      if (node.kind === RoomKind.NORMAL || node.kind === RoomKind.BOSS) {
+        VernanTerrainRules.capInteriorSolidPillarsOnMap(
+          gen.map,
+          ladderTx,
+          gen.leftDoorTileX ?? -1,
+          gen.rightDoorTileX ?? -1,
+          Number(node.contentSeed),
+          maxReach
+        );
+      }
+    }
+  }
 }
 
 /** LADDER-MOUTH-2: south mouth deck at runway row so VERT-TRANS-SOUTH can pass. */
@@ -1658,6 +1715,91 @@ function alignAsciiGroundYToSeams(groundY, w, h, secretSeams){
   if (secretSeams.superSecretFlatArena && maxFloor >= 0) groundY.fill(maxFloor);
 }
 
+function flattenDoorRunway(map, doorX, doorTopY, groundY, colLo, colHi, skipColumnTx){
+  const h = map.getHeight();
+  for (let x = colLo; x <= colHi; x++) {
+    if (skipColumnTx >= 0 && x === skipColumnTx) continue;
+    for (let y = 1; y < h - 1; y++) {
+      if (x === doorX) {
+        if (y === doorTopY || y === doorTopY + 1) continue;
+        if (y < doorTopY) continue;
+      }
+      if (y >= groundY) {
+        map.setTile(x, y, TILE_SOLID);
+      } else if (x !== doorX) {
+        const t = map.tileAt(x, y);
+        if (t === TILE_SOLID || t === TILE_BREAKABLE) map.setTile(x, y, TILE_EMPTY);
+      }
+    }
+  }
+}
+
+function isBreakableSecretDoorColumn(map, doorX, doorTop){
+  return (
+    map.tileAt(doorX, doorTop) === TILE_BREAKABLE &&
+    map.tileAt(doorX, doorTop + 1) === TILE_BREAKABLE
+  );
+}
+
+function restoreConnectedDoorRunwayFloor(map, doorX, doorTopY, ladderTx){
+  if (!map || doorX < 1 || doorTopY < 1) return;
+  if (ladderTx >= 0 && doorX === ladderTx) return;
+  if (
+    map.tileAt(doorX, doorTopY) !== TILE_DOOR ||
+    map.tileAt(doorX, doorTopY + 1) !== TILE_DOOR
+  ) {
+    return;
+  }
+  const floorRow = Math.min(map.getHeight() - 2, doorTopY + 2);
+  const t = map.tileAt(doorX, floorRow);
+  if (t === TILE_EMPTY || t === TILE_LADDER) map.setTile(doorX, floorRow, TILE_SOLID);
+}
+
+function restoreConnectedDoorRunwayFloors(
+  map,
+  leftDoorX,
+  leftDoorTopY,
+  rightDoorX,
+  rightDoorTopY,
+  ladderTx
+){
+  restoreConnectedDoorRunwayFloor(map, leftDoorX, leftDoorTopY, ladderTx);
+  restoreConnectedDoorRunwayFloor(map, rightDoorX, rightDoorTopY, ladderTx);
+}
+
+function restoreDoorShellColumn(map, doorX, doorTopY, ladderTx){
+  if (!map || doorX < 1 || doorTopY < 1) return;
+  const h = map.getHeight();
+  const doorTop = clamp(doorTopY, 1, h - 4);
+  if (!isBreakableSecretDoorColumn(map, doorX, doorTop)) return;
+  for (let y = 1; y < h - 1; y++) {
+    if (y === doorTop || y === doorTop + 1) continue;
+    if (ladderTx >= 0 && doorX === ladderTx) continue;
+    const t = map.tileAt(doorX, y);
+    if (t === TILE_EMPTY || t === TILE_LADDER) map.setTile(doorX, y, TILE_SOLID);
+  }
+}
+
+function restoreHorizontalDoorShellColumns(
+  map,
+  leftDoorX,
+  leftDoorTopY,
+  rightDoorX,
+  rightDoorTopY,
+  ladderTx
+){
+  restoreDoorShellColumn(map, leftDoorX, leftDoorTopY, ladderTx);
+  restoreDoorShellColumn(map, rightDoorX, rightDoorTopY, ladderTx);
+  restoreConnectedDoorRunwayFloors(
+    map,
+    leftDoorX,
+    leftDoorTopY,
+    rightDoorX,
+    rightDoorTopY,
+    ladderTx
+  );
+}
+
 function carveHorizontalFace(map, doorX, doorTopY, eastFace, ladderTx, breakableDoor){
   const h = map.getHeight();
   const w = map.getWidth();
@@ -1665,14 +1807,7 @@ function carveHorizontalFace(map, doorX, doorTopY, eastFace, ladderTx, breakable
   const groundY = Math.min(h - 2, doorTop + 2);
   const runwayLo = eastFace ? Math.max(1, doorX - SECRET_RUNWAY_TILES) : doorX;
   const runwayHi = eastFace ? doorX : Math.min(w - 2, doorX + SECRET_RUNWAY_TILES);
-  for (let x = runwayLo; x <= runwayHi; x++) {
-    for (let y = 1; y < h - 1; y++) {
-      const t = map.tileAt(x, y);
-      if (t === TILE_DOOR || t === TILE_BREAKABLE) continue;
-      map.setTile(x, y, TILE_EMPTY);
-    }
-    for (let y = groundY; y < h - 1; y++) map.setTile(x, y, TILE_SOLID);
-  }
+  flattenDoorRunway(map, doorX, doorTop, groundY, runwayLo, runwayHi, ladderTx);
   const doorTile = breakableDoor ? TILE_BREAKABLE : TILE_DOOR;
   map.setTile(doorX, doorTop, doorTile);
   map.setTile(doorX, doorTop + 1, doorTile);
@@ -1851,6 +1986,76 @@ class SecretSeam {
       return true;
     }
     return false;
+  }
+
+  /** Animation step: reveal one shell tile without finishing the seam. */
+  applyAnimatedStep(rooms, roomId, tx, ty, restoreTile){
+    for (const c of this.cells) {
+      if (c.role !== SEAM_ROLE_BREAKABLE || c.cleared || c.roomId !== roomId || c.tx !== tx || c.ty !== ty) continue;
+      c.cleared = true;
+      this.breakablesRemaining--;
+      rooms[roomId].map.setTile(tx, ty, restoreTile);
+      this.revealBuffersForRoom(rooms, roomId);
+      return true;
+    }
+    return false;
+  }
+
+  /** End of SEAM-ANIM strip. */
+  completeAnimatedOpen(rooms, roomId, unlockSouthLadderShaft){
+    if (unlockSouthLadderShaft && this.kind === SEAM_KIND_VERTICAL) {
+      const g = rooms[roomId];
+      const L = clampLadderColumn(g?.map?.getWidth?.() ?? 0, this.ladderTx);
+      if (g?.map && L >= 0) {
+        const t0 = g.map.tileAt(L, 0);
+        if (t0 !== TILE_DOOR && t0 !== TILE_BREAKABLE) g.map.setTile(L, 0, TILE_LADDER);
+      }
+    }
+    this.revealBuffersForRoom(rooms, roomId);
+    if (this.breakablesRemaining === 0) this.finishOpen(rooms);
+  }
+
+  roomWestId(){
+    return this.roomA;
+  }
+
+  roomEastId(){
+    return this.roomB;
+  }
+
+  isSouthFaceBreakable(mapHeight, rid, tx, ty){
+    if (this.kind !== SEAM_KIND_VERTICAL || rid !== this.roomA) return false;
+    return this.isHiddenBreakable(rid, tx, ty);
+  }
+
+  isNorthFaceBreakable(mapHeight, rid, tx, ty){
+    if (this.kind !== SEAM_KIND_VERTICAL || rid !== this.roomB) return false;
+    return this.isHiddenBreakable(rid, tx, ty);
+  }
+
+  probeRevealEastBuffers(rid){
+    for (const c of this.cells) {
+      if (c.role !== SEAM_ROLE_BUFFER_EAST || c.roomId !== rid) continue;
+      c.bufferRevealed = true;
+    }
+  }
+
+  probeRevealWestBuffers(rid){
+    for (const c of this.cells) {
+      if (c.role !== SEAM_ROLE_BUFFER_WEST || c.roomId !== rid) continue;
+      c.bufferRevealed = true;
+    }
+  }
+
+  snapshotBufferRevealed(){
+    return this.cells.map((c) => (this.isBufferRole(c.role) ? !!c.bufferRevealed : false));
+  }
+
+  restoreBufferRevealed(snap){
+    if (!snap || snap.length !== this.cells.length) return;
+    for (let i = 0; i < this.cells.length; i++) {
+      if (this.isBufferRole(this.cells[i].role)) this.cells[i].bufferRevealed = snap[i];
+    }
   }
 
   openRoomFaceInstant(rooms, roomId){
@@ -2157,8 +2362,33 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null, dung
 
   const leftGroundY = conn.doorWest ? groundY[Math.min(leftDoorX, w - 2)] : -1;
   const rightGroundY = conn.doorEast ? groundY[Math.min(rightDoorX, w - 2)] : -1;
-  const leftDoorTopY = conn.doorWest ? clamp(leftGroundY - 2, 1, h - 3) : -1;
-  const rightDoorTopY = conn.doorEast ? clamp(rightGroundY - 2, 1, h - 3) : -1;
+
+  const seamDoorTops =
+    secretFinish?.secretSeams?.edges?.length > 0;
+  let leftDoorTopY = -1;
+  let rightDoorTopY = -1;
+  if (seamDoorTops) {
+    let westTop = -1;
+    let eastTop = -1;
+    for (const e of secretFinish.secretSeams.edges) {
+      const doorTop = clamp(e.neighborDoorTopY, 1, h - 3);
+      if (e.secretEastFace) eastTop = doorTop;
+      else westTop = doorTop;
+    }
+    leftDoorTopY = conn.doorWest
+      ? westTop >= 0
+        ? westTop
+        : clamp(leftGroundY - 2, 1, h - 3)
+      : -1;
+    rightDoorTopY = conn.doorEast
+      ? eastTop >= 0
+        ? eastTop
+        : clamp(rightGroundY - 2, 1, h - 3)
+      : -1;
+  } else {
+    leftDoorTopY = conn.doorWest ? clamp(leftGroundY - 2, 1, h - 3) : -1;
+    rightDoorTopY = conn.doorEast ? clamp(rightGroundY - 2, 1, h - 3) : -1;
+  }
 
   if (secretFinish?.secretSeams) {
     alignAsciiGroundYToSeams(groundY, w, h, secretFinish.secretSeams);
@@ -2296,6 +2526,42 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null, dung
     }
   }
 
+  let dungeonLadderFloorRow = -1;
+  if (dungeonLadderTx >= 3 && dungeonLadderTx < w - 3 && dungeonVerticalLink) {
+    dungeonLadderFloorRow = resolvedLadderRunwayRowOnGrid(
+      grid,
+      w,
+      h,
+      groundY,
+      dungeonLadderTx,
+      conn.ladderSouth
+    );
+  }
+  if (typeof VernanBreakables !== "undefined") {
+    VernanBreakables.placeBreakablesOnStepFaces({
+      grid,
+      w,
+      h,
+      groundY,
+      rng,
+      kind,
+      leftDoorX: conn.doorWest ? leftDoorX : -1,
+      rightDoorX: conn.doorEast ? rightDoorX : -1,
+      leftDoorTopY,
+      rightDoorTopY,
+      dungeonLadderTx,
+      dungeonLadderFloorRow,
+      maxReach,
+    });
+  }
+
+  if (
+    (kind === RoomKind.NORMAL || kind === RoomKind.BOSS || kind === RoomKind.ITEM) &&
+    typeof VernanTerrainRules !== "undefined"
+  ) {
+    VernanTerrainRules.enforceOnGrid(grid, w, h, groundY);
+  }
+
   let map = TileMap.fromAscii(gridToAsciiRows(grid));
   let gen = makeGeneratedRoom(map, {
     leftDoorTileX: conn.doorWest ? leftDoorX : -1,
@@ -2321,6 +2587,29 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null, dung
     );
   }
 
+  if (
+    (kind === RoomKind.NORMAL || kind === RoomKind.BOSS || kind === RoomKind.ITEM) &&
+    typeof VernanTerrainRules !== "undefined"
+  ) {
+    const ladderTxForRules = dungeonVerticalLink ? dungeonLadderTx : -1;
+    VernanTerrainRules.capInteriorSolidPillarsOnMap(
+      gen.map,
+      ladderTxForRules,
+      conn.doorWest ? leftDoorX : -1,
+      conn.doorEast ? rightDoorX : -1,
+      Number(node.contentSeed),
+      maxReach
+    );
+    VernanTerrainRules.enforceOnMap(gen.map);
+    VernanTerrainRules.enforceInteriorPlayFloorSteps(
+      gen.map,
+      conn.doorWest ? leftDoorX : -1,
+      conn.doorEast ? rightDoorX : -1,
+      ladderTxForRules,
+      maxReach
+    );
+  }
+
   let decoTiles = [];
   let roomBridge = null;
   let biomeId = null;
@@ -2339,6 +2628,7 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null, dung
       objects: tilesetRuntime.objects,
       biomeRow: biome.biomeRow,
       rng,
+      tilesetRuntime,
     });
   }
 
@@ -3042,7 +3332,7 @@ class Player {
     }
 
     const blocksJump = this.attackPhase > 0 && this.attackPhase < 4;
-    const inAttack = this.attackPhase > 0;
+    const attackCommitLock = this.attackPhase === 2 || this.attackPhase === 3;
 
     // Ladder — latch on dungeon shaft; hold when idle on rungs (Java climb latch).
     let shaftCol = this.activeClimbShaftTx;
@@ -3105,9 +3395,9 @@ class Player {
       }
     }
 
-    // Horizontal movement
+    // Horizontal movement — wind-up stays fully controllable; active + early recover brake on ground (Java attackCommitLock).
     let targetVx = 0;
-    if (!inAttack || this.attackPhase >= 3) {
+    if (!attackCommitLock) {
       if (left) {
         this.facing = -1;
         targetVx = -this.stats.maxGroundSpeed;
@@ -3130,9 +3420,11 @@ class Player {
         this.vx = moveToward(this.vx, 0, brake * dt);
       }
       this.vx = moveToward(this.vx, targetVx, accel * dt);
+    } else if (attackCommitLock && this.onGround) {
+      this.vx = moveToward(this.vx, 0, brake * dt);
     } else if (this.onGround) {
       this.vx = moveToward(this.vx, 0, this.stats.groundFriction * dt);
-    } else {
+    } else if (!attackCommitLock) {
       this.vx = moveToward(this.vx, 0, brake * dt);
     }
     this.vx = clamp(this.vx, -maxSpd, maxSpd);
@@ -4784,8 +5076,8 @@ class AssetLoader {
       "sprites/rolling head cc.png",
       "sprites/cat shopkeep sheet.png",
       "sprites/items/item pedestal.png",
-      "sprites/heart pickup.png",
       "sprites/heart.png",
+      "sprites/heart collect.png",
       "tiles/underground tileset.png",
       "tiles/la sheet.png",
     ];
@@ -4909,6 +5201,8 @@ class GameSim {
   enemiesKilledThisRun = 0;
   lastEnemyDeathFeetCenterX = 0;
   lastEnemyDeathFeetCenterY = 0;
+  activeSeamOpenAnim = null;
+  brickChunks = [];
 
   backgroundRegistry = null;
   roomMathBackgroundPresetIds = [];
@@ -4955,6 +5249,8 @@ class GameSim {
     this.enemiesKilledThisRun = 0;
     this.lastEnemyDeathFeetCenterX = 0;
     this.lastEnemyDeathFeetCenterY = 0;
+    this.activeSeamOpenAnim = null;
+    this.brickChunks = [];
     this.assignRoomMathBackgroundPresets();
     this.roomVisited[0] = true;
     this.revealMinimapAdjacentNeighbors(0);
@@ -5044,6 +5340,7 @@ class GameSim {
     const gen = this.cachedRooms[roomId];
     this.map = gen.map;
     this.enemyProjectiles = [];
+    this.brickChunks = [];
     this.enemies = spawnEnemiesFromRoom(this.map, gen, this.player);
     this.roomSpawnEnemyCount = this.enemies.length;
     this.worldPickups = (this.roomPersistedPickups[roomId] ?? []).map((d) =>
@@ -5084,11 +5381,88 @@ class GameSim {
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
         if (!this.map.isBreakableTile(tx, ty)) continue;
-        for (const seam of this.secretEntranceSeams) {
-          if (seam.markBreakableCleared(this.cachedRooms, this.currentRoomId, tx, ty)) break;
-        }
+        if (!this.isHiddenShellBreakable(tx, ty)) continue;
+        if (this.tryBeginSeamOpenAnim(tx, ty)) return;
       }
     }
+  }
+
+  seamBrickRng(tx, ty){
+    return javaRandom(
+      this.seed ^ (tx * 0x9e3779b1) ^ (ty * 0x85ebca77) ^ (this.currentRoomId * 37)
+    );
+  }
+
+  spawnSeamBrickChunks(tx, ty){
+    if (typeof VernanBrickChunks === "undefined") return;
+    const bx = tx * TILE_SIZE;
+    const by = ty * TILE_SIZE;
+    const rnd = this.seamBrickRng(tx, ty);
+    this.brickChunks.push(...VernanBrickChunks.spawnBreakableChunks(bx, by, rnd));
+  }
+
+  horizontalOpenPanTargetX(seam, bounds){
+    if (this.currentRoomId === seam.roomWestId()) return bounds.maxAnchorX;
+    if (this.currentRoomId === seam.roomEastId()) return bounds.minAnchorX;
+    return this.camera.centerX;
+  }
+
+  tryBeginSeamOpenAnim(tx, ty){
+    if (typeof VernanSeamOpen === "undefined") return false;
+    if (this.activeSeamOpenAnim) return true;
+    const seam = VernanSeamOpen.findForBreakable(
+      this.secretEntranceSeams,
+      this.currentRoomId,
+      tx,
+      ty,
+      this.map.getHeight()
+    );
+    if (!seam || seam.isDone()) return false;
+    const bounds = this.scrollBounds();
+    const anchorX = this.camera.centerX;
+    const targetX = this.horizontalOpenPanTargetX(seam, bounds);
+    this.activeSeamOpenAnim = VernanSeamOpen.begin(
+      seam,
+      this.currentRoomId,
+      tx,
+      ty,
+      anchorX,
+      targetX
+    );
+    if (!this.activeSeamOpenAnim) return false;
+    this.activeSeamOpenAnim.onStrike = (step) => {
+      this.spawnSeamBrickChunks(step.tx, step.ty);
+      this.evictDecoAtCell(step.tx, step.ty);
+    };
+    this.activeSeamOpenAnim.onStep = (step) => {
+      if (step.spawnChunks) this.spawnSeamBrickChunks(step.tx, step.ty);
+      this.evictDecoAtCell(step.tx, step.ty);
+    };
+    this.activeSeamOpenAnim.applyStrikeStepNow(this.cachedRooms, tx, ty);
+    return true;
+  }
+
+  tickSeamOpenAnim(dt){
+    if (!this.activeSeamOpenAnim) return;
+    const done = this.activeSeamOpenAnim.tick(this.cachedRooms, true, true);
+    if (this.activeSeamOpenAnim.hasCameraPan()) {
+      this.camera.centerX = this.activeSeamOpenAnim.cameraXForStep(0);
+    }
+    if (done) this.activeSeamOpenAnim = null;
+  }
+
+  finishActiveSeamOpenAnimInstant(){
+    if (!this.activeSeamOpenAnim) return;
+    this.activeSeamOpenAnim.finishInstant(this.cachedRooms);
+    this.activeSeamOpenAnim = null;
+  }
+
+  tickBrickChunks(dt){
+    if (typeof VernanBrickChunks === "undefined" || this.brickChunks.length === 0) return;
+    VernanBrickChunks.tick(this.brickChunks, dt, this.map, TILE_SIZE, (map, tx, ty) => {
+      const t = map.tileAt(tx, ty);
+      return t === TILE_SOLID || t === TILE_PLATFORM;
+    });
   }
 
   tryStrikeBreakableTiles(hit){
@@ -5106,7 +5480,81 @@ class GameSim {
     }
   }
 
+  tryStrikeBreakableDeco(hit){
+    if (!hit || this.currentRoomId < 0) return;
+    const gen = this.currentGeneratedRoom();
+    if (!gen?.decoTiles?.length) return;
+    const ts = TILE_SIZE;
+    const x0 = Math.floor(hit.x / ts);
+    const x1 = Math.floor((hit.x + hit.w - 1e-5) / ts);
+    const y0 = Math.floor(hit.y / ts);
+    const y1 = Math.floor((hit.y + hit.h - 1e-5) / ts);
+    const kept = [];
+    let any = false;
+    for (const d of gen.decoTiles) {
+      if (!d.breakableDeco || !d.decoTileId) {
+        kept.push(d);
+        continue;
+      }
+      if (d.tx < x0 || d.tx > x1 || d.ty < y0 || d.ty > y1) {
+        kept.push(d);
+        continue;
+      }
+      if (this.map.isBreakableTile(d.tx, d.ty)) {
+        this.destroyBreakableTile(d.tx, d.ty);
+        any = true;
+        continue;
+      }
+      this.destroyBreakableDecoOverlay(d);
+      any = true;
+    }
+    if (any) this.replaceCachedRoomDecoList(kept);
+  }
+
+  evictDecoAtCell(tx, ty){
+    const gen = this.currentGeneratedRoom();
+    if (!gen?.decoTiles?.length) return;
+    const kept = gen.decoTiles.filter((d) => d.tx !== tx || d.ty !== ty);
+    if (kept.length !== gen.decoTiles.length) this.replaceCachedRoomDecoList(kept);
+  }
+
+  replaceCachedRoomDecoList(newDeco){
+    const rid = this.currentRoomId;
+    if (rid < 0 || !this.cachedRooms[rid]) return;
+    this.cachedRooms[rid] = { ...this.cachedRooms[rid], decoTiles: newDeco.slice() };
+  }
+
+  destroyBreakableDecoOverlay(deco){
+    const tx = deco.tx;
+    const ty = deco.ty;
+    const bx = tx * TILE_SIZE;
+    const by = ty * TILE_SIZE;
+    const lootKind = VernanPickups.BreakableLootRoll.decoLootKind(
+      this.seed,
+      this.currentRoomId,
+      deco,
+      javaRandom
+    );
+    if (!lootKind) return;
+    const rnd = VernanPickups.BreakableLootRoll.decoBrickRng(
+      this.seed,
+      this.currentRoomId,
+      deco,
+      javaRandom
+    );
+    this.worldPickups.push(
+      VernanPickups.WorldPickup.createFromCenter(
+        lootKind,
+        bx + TILE_SIZE * 0.5,
+        by + TILE_SIZE * 0.5,
+        VernanPickups.SpawnStyle.BREAKABLE,
+        rnd
+      )
+    );
+  }
+
   destroyBreakableTile(tx, ty){
+    this.evictDecoAtCell(tx, ty);
     const bx = tx * TILE_SIZE;
     const by = ty * TILE_SIZE;
     this.map.setTile(tx, ty, TILE_EMPTY);
@@ -5299,6 +5747,13 @@ class GameSim {
       return;
     }
 
+    if (this.activeSeamOpenAnim) {
+      this.tickSeamOpenAnim(dt);
+      this.tickBrickChunks(dt);
+      input?.endFrame?.();
+      return;
+    }
+
     const dungeonShaftTx =
       this.currentGeneratedRoom()?.ladderColumnTx >= 0
         ? clampLadderColumn(this.map.getWidth(), this.currentGeneratedRoom().ladderColumnTx)
@@ -5341,6 +5796,7 @@ class GameSim {
     if (hit) {
       this.tryStrikeSeamBreakables(hit);
       this.tryStrikeBreakableTiles(hit);
+      this.tryStrikeBreakableDeco(hit);
       for (const e of this.enemies) {
         if (e.dead) continue;
         const hb = e.hitbox();
@@ -5367,6 +5823,7 @@ class GameSim {
     this.pedestalBobPhase += dt * PEDESTAL_BOB_OMEGA;
     this.decorationTime += dt;
     this.tickItemPickupOverlay(dt);
+    this.tickBrickChunks(dt);
 
     const bounds = this.scrollBounds();
     const follow = {
@@ -5605,6 +6062,7 @@ class GameSim {
   }
 
   beginTransition(roomId, dir, input) {
+    this.finishActiveSeamOpenAnimInstant();
     const fromRoom = this.currentRoomId;
     this.persistRoomPickups(fromRoom);
     this.currentRoomId = roomId;
@@ -5737,6 +6195,7 @@ class GameSim {
       displaySalt: this.layout.room(this.currentRoomId).contentSeed,
       decoTiles: this.currentGeneratedRoom()?.decoTiles ?? [],
       roomBridge: this.currentGeneratedRoom()?.roomBridge ?? null,
+      brickChunks: this.brickChunks,
       seed: this.seed,
       gameOver: this.gameOver,
       layout: this.layout,
@@ -5921,6 +6380,9 @@ class RenderPipeline {
     ctx.setTransform(CAMERA_ZOOM, 0, 0, CAMERA_ZOOM, tx, ty);
 
     this.drawTiles(ctx, sim, snap, assets, tilesetRuntime, !usesMathBg);
+    if (typeof VernanBrickChunks !== "undefined" && snap.brickChunks?.length) {
+      VernanBrickChunks.drawChunks(ctx, snap.brickChunks);
+    }
     this.drawShopPickups(ctx, snap, assets);
     this.drawShopPedestals(ctx, snap, assets, sim.itemCatalog);
     this.drawShopKeeper(ctx, snap, assets);
@@ -6358,7 +6820,6 @@ class RenderPipeline {
       if (p.kind === VernanPickups.PickupKind.HEART) {
         const heart =
           assets.get("sprites/heart.png") ??
-          assets.get("sprites/heart pickup.png") ??
           assets.get("sprites/UI health.png");
         if (imageDrawable(heart)) {
           const fw = Math.max(1, Math.floor(heart.width / 8));
@@ -6399,7 +6860,7 @@ class RenderPipeline {
     for (const p of snap.shopPickups ?? []) {
       const hb = shopPickupHitbox(p);
       if (p.kind === "HEART") {
-        const heart = assets.get("sprites/heart pickup.png") ?? assets.get("sprites/UI health.png");
+        const heart = assets.get("sprites/heart.png") ?? assets.get("sprites/UI health.png");
         if (imageDrawable(heart)) {
           const fw = Math.max(1, Math.floor(heart.width / 3));
           ctx.drawImage(heart, 0, 0, fw, heart.height, hb.x, hb.y, hb.w, hb.h);
