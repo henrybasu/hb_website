@@ -35,7 +35,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.20";
+const WEB_CLIENT_VERSION_STR = "0.1.21";
 
   // --- math/util.ts ---
 
@@ -2038,22 +2038,32 @@ class AssetLoader {
     const url = resolveAssetUrl(this.assetBase, relPath);
     const el = new Image();
     el.decoding = "async";
-    el.src = url;
-    if (typeof el.decode === "function") {
-      try {
-        await el.decode();
-      } catch (_e) {
-        await new Promise((resolve, reject) => {
-          el.onload = () => resolve();
-          el.onerror = () => reject(new Error(`Failed to decode ${url}`));
-        });
-      }
-    } else {
-      await new Promise((resolve, reject) => {
+
+    const waitLoaded = () =>
+      new Promise((resolve, reject) => {
+        if (el.complete && el.naturalWidth > 0) {
+          resolve();
+          return;
+        }
         el.onload = () => resolve();
         el.onerror = () => reject(new Error(`Failed to load ${url}`));
       });
+
+    el.src = url;
+    try {
+      await waitLoaded();
+      if (el.naturalWidth > 0) return el;
+    } catch (_directErr) {
+      // Direct src can fail on some hosts; retry via blob (do not revoke — keeps canvas drawable).
     }
+
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`Failed to fetch ${url}`);
+    const blob = await res.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    el.src = blobUrl;
+    await waitLoaded();
+    if (el.naturalWidth <= 0) throw new Error(`Failed to decode ${url}`);
     return el;
   }
 
@@ -2560,10 +2570,13 @@ class RenderPipeline {
 
     this.drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet);
 
-    let tilesDrawn = 0;
+    // Always paint forest/underground sprite terrain first so floors stay visible even
+    // when tileset v3 only manages partial draws (e.g. grass without solids).
+    this.drawTilesSpriteLayer(ctx, map, x0, y0, x1, y1, sheet);
+
     if (tilesetRuntime) {
       try {
-        tilesDrawn = tilesetRuntime.drawRoom(ctx, map, {
+        tilesetRuntime.drawRoom(ctx, map, {
           roomKind: snap.roomKind,
           displaySalt: snap.displaySalt >>> 0,
           x0,
@@ -2572,12 +2585,8 @@ class RenderPipeline {
           y1,
         });
       } catch (err) {
-        console.error("[Vernan] tileset draw failed; using sprite tiles:", err);
+        console.error("[Vernan] tileset draw failed:", err);
       }
-    }
-
-    if (tilesDrawn === 0) {
-      this.drawTilesSpriteLayer(ctx, map, x0, y0, x1, y1, sheet);
     }
   }
 
@@ -2592,13 +2601,15 @@ class RenderPipeline {
   }
 
   drawTilesSpriteLayer(ctx, map, x0, y0, x1, y1, sheet) {
+    const forest = sheet;
+    const canSprite = imageDrawable(forest);
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
         const t = map.tileAt(tx, ty);
         if (t === TILE_EMPTY && isFloorTerrainTile(map, tx, ty + 1)) {
           const px = tx * TILE_SIZE;
           const py = ty * TILE_SIZE;
-          if (!drawForestTile(ctx, sheet, 1, 0, px, py)) {
+          if (!canSprite || !drawForestTile(ctx, forest, 1, 0, px, py)) {
             ctx.fillStyle = "#5a8f4a";
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           }
@@ -2613,24 +2624,24 @@ class RenderPipeline {
         const py = ty * TILE_SIZE;
         if (t === TILE_SOLID || t === TILE_BREAKABLE) {
           const [col, row] = solidAutotileCell(map, tx, ty);
-          if (!drawForestTile(ctx, sheet, col, row, px, py)) {
+          if (!canSprite || !drawForestTile(ctx, forest, col, row, px, py)) {
             ctx.fillStyle = tileToColor(t);
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           }
         } else if (t === TILE_PLATFORM) {
-          if (!drawForestTile(ctx, sheet, 0, 1, px, py)) {
+          if (!canSprite || !drawForestTile(ctx, forest, 0, 1, px, py)) {
             ctx.fillStyle = tileToColor(t);
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           }
         } else if (t === TILE_LADDER) {
-          if (!drawForestTile(ctx, sheet, 2, 5, px, py)) {
+          if (!canSprite || !drawForestTile(ctx, forest, 2, 5, px, py)) {
             ctx.fillStyle = tileToColor(t);
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           }
         } else if (t === TILE_DOOR) {
           const doorTop = ty + 1 < map.getHeight() && map.tileAt(tx, ty + 1) === TILE_DOOR;
           const [col, row] = doorTop ? [2, 9] : [3, 10];
-          if (!drawForestTile(ctx, sheet, col, row, px, py)) {
+          if (!canSprite || !drawForestTile(ctx, forest, col, row, px, py)) {
             ctx.fillStyle = tileToColor(t);
             ctx.fillRect(px, py, TILE_SIZE, TILE_SIZE);
           }
