@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.42";
+const WEB_CLIENT_VERSION_STR = "0.1.43";
 
   // --- math/util.ts ---
 
@@ -5677,8 +5677,7 @@ class RenderPipeline {
     const sheet =
       underground && imageDrawable(underground) ? underground : forest;
 
-    const drawSky = !tilesetRuntime;
-    if (drawSky) {
+    if (drawSky && !tilesetRuntime) {
       this.drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet, tilesetRuntime);
     }
 
