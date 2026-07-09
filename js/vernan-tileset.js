@@ -1,6 +1,6 @@
 /**
  * Tileset v3 runtime for Vernan web (terrain bridge + member-graph autotile + layer compositing).
- * Ported from new-vernan-2 Java tileset pipeline (simplified: no glow/warp/deco overlays).
+ * Animated deco (torch flicker, grass wave) via VernanTileRender when simTicks is provided.
  */
 (function (global) {
   "use strict";
@@ -1176,6 +1176,7 @@
       if (!sheets.has("main")) {
         throw new Error("tileset main sheet missing");
       }
+      if (typeof VernanTileRender !== "undefined") VernanTileRender.clearCache();
       return new TilesetRuntime(root, sheets, images, bridge);
     }
 
@@ -1267,9 +1268,17 @@
       return null;
     }
 
-    drawTile(ctx, tileId, dstX, dstY) {
+    drawTile(ctx, tileId, dstX, dstY, simTicks = 0) {
       const def = this.tileById(tileId);
       if (!def) return false;
+      if (
+        typeof VernanTileRender !== "undefined" &&
+        VernanTileRender.tileUsesAnimation(def)
+      ) {
+        if (VernanTileRender.drawCachedTile(ctx, this, def, tileId, dstX, dstY, simTicks)) {
+          return true;
+        }
+      }
       const layers = asList(def.renderLayers);
       if (!layers?.length) return false;
       const sorted = layers
@@ -1332,6 +1341,7 @@
         roomKind = "NORMAL",
         grassTuftsOnly = false,
         isGrassTuft = null,
+        simTicks = 0,
       } = opts || {};
       const tileDefById = (id) => this.tileById(id);
       let drawn = 0;
@@ -1356,7 +1366,7 @@
             this.objects,
             tileDefById
           );
-          if (tileId && this.drawTile(ctx, tileId, px, py)) drawn++;
+          if (tileId && this.drawTile(ctx, tileId, px, py, simTicks)) drawn++;
         } else if (d.argb) {
           const a = ((d.argb >>> 24) & 255) / 255;
           const r = (d.argb >>> 16) & 255;
@@ -1384,6 +1394,7 @@
         bridge: bridgeOverride = null,
         decoTiles = null,
         isGrassTuft = null,
+        simTicks = 0,
       } = opts || {};
       const bridge = bridgeOverride || this.bridge;
       const tileAt = (tx, ty) => (terrainAt ? terrainAt(tx, ty) : map.tileAt(tx, ty));
@@ -1394,7 +1405,7 @@
           : null;
       let drawn = 0;
       const kind = String(roomKind || "").toUpperCase();
-      const decoOpts = { x0, y0, x1, y1, bridge, displaySalt, roomKind, isGrassTuft };
+      const decoOpts = { x0, y0, x1, y1, bridge, displaySalt, roomKind, isGrassTuft, simTicks };
 
       drawn += this.drawDecoTiles(ctx, map, decoTiles, { ...decoOpts, grassTuftsOnly: false });
 
@@ -1422,7 +1433,7 @@
             tileDefById,
             decoByCell
           );
-          if (tileId && this.drawTile(ctx, tileId, tx * 16, ty * 16)) drawn++;
+          if (tileId && this.drawTile(ctx, tileId, tx * 16, ty * 16, simTicks)) drawn++;
         }
       }
 

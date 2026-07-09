@@ -19,6 +19,8 @@ const CAMERA_EDGE_BUFFER_WORLD = 16 / CAMERA_ZOOM;
 const LADDER_TRANSITION_NORTH_EDGE_PX = TILE_SIZE;
 const PLAYER_STAND_H = 18;
 const PLAYER_STAND_W = 10;
+/** Matches Java Player.PLATFORM_DECK_SLACK_PX — feet-on-mouth-deck tolerance. */
+const PLATFORM_DECK_SLACK_PX = 6;
 const SPRITE_FRAME_W = 32;
 const SPRITE_FRAME_H = 32;
 const HP_BAR_W = 16;
@@ -39,7 +41,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.60";
+const WEB_CLIENT_VERSION_STR = "0.1.62";
 
   // --- math/util.ts ---
 
@@ -3002,21 +3004,125 @@ function spawnAtFloor(map, spawnTx, bodyHeight = PLAYER_STAND_H){
   return { x: spawnTx * TILE_SIZE, y: groundTop - bodyHeight };
 }
 
-function ladderShaftBelowFeetPlatform(map, player, columnTx){
-  const feetTy = Math.floor((player.feetY() - 1e-3) / TILE_SIZE);
-  if (feetTy < 0 || feetTy >= map.getHeight()) return false;
-  if (!map.isPlatformTile(columnTx, feetTy)) return false;
-  for (let y = feetTy + 1; y < map.getHeight() - 1; y++) {
-    if (map.isLadderTile(columnTx, y)) return true;
-    const t = map.tileAt(columnTx, y);
-    if (t === TILE_SOLID || t === TILE_BREAKABLE || t === TILE_DOOR) break;
+/** True when feet rest on a one-way platform deck (Java feetOnPlatformDeckOnly). */
+function feetOnPlatformDeckOnly(map, player){
+  const leftTile = Math.floor((player.x + 0.001) / TILE_SIZE);
+  const rightTile = Math.floor((player.x + player.w() - 0.001) / TILE_SIZE);
+  const tyCenter = Math.floor((player.feetY() - 1e-3) / TILE_SIZE);
+  const scanLo = Math.max(0, leftTile - 1);
+  const scanHi = Math.min(map.getWidth() - 1, rightTile + 1);
+  for (let dty = -1; dty <= 1; dty++) {
+    const ty = tyCenter + dty;
+    if (ty < 0 || ty >= map.getHeight()) continue;
+    for (let tx = scanLo; tx <= scanHi; tx++) {
+      if (!map.isPlatformTile(tx, ty)) continue;
+      const tileLeft = tx * TILE_SIZE;
+      const tileRight = (tx + 1) * TILE_SIZE;
+      if (player.x + player.w() <= tileLeft + 1e-6 || player.x >= tileRight - 1e-6) continue;
+      const deckTop = ty * TILE_SIZE;
+      if (
+        player.feetY() >= deckTop - 1e-3 &&
+        player.feetY() <= deckTop + PLATFORM_DECK_SLACK_PX
+      ) {
+        return true;
+      }
+    }
   }
   return false;
 }
 
+function ladderShaftInColumnFromRow(map, columnTx, startTy){
+  if (columnTx < 0 || columnTx >= map.getWidth()) return false;
+  for (let ty = startTy; ty < map.getHeight(); ty++) {
+    if (map.isLadderTile(columnTx, ty)) return true;
+    if (
+      map.isSolidTile(columnTx, ty) ||
+      map.isBreakableTile(columnTx, ty) ||
+      map.isDoorTile(columnTx, ty)
+    ) {
+      break;
+    }
+    if (map.isPlatformTile(columnTx, ty)) break;
+  }
+  return false;
+}
+
+function ladderShaftBelowFeetPlatformInColumn(map, player, columnTx){
+  if (!feetOnPlatformDeckOnly(map, player)) return false;
+  const leftTile = Math.floor((player.x + 0.001) / TILE_SIZE);
+  const rightTile = Math.floor((player.x + player.w() - 0.001) / TILE_SIZE);
+  const scanLo = Math.max(0, leftTile - 1);
+  const scanHi = Math.min(map.getWidth() - 1, rightTile + 1);
+  if (columnTx < scanLo || columnTx > scanHi) return false;
+  const tyCenter = Math.floor((player.feetY() - 1e-3) / TILE_SIZE);
+  for (let dty = -1; dty <= 1; dty++) {
+    const feetTy = tyCenter + dty;
+    if (feetTy < 0 || feetTy >= map.getHeight()) continue;
+    if (!map.isPlatformTile(columnTx, feetTy)) continue;
+    const deckTop = feetTy * TILE_SIZE;
+    if (player.feetY() < deckTop - 1e-3 || player.feetY() > deckTop + PLATFORM_DECK_SLACK_PX) continue;
+    if (ladderShaftInColumnFromRow(map, columnTx, feetTy + 1)) return true;
+  }
+  return false;
+}
+
+/** Feet on a mouth deck with a ladder shaft below — only when actually standing on that deck (Java). */
+function ladderShaftBelowFeetPlatform(map, player){
+  if (!feetOnPlatformDeckOnly(map, player)) return false;
+  const leftTile = Math.floor((player.x + 0.001) / TILE_SIZE);
+  const rightTile = Math.floor((player.x + player.w() - 0.001) / TILE_SIZE);
+  const scanLo = Math.max(0, leftTile - 1);
+  const scanHi = Math.min(map.getWidth() - 1, rightTile + 1);
+  for (let tx = scanLo; tx <= scanHi; tx++) {
+    if (ladderShaftBelowFeetPlatformInColumn(map, player, tx)) return true;
+  }
+  return false;
+}
+
+function mouthDeckRowUnderFeet(map, player, columnTx){
+  if (columnTx < 0) return -1;
+  const tyCenter = Math.floor((player.feetY() - 1e-3) / TILE_SIZE);
+  for (let dty = -1; dty <= 1; dty++) {
+    const ty = tyCenter + dty;
+    if (ty < 0 || ty >= map.getHeight()) continue;
+    if (!map.isPlatformTile(columnTx, ty)) continue;
+    const deckTop = ty * TILE_SIZE;
+    if (player.feetY() < deckTop - 1e-3 || player.feetY() > deckTop + PLATFORM_DECK_SLACK_PX) continue;
+    if (ladderShaftInColumnFromRow(map, columnTx, ty + 1)) return ty;
+  }
+  return -1;
+}
+
+function mouthShaftColumnFromStrictFeet(map, player){
+  const centerX = player.x + player.w() * 0.5;
+  const leftTile = Math.floor((player.x + 0.001) / TILE_SIZE);
+  const rightTile = Math.floor((player.x + player.w() - 0.001) / TILE_SIZE);
+  const scanLo = Math.max(0, leftTile - 1);
+  const scanHi = Math.min(map.getWidth() - 1, rightTile + 1);
+  let bestTx = -1;
+  let bestDist = Infinity;
+  for (let tx = scanLo; tx <= scanHi; tx++) {
+    if (mouthDeckRowUnderFeet(map, player, tx) < 0) continue;
+    const dist = Math.abs(centerX - (tx + 0.5) * TILE_SIZE);
+    if (dist < bestDist) {
+      bestDist = dist;
+      bestTx = tx;
+    }
+  }
+  return bestTx;
+}
+
+function mouthDeckLadderContinuesAbove(map, player){
+  const col = mouthShaftColumnFromStrictFeet(map, player);
+  if (col < 0) return false;
+  const deckTy = mouthDeckRowUnderFeet(map, player, col);
+  if (deckTy < 0) return false;
+  return ladderContinuesAboveDeck(map, col, deckTy);
+}
+
 function playerOverlapsLadderColumn(map, player, columnTx){
   if (columnTx < 0) return false;
-  if (ladderShaftBelowFeetPlatform(map, player, columnTx)) return true;
+  if (ladderShaftBelowFeetPlatformInColumn(map, player, columnTx)) return true;
   const leftTile = Math.floor((player.x + 0.001) / TILE_SIZE);
   const rightTile = Math.floor((player.x + player.w() - 0.001) / TILE_SIZE);
   if (columnTx < leftTile || columnTx > rightTile) return false;
@@ -3096,10 +3202,9 @@ function canStepOffLadderTop(map, player, columnTx){
 }
 
 /** Hitbox intersects ladder tiles, or feet on a mouth deck with shaft below (Java overlapsLadderOrPlatformShaftBelow). */
-function overlapsLadderOrPlatformShaftBelow(map, player, shaftCol){
+function overlapsLadderOrPlatformShaftBelow(map, player){
   if (playerOverlapsLadder(map, player)) return true;
-  if (shaftCol >= 0 && ladderShaftBelowFeetPlatform(map, player, shaftCol)) return true;
-  return false;
+  return ladderShaftBelowFeetPlatform(map, player);
 }
 
 function topIntersectedLadderRowInColumn(map, columnTx, player){
@@ -3625,14 +3730,14 @@ class Player {
     const resolvedShaft = resolveClimbShaftColumn(map, this);
     if (resolvedShaft >= 0) this.activeClimbShaftTx = resolvedShaft;
     shaftCol = this.activeClimbShaftTx >= 0 ? this.activeClimbShaftTx : resolvedShaft;
-    const onLadderNow = overlapsLadderOrPlatformShaftBelow(map, this, shaftCol);
+    const onLadderNow = overlapsLadderOrPlatformShaftBelow(map, this);
 
     if (
       !this.climbing &&
       down &&
       this.onGround &&
       shaftCol >= 0 &&
-      ladderShaftBelowFeetPlatform(map, this, shaftCol)
+      ladderShaftBelowFeetPlatform(map, this)
     ) {
       this.climbing = true;
       this.activeClimbShaftTx = shaftCol;
@@ -3649,7 +3754,21 @@ class Player {
       this.climbing = false;
       this.activeClimbShaftTx = -1;
     }
-    if (!this.climbing && onLadderNow && (up || down)) {
+    const onMouthWithShaftBelow =
+      this.onGround &&
+      feetOnPlatformDeckOnly(map, this) &&
+      ladderShaftBelowFeetPlatform(map, this);
+    const upClimbAboveMouth =
+      onMouthWithShaftBelow && mouthDeckLadderContinuesAbove(map, this);
+    const latchUp =
+      up &&
+      (!onMouthWithShaftBelow || upClimbAboveMouth) &&
+      (playerOverlapsLadder(map, this) || preserveClimbAscentToDeck(map, this, shaftCol, up));
+    const latchDown =
+      down &&
+      onLadderNow &&
+      (!this.onGround || feetOnPlatformDeckOnly(map, this));
+    if (!this.climbing && (latchUp || latchDown)) {
       this.climbing = true;
       if (shaftCol >= 0) this.activeClimbShaftTx = shaftCol;
     }
@@ -6869,6 +6988,15 @@ class GameSim {
       this.player.activeClimbShaftTx = dungeonShaftTx;
     }
 
+    // Doors before movement so Up at a door frame is not consumed by climb latch first.
+    this.tryDoorTransition(input);
+    if (this.transitionFade > 0) {
+      this.syncRenderInterpolationState();
+      this.tickBrickChunks(dt);
+      input?.endFrame?.();
+      return;
+    }
+
     this.player.update(dt, input, this.map);
 
     const spawnCtx = { projectiles: this.enemyProjectiles };
@@ -6925,8 +7053,7 @@ class GameSim {
     this.updateSubweaponProjectiles(dt);
     this.tryCollectFreePrimaryPedestal();
 
-    // Room transitions (doors + ladder shafts)
-    this.tryDoorTransition(input);
+    // Room transitions (ladder shafts; horizontal doors handled before player movement)
     this.tryLadderTransition(input);
     this.tryShopInteractions(input);
 
@@ -7574,7 +7701,7 @@ class RenderPipeline {
     const bgH = Math.max(1, Math.floor(WORLD_VIEWPORT_H / pixelScale));
     if (!this._bgCanvas) {
       this._bgCanvas = document.createElement("canvas");
-      this._bgCtx = this._bgCanvas.getContext("2d", { willReadFrequently: true });
+      this._bgCtx = this._bgCanvas.getContext("2d");
     }
     this._bgCanvas.width = bgW;
     this._bgCanvas.height = bgH;
@@ -7646,6 +7773,7 @@ class RenderPipeline {
           bridge: snap.roomBridge || undefined,
           decoTiles: snap.decoTiles,
           isGrassTuft,
+          simTicks: Math.floor((snap.decorationTime ?? 0) * 60),
           x0,
           y0,
           x1,
@@ -8559,7 +8687,7 @@ async function mount(selector, options = {}){
         <button type="button" class="vernan-touch-btn" data-touch="attack">Attack</button>
         <button type="button" class="vernan-touch-btn" data-touch="down">↓</button>
       </div>
-      <p class="vernan-web-help">Move: WASD/Arrows · Jump: Z/Space · Attack: X · Subweapon: C · Pause: Enter · Debug (paused): F3/`</p>
+      <p class="vernan-web-help">Move: WASD/Arrows · Jump: Z/Space · Attack: X · Subweapon: C · Pause: Enter · Debug (paused): F3/\`</p>
     </div>
   `;
 

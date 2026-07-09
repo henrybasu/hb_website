@@ -139,6 +139,7 @@
   }
 
   function readSpritePixels(img) {
+    if (img.__vernanSpritePx) return img.__vernanSpritePx;
     const c = document.createElement("canvas");
     c.width = img.width;
     c.height = img.height;
@@ -149,6 +150,7 @@
     for (let i = 0, j = 0; i < out.length; i++, j += 4) {
       out[i] = (data[j + 3] << 24) | (data[j] << 16) | (data[j + 1] << 8) | data[j + 2];
     }
+    img.__vernanSpritePx = out;
     return out;
   }
 
