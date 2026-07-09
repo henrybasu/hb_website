@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.40";
+const WEB_CLIENT_VERSION_STR = "0.1.41";
 
   // --- math/util.ts ---
 
@@ -1718,7 +1718,7 @@ function openEnteredFaceForTransition(layout, rooms, seams, fromRoom, toRoom, di
   if (seam && !seam.isDone()) seam.openRoomFaceInstant(rooms, toRoom);
 }
 
-function buildDungeonContent(layout){
+function buildDungeonContent(layout, dungeonFloorOrdinal = 1){
   const n = layout.roomCount();
   const plannedW = plannedRoomWidths(layout);
   const plannedH = plannedRoomHeights(layout);
@@ -1738,6 +1738,7 @@ function buildDungeonContent(layout){
     });
   }
   const seams = placeSecretEntranceSeams(layout, rooms);
+  applyPostGenerationEnemies(layout, rooms, dungeonFloorOrdinal);
   return { rooms, seams };
 }
 
@@ -2010,8 +2011,34 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null){
       secretFinish.neighborFaces ?? null
     );
   }
-  const enemySpawns = rollEnemySpawns(gen, node.contentSeed, kind, node.gridY);
-  return { ...gen, enemySpawns, enemyCount: enemySpawns.length };
+  return { ...gen, enemySpawns: [], enemyCount: 0 };
+}
+
+function rollPostGenerationEnemies(gen, contentSeed, kind, dungeonFloorOrdinal) {
+  if (kind === RoomKind.NORMAL) {
+    return rollEnemySpawns(gen, contentSeed, kind, dungeonFloorOrdinal);
+  }
+  if (kind === RoomKind.SECRET) {
+    const chanceRng = javaRandom(Number(BigInt(contentSeed) ^ 0x5ec7e701n));
+    if (chanceRng.nextDouble() >= SECRET_ROOM_ENEMY_CHANCE) return [];
+    return rollEnemySpawns(gen, contentSeed, kind, dungeonFloorOrdinal);
+  }
+  return [];
+}
+
+function applyPostGenerationEnemies(layout, rooms, dungeonFloorOrdinal) {
+  for (let id = 0; id < layout.roomCount(); id++) {
+    const gen = rooms[id];
+    if (!gen) continue;
+    const node = layout.room(id);
+    const enemySpawns = rollPostGenerationEnemies(
+      gen,
+      node.contentSeed,
+      node.kind,
+      dungeonFloorOrdinal
+    );
+    rooms[id] = { ...gen, enemySpawns, enemyCount: enemySpawns.length };
+  }
 }
 
 function generateRoom(node){
@@ -2983,10 +3010,10 @@ function enemyBaseMaxHealth(kind){
   }
 }
 
-function enemyEligibleKinds(dungeonFloor, secretRoom){
+function enemyEligibleKinds(dungeonFloorOrdinal, secretRoom){
   const maxChallenge = secretRoom
-    ? Math.floor(dungeonFloor / 5)
-    : Math.max(1, dungeonFloor + 1);
+    ? Math.floor(dungeonFloorOrdinal / 5)
+    : Math.max(1, dungeonFloorOrdinal + 1);
   return ENEMY_REGULAR_KINDS.filter((k) => enemyChallengeLevel(k) <= maxChallenge);
 }
 
@@ -3038,7 +3065,7 @@ function isDoorColumn(gen, tx){
   );
 }
 
-function rollEnemySpawns(gen, contentSeed, kind, dungeonFloor){
+function rollEnemySpawns(gen, contentSeed, kind, dungeonFloorOrdinal){
   if (
     kind === RoomKind.BOSS ||
     kind === RoomKind.SUPER_SECRET ||
@@ -3049,14 +3076,10 @@ function rollEnemySpawns(gen, contentSeed, kind, dungeonFloor){
     return [];
   }
   const secretRoom = kind === RoomKind.SECRET;
-  if (secretRoom) {
-    const chanceRng = javaRandom(Number(BigInt(contentSeed) ^ 0x5ec7e701n));
-    if (chanceRng.nextDouble() >= SECRET_ROOM_ENEMY_CHANCE) return [];
-  }
-  const eligible = enemyEligibleKinds(dungeonFloor, secretRoom);
+  const eligible = enemyEligibleKinds(dungeonFloorOrdinal, secretRoom);
   if (!eligible.length) return [];
   const rng = javaRandom(Number(BigInt(contentSeed) ^ 0x5deece66n));
-  let budget = rng.nextInt(Math.max(0, dungeonFloor) * 4 + 1);
+  let budget = rng.nextInt(Math.max(0, dungeonFloorOrdinal) * 4 + 1);
   if (budget <= 0) return [];
 
   const want = 1 + rng.nextInt(Math.min(3, eligible.length));
@@ -4557,6 +4580,7 @@ class GameSim {
   }
 
   initRun(seed){
+    this.dungeonLevel = 1;
     this.seed = seed >>> 0;
     this.gameOver = false;
     this.transitionFade = 0;
@@ -4569,7 +4593,7 @@ class GameSim {
     this.decorationTime = 0;
     this.itemPickupOverlay = null;
     this.layout = DungeonLayout.generate(this.seed, 12, 24);
-    const built = buildDungeonContent(this.layout);
+    const built = buildDungeonContent(this.layout, this.dungeonLevel);
     this.cachedRooms = built.rooms;
     this.secretEntranceSeams = built.seams;
     const n = this.layout.roomCount();
