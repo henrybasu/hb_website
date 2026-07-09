@@ -30,7 +30,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.5";
+const WEB_CLIENT_VERSION_STR = "0.1.6";
 
   // --- math/util.ts ---
 
@@ -336,12 +336,12 @@ class DungeonLayout {
     const cellToId = new Map();
     const rooms = cells.map((c, id) => {
       cellToId.set(key(c.gx, c.gy), id);
-      const contentSeed = (runSeed ^ BigInt(id * 0x9e3779b9));
+      const contentSeed = (runSeed ^ (id * 0x9e3779b9)) >>> 0;
       return {
         id,
         gridX: c.gx,
         gridY: c.gy,
-        contentSeed: Number(contentSeed) >>> 0,
+        contentSeed,
         doorWest: false,
         doorEast: false,
         ladderNorth: false,
