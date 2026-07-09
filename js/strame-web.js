@@ -5,7 +5,8 @@
 (function (global) {
   "use strict";
 
-  const WEB_CLIENT_VERSION = "20260702-recruit2";
+  const WEB_CLIENT_VERSION = "20260707-lobby-ui";
+  const STARTING_GOLD = 5;
   const RECRUIT_COST = 1;
   const KILL_GOLD = 1;
 
@@ -832,49 +833,95 @@
       typeof selector === "string" ? document.querySelector(selector) : selector;
     if (!root) throw new Error("StrameWeb.mount: container not found");
 
+    function escapeHtml(s) {
+      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
+    }
+
     root.classList.add("strame-web-root");
-      root.innerHTML = `
-      <div class="strame-web-header">
-        <h1>Strame Online</h1>
-        <div class="strame-web-status" data-status>Offline</div>
-      </div>
-      <p class="strame-web-note">Browser client v${WEB_CLIENT_VERSION} (Soldier &amp; Gollem, preset maps). Run the desktop app separately for full features.</p>
-      <div class="strame-web-panel" data-lobby>
-        <h2>Connect</h2>
-        <div class="strame-web-row">
-          <label>Relay URL</label>
-          <input type="text" class="wide" data-relay value="${escapeHtml(options.relayUrl || DEFAULT_RELAY)}" placeholder="${RELAY_PLACEHOLDER}">
-        </div>
-        <div class="strame-web-row">
-          <label>Your name</label>
-          <input type="text" data-name maxlength="32" placeholder="Player">
-        </div>
-        <div class="strame-web-lobby-actions">
-          <section class="strame-web-lobby-card strame-web-lobby-card--host">
-            <h3>Host a game</h3>
-            <p class="strame-web-lobby-lead">Create a room and share the code with your opponent.</p>
-            <div class="strame-web-field">
-              <label for="strame-map-select">Map</label>
-              <select id="strame-map-select" data-map>
-                <option value="STANDARD_5X10">Standard 5×10</option>
-                <option value="RIVER_5X10">5×10 River</option>
-              </select>
+    root.innerHTML = `
+      <div class="strame-web-lobby-shell" data-lobby>
+        <header class="strame-web-lobby-hero">
+          <div class="strame-web-lobby-brand">
+            <h1>Strame Online</h1>
+            <span class="strame-web-version-badge">v${WEB_CLIENT_VERSION}</span>
+          </div>
+          <p class="strame-web-lobby-tagline">Standard Online · Soldier &amp; Gollem</p>
+          <div class="strame-web-status-pill" data-status-pill>
+            <span class="strame-web-status-dot is-idle" data-status-dot aria-hidden="true"></span>
+            <span class="strame-web-status-text" data-status>Loading…</span>
+          </div>
+        </header>
+
+        <div class="strame-web-party" data-party aria-label="Lobby players">
+          <div class="strame-web-party-slot is-you" data-slot-you>
+            <div class="strame-web-party-avatar" aria-hidden="true">1</div>
+            <div class="strame-web-party-meta">
+              <span class="strame-web-party-label">Player 1</span>
+              <strong class="strame-web-party-name" data-slot-you-name>You</strong>
+              <span class="strame-web-party-state" data-slot-you-state>Offline</span>
             </div>
-            <button type="button" class="primary-host block" data-host>Host game</button>
-            <p class="strame-web-hint">If the relay times out while you wait, click Host game again for a new code.</p>
-          </section>
-          <p class="strame-web-lobby-or" aria-hidden="true">or</p>
-          <section class="strame-web-lobby-card strame-web-lobby-card--guest">
-            <h3>Join as guest</h3>
-            <p class="strame-web-lobby-lead">Enter the room code from the host to play as Player 2.</p>
-            <div class="strame-web-field">
-              <label for="strame-room-code">Room code</label>
-              <input id="strame-room-code" type="text" data-code maxlength="12" placeholder="ABCDEF" autocomplete="off" spellcheck="false">
+          </div>
+          <div class="strame-web-party-vs" aria-hidden="true">VS</div>
+          <div class="strame-web-party-slot is-empty" data-slot-opp>
+            <div class="strame-web-party-avatar" aria-hidden="true">2</div>
+            <div class="strame-web-party-meta">
+              <span class="strame-web-party-label">Player 2</span>
+              <strong class="strame-web-party-name" data-slot-opp-name>Waiting…</strong>
+              <span class="strame-web-party-state" data-slot-opp-state>Empty slot</span>
             </div>
-            <button type="button" class="primary-guest block" data-join>Join game</button>
-            <p class="strame-web-hint">Use the same relay URL as the host.</p>
-          </section>
+          </div>
         </div>
+
+        <div class="strame-web-player-bar">
+          <label for="strame-display-name">Display name</label>
+          <input id="strame-display-name" type="text" data-name maxlength="32" placeholder="Enter your name" autocomplete="nickname">
+        </div>
+
+        <div class="strame-web-mode-tabs" role="tablist" aria-label="Lobby mode">
+          <button type="button" class="strame-web-mode-tab is-active" role="tab" id="strame-tab-host" data-tab-host aria-selected="true" aria-controls="strame-panel-host">Create lobby</button>
+          <button type="button" class="strame-web-mode-tab" role="tab" id="strame-tab-join" data-tab-join aria-selected="false" aria-controls="strame-panel-join">Join game</button>
+        </div>
+
+        <section class="strame-web-mode-panel" id="strame-panel-host" role="tabpanel" aria-labelledby="strame-tab-host" data-panel-host>
+          <div class="strame-web-field">
+            <label for="strame-map-select">Map</label>
+            <select id="strame-map-select" data-map>
+              <option value="STANDARD_5X10">Standard 5×10</option>
+              <option value="RIVER_5X10">5×10 River</option>
+            </select>
+          </div>
+          <div class="strame-web-room-reveal strame-web-hidden" data-room-reveal>
+            <p class="strame-web-room-reveal-label">Room code — share with your opponent</p>
+            <div class="strame-web-room-code-row">
+              <output class="strame-web-room-code" data-room-code for="strame-room-code">------</output>
+              <button type="button" class="strame-web-copy-btn" data-copy-code>Copy</button>
+            </div>
+          </div>
+          <button type="button" class="strame-web-play-btn strame-web-play-btn--host" data-host>
+            <span class="strame-web-play-btn-label" data-host-label>Create lobby</span>
+          </button>
+          <p class="strame-web-hint">Host creates the room and shares the code. Match starts when both players connect.</p>
+        </section>
+
+        <section class="strame-web-mode-panel strame-web-hidden" id="strame-panel-join" role="tabpanel" aria-labelledby="strame-tab-join" data-panel-join hidden>
+          <div class="strame-web-field">
+            <label for="strame-room-code">Room code</label>
+            <input id="strame-room-code" class="strame-web-room-input" type="text" data-code maxlength="12" placeholder="ABCDEF" autocomplete="off" spellcheck="false" inputmode="text">
+          </div>
+          <button type="button" class="strame-web-play-btn strame-web-play-btn--join" data-join>
+            <span class="strame-web-play-btn-label" data-join-label>Join game</span>
+          </button>
+          <p class="strame-web-hint">Use the same relay server as the host. Codes are not case-sensitive.</p>
+        </section>
+
+        <details class="strame-web-advanced">
+          <summary>Connection settings</summary>
+          <div class="strame-web-field">
+            <label for="strame-relay-url">Relay server</label>
+            <input id="strame-relay-url" type="text" class="wide" data-relay value="${escapeHtml(options.relayUrl || DEFAULT_RELAY)}" placeholder="${RELAY_PLACEHOLDER}" spellcheck="false">
+            <p class="strame-web-advanced-note">Both players must use the exact same WebSocket relay URL.</p>
+          </div>
+        </details>
       </div>
       <div class="strame-web-banner strame-web-hidden" data-banner></div>
       <div class="strame-web-game strame-web-hidden" data-game>
@@ -921,6 +968,8 @@
 
     const el = {
       status: root.querySelector("[data-status]"),
+      statusDot: root.querySelector("[data-status-dot]"),
+      statusPill: root.querySelector("[data-status-pill]"),
       lobby: root.querySelector("[data-lobby]"),
       game: root.querySelector("[data-game]"),
       banner: root.querySelector("[data-banner]"),
@@ -945,6 +994,23 @@
       name: root.querySelector("[data-name]"),
       code: root.querySelector("[data-code]"),
       unit: root.querySelector("[data-unit]"),
+      tabHost: root.querySelector("[data-tab-host]"),
+      tabJoin: root.querySelector("[data-tab-join]"),
+      panelHost: root.querySelector("[data-panel-host]"),
+      panelJoin: root.querySelector("[data-panel-join]"),
+      hostBtn: root.querySelector("[data-host]"),
+      joinBtn: root.querySelector("[data-join]"),
+      hostLabel: root.querySelector("[data-host-label]"),
+      joinLabel: root.querySelector("[data-join-label]"),
+      roomReveal: root.querySelector("[data-room-reveal]"),
+      roomCode: root.querySelector("[data-room-code]"),
+      copyCode: root.querySelector("[data-copy-code]"),
+      slotYou: root.querySelector("[data-slot-you]"),
+      slotOpp: root.querySelector("[data-slot-opp]"),
+      slotYouName: root.querySelector("[data-slot-you-name]"),
+      slotYouState: root.querySelector("[data-slot-you-state]"),
+      slotOppName: root.querySelector("[data-slot-opp-name]"),
+      slotOppState: root.querySelector("[data-slot-opp-state]"),
     };
 
     const model = new GameModel();
@@ -991,9 +1057,115 @@
       el.banner.classList.remove("win");
       if (options.clearRoomCode) {
         el.code.value = "";
+        updateRoomCodeDisplay("");
       }
       if (options.clearLog) {
         el.log.textContent = "";
+      }
+      setLobbyConnecting(false);
+      updatePartySlots();
+    }
+
+    function displayName() {
+      const n = el.name && el.name.value.trim();
+      return n || "Player";
+    }
+
+    function setLobbyMode(mode) {
+      const isHost = mode === "host";
+      if (el.panelHost) {
+        el.panelHost.classList.toggle("strame-web-hidden", !isHost);
+        el.panelHost.hidden = !isHost;
+      }
+      if (el.panelJoin) {
+        el.panelJoin.classList.toggle("strame-web-hidden", isHost);
+        el.panelJoin.hidden = isHost;
+      }
+      if (el.tabHost) {
+        el.tabHost.classList.toggle("is-active", isHost);
+        el.tabHost.setAttribute("aria-selected", isHost ? "true" : "false");
+      }
+      if (el.tabJoin) {
+        el.tabJoin.classList.toggle("is-active", !isHost);
+        el.tabJoin.setAttribute("aria-selected", isHost ? "false" : "true");
+      }
+    }
+
+    function setConnectionVisual(state) {
+      if (!el.statusDot) return;
+      el.statusDot.className = "strame-web-status-dot is-" + state;
+      if (el.statusPill) {
+        el.statusPill.classList.remove(
+          "is-idle",
+          "is-ready",
+          "is-connecting",
+          "is-online",
+          "is-waiting",
+          "is-error"
+        );
+        el.statusPill.classList.add("is-" + state);
+      }
+    }
+
+    function updateRoomCodeDisplay(code) {
+      const text = (code || "").trim().toUpperCase();
+      if (el.roomCode) el.roomCode.textContent = text || "------";
+      if (el.roomReveal) el.roomReveal.classList.toggle("strame-web-hidden", !text);
+    }
+
+    function updatePartySlots() {
+      const youName = displayName();
+      if (el.slotYouName) el.slotYouName.textContent = youName;
+
+      if (!online || online.closed) {
+        if (el.slotYou) el.slotYou.classList.remove("is-connected");
+        if (el.slotOpp) {
+          el.slotOpp.classList.add("is-empty");
+          el.slotOpp.classList.remove("is-connected", "is-waiting");
+        }
+        if (el.slotYouState) el.slotYouState.textContent = "Offline";
+        if (el.slotOppName) el.slotOppName.textContent = "Waiting…";
+        if (el.slotOppState) el.slotOppState.textContent = "Empty slot";
+        return;
+      }
+
+      if (el.slotYou) el.slotYou.classList.add("is-connected");
+      if (seat === 0) {
+        if (el.slotYouState) el.slotYouState.textContent = "Host · Connected";
+        if (el.slotOppName) el.slotOppName.textContent = "Opponent";
+        if (el.slotOppState) {
+          el.slotOppState.textContent = matchStarted ? "In match" : "Waiting to join…";
+        }
+        if (el.slotOpp) {
+          el.slotOpp.classList.toggle("is-empty", false);
+          el.slotOpp.classList.toggle("is-waiting", !matchStarted);
+          el.slotOpp.classList.toggle("is-connected", matchStarted);
+        }
+      } else if (seat === 1) {
+        if (el.slotYouState) el.slotYouState.textContent = "Guest · Connected";
+        if (el.slotOppName) el.slotOppName.textContent = "Host";
+        if (el.slotOppState) {
+          el.slotOppState.textContent = matchStarted ? "In match" : "In lobby";
+        }
+        if (el.slotOpp) {
+          el.slotOpp.classList.remove("is-empty", "is-waiting");
+          el.slotOpp.classList.add("is-connected");
+        }
+      }
+    }
+
+    function setLobbyConnecting(active) {
+      if (el.hostBtn) el.hostBtn.disabled = active;
+      if (el.joinBtn) el.joinBtn.disabled = active;
+      if (el.tabHost) el.tabHost.disabled = active;
+      if (el.tabJoin) el.tabJoin.disabled = active;
+      if (active) {
+        setConnectionVisual("connecting");
+        if (el.hostLabel) el.hostLabel.textContent = "Connecting…";
+        if (el.joinLabel) el.joinLabel.textContent = "Connecting…";
+      } else {
+        if (el.hostLabel) el.hostLabel.textContent = "Create lobby";
+        if (el.joinLabel) el.joinLabel.textContent = "Join game";
       }
     }
 
@@ -1060,17 +1232,25 @@
       setStatus("Not connected");
     }
 
-    function setStatus(t) {
+    function setStatus(t, connectionState) {
       el.status.textContent = t;
+      if (connectionState) {
+        setConnectionVisual(connectionState);
+      } else if (/connect|loading/i.test(t)) {
+        setConnectionVisual("connecting");
+      } else if (/room|joined|connected|waiting|host|guest|relay/i.test(t) && !/not connected|disconnect|lost/i.test(t)) {
+        setConnectionVisual(/waiting/i.test(t) ? "waiting" : "online");
+      } else if (/ready/i.test(t)) {
+        setConnectionVisual("ready");
+      } else if (/not connected|disconnect|error|enter a relay|room code/i.test(t)) {
+        setConnectionVisual(/error|enter a relay|room code/i.test(t) ? "error" : "idle");
+      }
+      updatePartySlots();
     }
 
     function log(line) {
       el.log.textContent = (el.log.textContent + line + "\n").slice(-4000);
       el.log.scrollTop = el.log.scrollHeight;
-    }
-
-    function escapeHtml(s) {
-      return String(s).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/"/g, "&quot;");
     }
 
     let actionFlashTimer = null;
@@ -1240,7 +1420,8 @@
 
     function handleNetwork(msg) {
       if (msg === "READY") {
-        setStatus("Both players connected");
+        setStatus("Both players connected — starting match", "online");
+        updatePartySlots();
         if (seat === 0 && !matchStarted) {
           const seed = Date.now();
           const mapId = matchMap;
@@ -1317,14 +1498,14 @@
       el.banner.classList.remove("strame-web-hidden");
       el.banner.classList.add("error");
       el.banner.textContent = msg;
-      setStatus(msg);
+      setStatus(msg, "error");
     }
 
     async function connectOnline(asHost) {
       try {
         const url = el.relay.value.trim();
         if (!url) {
-          throw new Error("Enter a relay URL (e.g. " + RELAY_PLACEHOLDER + ")");
+          throw new Error("Enter a relay URL in Connection settings");
         }
         if (!/^wss?:\/\//i.test(url)) {
           throw new Error("Relay URL must start with ws:// or wss://");
@@ -1336,22 +1517,27 @@
         stopKeepalive();
         matchStarted = false;
         matchMap = el.map.value;
+        setLobbyConnecting(true);
+        setStatus("Connecting to relay…", "connecting");
         online = new RelaySession(handleNetwork, onRelayFatal);
         await online.connect(url);
-        setStatus("Connected to relay");
         if (asHost) {
           await online.host();
           seat = online.role === "host" ? 0 : 1;
           if (seat !== 0) throw new Error("Relay did not assign host role");
           el.code.value = online.roomCode;
-          setStatus("Room " + online.roomCode + " — share code with opponent");
+          updateRoomCodeDisplay(online.roomCode);
+          setLobbyMode("host");
+          setStatus("Lobby open — share room code " + online.roomCode, "waiting");
         } else {
           const code = el.code.value.trim();
           if (!code) throw new Error("Enter a room code");
           await online.join(code);
           seat = online.role === "host" ? 0 : 1;
           if (seat !== 1) throw new Error("Relay did not assign guest role");
-          setStatus("Joined room " + online.roomCode);
+          updateRoomCodeDisplay(online.roomCode);
+          setLobbyMode("join");
+          setStatus("Joined " + online.roomCode + " — waiting for match", "waiting");
         }
         online.pump();
         startKeepalive();
@@ -1359,11 +1545,17 @@
         if (name) {
           online.send("PEERNAME " + btoa(unescape(encodeURIComponent(name))));
         }
+        updatePartySlots();
       } catch (e) {
         stopKeepalive();
         showError(e.message || String(e));
         if (online) online.close();
         online = null;
+        seat = null;
+        updateRoomCodeDisplay("");
+        updatePartySlots();
+      } finally {
+        setLobbyConnecting(false);
       }
     }
 
@@ -1445,6 +1637,39 @@
     root.querySelector("[data-host]").addEventListener("click", () => connectOnline(true));
     root.querySelector("[data-join]").addEventListener("click", () => connectOnline(false));
 
+    if (el.tabHost) {
+      el.tabHost.addEventListener("click", () => setLobbyMode("host"));
+    }
+    if (el.tabJoin) {
+      el.tabJoin.addEventListener("click", () => setLobbyMode("join"));
+    }
+    if (el.name) {
+      el.name.addEventListener("input", () => updatePartySlots());
+    }
+    if (el.copyCode) {
+      el.copyCode.addEventListener("click", () => {
+        const code = el.code.value.trim().toUpperCase();
+        if (!code) return;
+        const copied = () => {
+          el.copyCode.textContent = "Copied!";
+          setTimeout(() => {
+            el.copyCode.textContent = "Copy";
+          }, 1800);
+        };
+        if (navigator.clipboard && navigator.clipboard.writeText) {
+          navigator.clipboard.writeText(code).then(copied).catch(() => {
+            el.code.select();
+            document.execCommand("copy");
+            copied();
+          });
+        } else {
+          el.code.select();
+          document.execCommand("copy");
+          copied();
+        }
+      });
+    }
+
     if (el.unit) {
       el.unit.addEventListener("change", () => {
         model.recruitUnit = el.unit.value;
@@ -1519,6 +1744,9 @@
 
     window.addEventListener("resize", () => refresh());
     refresh();
+    setLobbyMode("host");
+    updatePartySlots();
+    setStatus("Ready — create or join a lobby", "ready");
   }
 
   global.StrameWeb = { mount, GameModel, MAPS, UNITS, WEB_CLIENT_VERSION };

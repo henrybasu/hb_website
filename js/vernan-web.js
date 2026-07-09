@@ -4465,6 +4465,10 @@ class AssetLoader {
     const optional = [
       "sprites/UI key.png",
       "sprites/UI coin.png",
+      "sprites/key.png",
+      "sprites/coin 1.png",
+      "sprites/coin 5.png",
+      "sprites/coin 10.png",
       "sprites/mouse.png",
       "sprites/mouse hurt.png",
       "sprites/penisman.png",
@@ -4474,6 +4478,7 @@ class AssetLoader {
       "sprites/cat shopkeep sheet.png",
       "sprites/items/item pedestal.png",
       "sprites/heart pickup.png",
+      "sprites/heart.png",
       "tiles/underground tileset.png",
       "tiles/la sheet.png",
     ];
@@ -4590,6 +4595,13 @@ class GameSim {
   pedestalBobPhase = 0;
   itemPickupOverlay = null;
   decorationTime = 0;
+  worldPickups = [];
+  roomPersistedPickups = [];
+  roomCombatCleared = [];
+  roomSpawnEnemyCount = 0;
+  enemiesKilledThisRun = 0;
+  lastEnemyDeathFeetCenterX = 0;
+  lastEnemyDeathFeetCenterY = 0;
 
   backgroundRegistry = null;
   roomMathBackgroundPresetIds = [];
@@ -4630,6 +4642,12 @@ class GameSim {
     this.shopPedestalCollected = new Array(n).fill(null);
     this.shopPickupCollected = new Array(n).fill(null);
     this.shopRoomInitialized = new Array(n).fill(false);
+    this.roomCombatCleared = new Array(n).fill(false);
+    this.roomPersistedPickups = new Array(n).fill(null).map(() => []);
+    this.worldPickups = [];
+    this.enemiesKilledThisRun = 0;
+    this.lastEnemyDeathFeetCenterX = 0;
+    this.lastEnemyDeathFeetCenterY = 0;
     this.assignRoomMathBackgroundPresets();
     this.roomVisited[0] = true;
     this.revealMinimapAdjacentNeighbors(0);
@@ -4720,6 +4738,10 @@ class GameSim {
     this.map = gen.map;
     this.enemyProjectiles = [];
     this.enemies = spawnEnemiesFromRoom(this.map, gen, this.player);
+    this.roomSpawnEnemyCount = this.enemies.length;
+    this.worldPickups = (this.roomPersistedPickups[roomId] ?? []).map((d) =>
+      VernanPickups.WorldPickup.fromSnapshot(d)
+    );
     this.shopKeeper = null;
     this.activeShopPickups = [];
     const kind = this.layout.room(roomId).kind;
@@ -4759,6 +4781,171 @@ class GameSim {
           if (seam.markBreakableCleared(this.cachedRooms, this.currentRoomId, tx, ty)) break;
         }
       }
+    }
+  }
+
+  tryStrikeBreakableTiles(hit){
+    if (!hit) return;
+    const x0 = Math.floor(hit.x / TILE_SIZE);
+    const x1 = Math.floor((hit.x + hit.w - 1e-5) / TILE_SIZE);
+    const y0 = Math.floor(hit.y / TILE_SIZE);
+    const y1 = Math.floor((hit.y + hit.h - 1e-5) / TILE_SIZE);
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (!this.map.isBreakableTile(tx, ty)) continue;
+        if (this.isHiddenShellBreakable(tx, ty)) continue;
+        this.destroyBreakableTile(tx, ty);
+      }
+    }
+  }
+
+  destroyBreakableTile(tx, ty){
+    const bx = tx * TILE_SIZE;
+    const by = ty * TILE_SIZE;
+    this.map.setTile(tx, ty, TILE_EMPTY);
+    const lootKind = VernanPickups.BreakableLootRoll.terrainLootKind(
+      this.seed,
+      this.currentRoomId,
+      tx,
+      ty,
+      javaRandom
+    );
+    if (!lootKind) return;
+    const rnd = VernanPickups.BreakableLootRoll.terrainBrickRng(
+      this.seed,
+      this.currentRoomId,
+      tx,
+      ty,
+      javaRandom
+    );
+    this.worldPickups.push(
+      VernanPickups.WorldPickup.createFromCenter(
+        lootKind,
+        bx + TILE_SIZE * 0.5,
+        by + TILE_SIZE * 0.5,
+        VernanPickups.SpawnStyle.BREAKABLE,
+        rnd
+      )
+    );
+  }
+
+  persistRoomPickups(roomId){
+    if (roomId < 0 || roomId >= this.roomPersistedPickups.length) return;
+    this.roomPersistedPickups[roomId] = this.worldPickups.map((p) => p.snapshot());
+  }
+
+  processEnemyDeaths(){
+    let sumFeetX = 0;
+    let sumFeetY = 0;
+    let newDeaths = 0;
+    for (const e of this.enemies) {
+      if (!e.dead || e.deathProcessed) continue;
+      e.deathProcessed = true;
+      const hb = e.hitbox();
+      sumFeetX += hb.x + hb.w * 0.5;
+      sumFeetY += hb.y + hb.h;
+      newDeaths++;
+      this.enemiesKilledThisRun++;
+    }
+    if (newDeaths > 0) {
+      this.lastEnemyDeathFeetCenterX = sumFeetX / newDeaths;
+      this.lastEnemyDeathFeetCenterY = sumFeetY / newDeaths;
+    }
+    this.enemies = this.enemies.filter((e) => !e.dead);
+    this.tryProcessRoomClearRewards();
+  }
+
+  anyEnemyBlocksRoomClear(){
+    return this.enemies.some((e) => !e.dead);
+  }
+
+  tryProcessRoomClearRewards(){
+    if (this.currentRoomId < 0) return;
+    if (this.anyEnemyBlocksRoomClear()) return;
+    if (this.currentRoomId >= this.roomCombatCleared.length) return;
+    if (this.roomCombatCleared[this.currentRoomId]) return;
+    if (this.roomSpawnEnemyCount <= 0) return;
+
+    this.roomCombatCleared[this.currentRoomId] = true;
+    const node = this.layout.room(this.currentRoomId);
+    const rnd = javaRandom(
+      VernanPickups.roomClearRngSeed(
+        this.seed,
+        this.currentRoomId,
+        this.dungeonLevel,
+        this.enemiesKilledThisRun
+      )
+    );
+
+    if (node.kind === RoomKind.NORMAL) {
+      const grant = this.enemiesKilledThisRun % 6 === 0 || rnd.nextDouble() < 0.4;
+      if (grant) {
+        const drop = VernanPickups.rollRoomClearPickupKind(rnd);
+        this.worldPickups.push(
+          VernanPickups.WorldPickup.createAtFeet(
+            drop,
+            this.lastEnemyDeathFeetCenterX,
+            this.lastEnemyDeathFeetCenterY,
+            VernanPickups.SpawnStyle.ROOM_CLEAR,
+            rnd
+          )
+        );
+      }
+    } else if (node.kind === RoomKind.BOSS) {
+      if (this.enemiesKilledThisRun % 6 === 0) {
+        const burst = 2 + rnd.nextInt(5);
+        for (let i = 0; i < burst; i++) {
+          const drop = rnd.nextBoolean()
+            ? VernanPickups.rollRoomClearCoinKind(rnd)
+            : VernanPickups.PickupKind.HEART;
+          let tx = Math.floor(this.lastEnemyDeathFeetCenterX / TILE_SIZE + rnd.nextInt(5) - 2);
+          tx = Math.max(2, Math.min(this.map.getWidth() - 3, tx));
+          const feetCx = tx * TILE_SIZE + TILE_SIZE * 0.5;
+          const feetY = this.map.groundTopWorldYAtColumn(tx);
+          this.worldPickups.push(
+            VernanPickups.WorldPickup.createAtFeet(
+              drop,
+              feetCx,
+              feetY,
+              VernanPickups.SpawnStyle.BREAKABLE,
+              rnd
+            )
+          );
+        }
+      }
+    }
+  }
+
+  updateWorldPickups(dt){
+    for (const p of this.worldPickups) {
+      p.update(dt, this.map);
+    }
+  }
+
+  collectWorldPickups(){
+    const playerBox = playerPickupRect(this.player);
+    for (let i = this.worldPickups.length - 1; i >= 0; i--) {
+      const p = this.worldPickups[i];
+      if (!rectsOverlap(playerBox, p.hitbox())) continue;
+      if (p.kind === VernanPickups.PickupKind.HEART && this.player.health.isAtFullHealth()) continue;
+      switch (p.kind) {
+        case VernanPickups.PickupKind.HEART:
+          this.player.health.heal(2);
+          break;
+        case VernanPickups.PickupKind.KEY:
+          this.player.stats.keys++;
+          break;
+        case VernanPickups.PickupKind.COIN_1:
+          this.player.stats.money++;
+          break;
+        case VernanPickups.PickupKind.COIN_5:
+          this.player.stats.money += 5;
+          break;
+        case VernanPickups.PickupKind.COIN_10:
+          this.player.stats.money += 10;
+          break;
+      }
+      this.worldPickups.splice(i, 1);
     }
   }
 
@@ -4835,6 +5022,7 @@ class GameSim {
     const hit = this.player.attackHitbox();
     if (hit) {
       this.tryStrikeSeamBreakables(hit);
+      this.tryStrikeBreakableTiles(hit);
       for (const e of this.enemies) {
         if (e.dead) continue;
         const hb = e.hitbox();
@@ -4848,6 +5036,10 @@ class GameSim {
         }
       }
     }
+
+    this.processEnemyDeaths();
+    this.updateWorldPickups(dt);
+    this.collectWorldPickups();
 
     // Room transitions (doors + ladder shafts)
     this.tryDoorTransition(input);
@@ -5060,6 +5252,7 @@ class GameSim {
 
   beginTransition(roomId, dir, input) {
     const fromRoom = this.currentRoomId;
+    this.persistRoomPickups(fromRoom);
     this.currentRoomId = roomId;
     if (roomId >= 0 && roomId < this.roomVisited.length) {
       this.roomVisited[roomId] = true;
@@ -5207,6 +5400,13 @@ class GameSim {
         x: p.x,
         groundTop: p.groundTop,
         price: p.price,
+      })),
+      worldPickups: this.worldPickups.map((p) => ({
+        kind: p.kind,
+        x: p.x,
+        y: p.y,
+        angleRad: p.angleRad,
+        animTime: p.animTime,
       })),
       shopKeeper: this.shopKeeper,
       pedestalBobPhase: this.pedestalBobPhase,
@@ -5370,6 +5570,7 @@ class RenderPipeline {
     this.drawShopPickups(ctx, snap, assets);
     this.drawShopPedestals(ctx, snap, assets, sim.itemCatalog);
     this.drawShopKeeper(ctx, snap, assets);
+    this.drawWorldPickups(ctx, snap, assets);
     this.drawEnemies(ctx, snap, assets);
     this.drawEnemyProjectiles(ctx, snap);
     this.drawPlayer(ctx, snap, assets);
@@ -5789,6 +5990,55 @@ class RenderPipeline {
       if (p.dead) continue;
       ctx.fillStyle = p.color ?? "#ffcc44";
       ctx.fillRect(p.x, p.y, p.w, p.h);
+    }
+  }
+
+  drawWorldPickups(ctx, snap, assets){
+    for (const p of snap.worldPickups ?? []) {
+      const cx = p.x + 4;
+      const cy = p.y + 4;
+      ctx.save();
+      ctx.translate(cx, cy);
+      ctx.rotate(p.angleRad ?? 0);
+      ctx.translate(-cx, -cy);
+
+      if (p.kind === VernanPickups.PickupKind.HEART) {
+        const heart =
+          assets.get("sprites/heart.png") ??
+          assets.get("sprites/heart pickup.png") ??
+          assets.get("sprites/UI health.png");
+        if (imageDrawable(heart)) {
+          const fw = Math.max(1, Math.floor(heart.width / 8));
+          const frame = Math.floor((p.animTime ?? 0) * 12) & 7;
+          ctx.drawImage(heart, frame * fw, 0, fw, heart.height, p.x, p.y, 8, 8);
+        } else {
+          ctx.fillStyle = "#e74c3c";
+          ctx.fillRect(p.x, p.y, 8, 8);
+        }
+      } else if (p.kind === VernanPickups.PickupKind.KEY) {
+        const key = assets.get("sprites/key.png") ?? assets.get("sprites/UI key.png");
+        if (imageDrawable(key)) {
+          ctx.drawImage(key, p.x, p.y, 8, 8);
+        } else {
+          ctx.fillStyle = "#f1c40f";
+          ctx.fillRect(p.x, p.y, 8, 8);
+        }
+      } else {
+        const coinPath =
+          p.kind === VernanPickups.PickupKind.COIN_5
+            ? "sprites/coin 5.png"
+            : p.kind === VernanPickups.PickupKind.COIN_10
+              ? "sprites/coin 10.png"
+              : "sprites/coin 1.png";
+        const coin = assets.get(coinPath) ?? assets.get("sprites/UI coin.png");
+        if (imageDrawable(coin)) {
+          ctx.drawImage(coin, p.x, p.y, 8, 8);
+        } else {
+          ctx.fillStyle = "#ffd678";
+          ctx.fillRect(p.x, p.y, 8, 8);
+        }
+      }
+      ctx.restore();
     }
   }
 

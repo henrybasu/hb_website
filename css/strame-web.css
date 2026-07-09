@@ -1,25 +1,51 @@
 /* Scoped styles for embedding Strame as a subpage. */
 .strame-web-root {
-  --sw-bg: #f6f7fb;
-  --sw-panel: #ffffff;
-  --sw-border: #cbd5e1;
-  --sw-input-bg: #ffffff;
-  --sw-input-text: #0f172a;
-  --sw-text: #1a1f28;
-  --sw-muted: #475569;
-  --sw-p1: #3861f0;
-  --sw-p2: #e04545;
-  --sw-accent: #3861f0;
-  color-scheme: light;
-  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  --sw-bg: #0b1020;
+  --sw-panel: #141c32;
+  --sw-panel-elevated: #1a2440;
+  --sw-border: rgba(148, 163, 184, 0.22);
+  --sw-border-strong: rgba(148, 163, 184, 0.38);
+  --sw-input-bg: rgba(8, 12, 24, 0.55);
+  --sw-input-text: #f1f5f9;
+  --sw-text: #e8edf7;
+  --sw-muted: #94a3b8;
+  --sw-p1: #4f7cff;
+  --sw-p2: #ff5c6c;
+  --sw-accent: #5b8cff;
+  --sw-glow: rgba(91, 140, 255, 0.35);
+  --sw-hero-gradient: linear-gradient(160deg, #121a30 0%, #0f1528 45%, #0b1020 100%);
+  color-scheme: dark;
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   color: var(--sw-text);
-  background: var(--sw-bg);
-  border-radius: 12px;
-  border: 1px solid var(--sw-border);
-  padding: 16px;
-  max-width: 980px;
+  background: var(--sw-hero-gradient);
+  border-radius: 16px;
+  border: 1px solid var(--sw-border-strong);
+  padding: 0;
+  max-width: 520px;
   margin: 0 auto;
   box-sizing: border-box;
+  overflow: hidden;
+  box-shadow:
+    0 24px 48px rgba(0, 0, 0, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+}
+
+html[data-theme="light"] .strame-web-root {
+  --sw-bg: #eef2fb;
+  --sw-panel: #ffffff;
+  --sw-panel-elevated: #f8faff;
+  --sw-border: rgba(71, 85, 105, 0.18);
+  --sw-border-strong: rgba(71, 85, 105, 0.28);
+  --sw-input-bg: #ffffff;
+  --sw-input-text: #0f172a;
+  --sw-text: #0f172a;
+  --sw-muted: #64748b;
+  --sw-glow: rgba(56, 97, 240, 0.22);
+  --sw-hero-gradient: linear-gradient(160deg, #f4f7ff 0%, #eef3ff 45%, #e8edf8 100%);
+  color-scheme: light;
+  box-shadow:
+    0 16px 40px rgba(15, 23, 42, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
 }
 
 .strame-web-root *,
@@ -46,6 +72,438 @@
   font-size: 0.9rem;
   color: var(--sw-muted);
   min-height: 1.2em;
+}
+
+/* —— Game-style lobby —— */
+.strame-web-lobby-shell {
+  padding: 20px 20px 18px;
+}
+
+.strame-web-lobby-hero {
+  text-align: center;
+  margin-bottom: 18px;
+}
+
+.strame-web-lobby-brand {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.strame-web-lobby-brand h1 {
+  margin: 0;
+  font-size: 1.55rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  text-transform: uppercase;
+}
+
+.strame-web-version-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--sw-muted);
+  border: 1px solid var(--sw-border);
+  border-radius: 999px;
+  padding: 3px 8px;
+  background: rgba(255, 255, 255, 0.04);
+}
+
+html[data-theme="light"] .strame-web-version-badge {
+  background: rgba(15, 23, 42, 0.04);
+}
+
+.strame-web-lobby-tagline {
+  margin: 6px 0 14px;
+  font-size: 0.82rem;
+  color: var(--sw-muted);
+}
+
+.strame-web-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 14px;
+  border-radius: 999px;
+  border: 1px solid var(--sw-border);
+  background: rgba(0, 0, 0, 0.18);
+  font-size: 0.82rem;
+  font-weight: 600;
+  color: var(--sw-text);
+}
+
+html[data-theme="light"] .strame-web-status-pill {
+  background: rgba(255, 255, 255, 0.72);
+}
+
+.strame-web-status-dot {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #64748b;
+  box-shadow: 0 0 0 2px rgba(100, 116, 139, 0.25);
+  flex-shrink: 0;
+}
+
+.strame-web-status-dot.is-ready { background: #38bdf8; box-shadow: 0 0 8px rgba(56, 189, 248, 0.65); }
+.strame-web-status-dot.is-connecting { background: #fbbf24; animation: strame-pulse 1.1s ease-in-out infinite; }
+.strame-web-status-dot.is-online { background: #34d399; box-shadow: 0 0 8px rgba(52, 211, 153, 0.65); }
+.strame-web-status-dot.is-waiting { background: #fbbf24; box-shadow: 0 0 8px rgba(251, 191, 36, 0.55); }
+.strame-web-status-dot.is-error { background: #f87171; box-shadow: 0 0 8px rgba(248, 113, 113, 0.55); }
+.strame-web-status-dot.is-idle { background: #64748b; }
+
+@keyframes strame-pulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.55; transform: scale(0.88); }
+}
+
+.strame-web-party {
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  gap: 10px;
+  align-items: stretch;
+  margin-bottom: 16px;
+  padding: 12px;
+  border-radius: 14px;
+  border: 1px solid var(--sw-border);
+  background: rgba(0, 0, 0, 0.16);
+}
+
+html[data-theme="light"] .strame-web-party {
+  background: rgba(255, 255, 255, 0.65);
+}
+
+.strame-web-party-slot {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  min-width: 0;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid transparent;
+  background: rgba(255, 255, 255, 0.03);
+  transition: border-color 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+
+html[data-theme="light"] .strame-web-party-slot {
+  background: rgba(255, 255, 255, 0.9);
+}
+
+.strame-web-party-slot.is-you {
+  border-color: rgba(79, 124, 255, 0.35);
+}
+
+.strame-web-party-slot.is-connected {
+  border-color: rgba(52, 211, 153, 0.45);
+  box-shadow: inset 0 0 0 1px rgba(52, 211, 153, 0.18);
+}
+
+.strame-web-party-slot.is-waiting {
+  border-color: rgba(251, 191, 36, 0.45);
+}
+
+.strame-web-party-slot.is-empty {
+  opacity: 0.72;
+}
+
+.strame-web-party-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  display: grid;
+  place-items: center;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #fff;
+  background: linear-gradient(145deg, var(--sw-p1), #2f55d4);
+  flex-shrink: 0;
+}
+
+.strame-web-party-slot.is-empty .strame-web-party-avatar {
+  background: linear-gradient(145deg, #64748b, #475569);
+}
+
+.strame-web-party-slot[data-slot-opp]:not(.is-empty) .strame-web-party-avatar {
+  background: linear-gradient(145deg, var(--sw-p2), #d93648);
+}
+
+.strame-web-party-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.strame-web-party-label {
+  font-size: 0.65rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--sw-muted);
+  font-weight: 700;
+}
+
+.strame-web-party-name {
+  font-size: 0.92rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.strame-web-party-state {
+  font-size: 0.74rem;
+  color: var(--sw-muted);
+}
+
+.strame-web-party-vs {
+  align-self: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  color: var(--sw-muted);
+  opacity: 0.8;
+}
+
+.strame-web-player-bar {
+  margin-bottom: 14px;
+}
+
+.strame-web-player-bar label {
+  display: block;
+  font-size: 0.75rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--sw-muted);
+  margin-bottom: 6px;
+}
+
+.strame-web-player-bar input {
+  width: 100%;
+}
+
+.strame-web-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0;
+  padding: 4px;
+  border-radius: 12px;
+  border: 1px solid var(--sw-border);
+  background: rgba(0, 0, 0, 0.2);
+  margin-bottom: 14px;
+}
+
+html[data-theme="light"] .strame-web-mode-tabs {
+  background: rgba(15, 23, 42, 0.05);
+}
+
+.strame-web-mode-tab {
+  appearance: none;
+  border: none;
+  background: transparent;
+  color: var(--sw-muted);
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  padding: 11px 10px;
+  border-radius: 9px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.strame-web-mode-tab.is-active {
+  color: var(--sw-text);
+  background: var(--sw-panel-elevated);
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.18);
+}
+
+html[data-theme="light"] .strame-web-mode-tab.is-active {
+  background: #fff;
+  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.08);
+}
+
+.strame-web-mode-tab:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.strame-web-mode-panel {
+  margin-bottom: 12px;
+}
+
+.strame-web-room-reveal {
+  margin-bottom: 14px;
+  padding: 14px;
+  border-radius: 12px;
+  border: 1px dashed rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.08);
+  text-align: center;
+}
+
+.strame-web-room-reveal-label {
+  margin: 0 0 8px;
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: #6ee7b7;
+}
+
+html[data-theme="light"] .strame-web-room-reveal-label {
+  color: #047857;
+}
+
+.strame-web-room-code-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.strame-web-room-code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: clamp(1.5rem, 6vw, 2rem);
+  font-weight: 800;
+  letter-spacing: 0.22em;
+  color: #ecfdf5;
+  text-shadow: 0 0 18px rgba(52, 211, 153, 0.35);
+}
+
+html[data-theme="light"] .strame-web-room-code {
+  color: #065f46;
+  text-shadow: none;
+}
+
+.strame-web-copy-btn {
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(52, 211, 153, 0.45);
+  background: rgba(52, 211, 153, 0.14);
+  color: #a7f3d0;
+  cursor: pointer;
+}
+
+html[data-theme="light"] .strame-web-copy-btn {
+  color: #047857;
+  background: #ecfdf5;
+  border-color: #6ee7b7;
+}
+
+.strame-web-copy-btn:hover {
+  filter: brightness(1.08);
+}
+
+.strame-web-room-input {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+  font-size: 1.35rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.18em !important;
+  text-align: center;
+  text-transform: uppercase;
+}
+
+.strame-web-play-btn {
+  display: block;
+  width: 100%;
+  margin-top: 4px;
+  padding: 15px 18px;
+  border: none;
+  border-radius: 12px;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.12s ease, filter 0.12s ease, box-shadow 0.12s ease;
+  box-shadow: 0 10px 24px rgba(0, 0, 0, 0.22);
+}
+
+.strame-web-play-btn:hover:not(:disabled) {
+  transform: translateY(-1px);
+  filter: brightness(1.05);
+}
+
+.strame-web-play-btn:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+.strame-web-play-btn:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.strame-web-play-btn--host {
+  background: linear-gradient(180deg, #5f84ff 0%, #3861f0 55%, #2a4fd4 100%);
+  box-shadow: 0 12px 28px rgba(56, 97, 240, 0.38);
+}
+
+.strame-web-play-btn--join {
+  background: linear-gradient(180deg, #ff7a86 0%, #e04545 55%, #c53030 100%);
+  box-shadow: 0 12px 28px rgba(224, 69, 69, 0.35);
+}
+
+.strame-web-advanced {
+  margin-top: 6px;
+  border-top: 1px solid var(--sw-border);
+  padding-top: 10px;
+}
+
+.strame-web-advanced summary {
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--sw-muted);
+  list-style: none;
+}
+
+.strame-web-advanced summary::-webkit-details-marker {
+  display: none;
+}
+
+.strame-web-advanced[open] summary {
+  margin-bottom: 10px;
+  color: var(--sw-text);
+}
+
+.strame-web-advanced-note {
+  margin: 8px 0 0;
+  font-size: 0.76rem;
+  line-height: 1.45;
+  color: var(--sw-muted);
+}
+
+@media (max-width: 520px) {
+  .strame-web-lobby-shell {
+    padding: 16px 14px 14px;
+  }
+
+  .strame-web-party {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .strame-web-party-vs {
+    display: none;
+  }
+
+  .strame-web-lobby-brand h1 {
+    font-size: 1.35rem;
+  }
 }
 
 .strame-web-panel {
@@ -143,8 +601,8 @@
   width: 100%;
   color: var(--sw-input-text);
   background-color: var(--sw-input-bg);
-  border: 2px solid #64748b;
-  border-radius: 8px;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 10px;
 }
 
 .strame-web-lobby-card--guest .strame-web-field input[type="text"] {
@@ -165,10 +623,11 @@
 }
 
 .strame-web-hint {
-  font-size: 0.78rem;
+  font-size: 0.76rem;
   color: var(--sw-muted);
   margin: 10px 0 0;
-  line-height: 1.4;
+  line-height: 1.45;
+  text-align: center;
 }
 
 .strame-web-root button.block {
@@ -222,9 +681,9 @@
 .strame-web-root input[type="text"],
 .strame-web-root select {
   font: inherit;
-  padding: 8px 10px;
-  border: 2px solid #64748b;
-  border-radius: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--sw-border-strong);
+  border-radius: 10px;
   min-width: 0;
   color: var(--sw-input-text);
   background-color: var(--sw-input-bg);
@@ -272,6 +731,9 @@
   display: flex;
   flex-direction: column;
   gap: 14px;
+  padding: 16px;
+  max-width: 980px;
+  margin: 0 auto;
 }
 
 .strame-web-match-bar {
@@ -586,12 +1048,13 @@
 }
 
 .strame-web-banner {
-  padding: 10px 12px;
-  border-radius: 8px;
-  background: #eef3ff;
-  border: 1px solid #c8d6ff;
-  font-size: 0.88rem;
-  margin-bottom: 12px;
+  padding: 10px 14px;
+  border-radius: 0;
+  background: rgba(56, 97, 240, 0.12);
+  border: none;
+  border-top: 1px solid var(--sw-border);
+  font-size: 0.86rem;
+  margin: 0;
 }
 
 .strame-web-banner.error {
@@ -603,6 +1066,26 @@
 .strame-web-banner.win {
   background: #edfbf3;
   border-color: #b8e6cc;
+}
+
+.strame-web-help--compact {
+  margin-bottom: 14px;
+}
+
+.strame-web-help--compact summary {
+  cursor: pointer;
+  font-size: 0.95rem;
+  font-weight: 700;
+  padding: 12px 14px;
+  list-style: none;
+}
+
+.strame-web-help--compact summary::-webkit-details-marker {
+  display: none;
+}
+
+.strame-web-help--compact[open] summary {
+  margin-bottom: 8px;
 }
 
 .strame-web-help {
