@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.43";
+const WEB_CLIENT_VERSION_STR = "0.1.45";
 
   // --- math/util.ts ---
 
@@ -1206,27 +1206,332 @@ function stripSpuriousLaddersFromGrid(grid, w, h, shaftColumnL, groundY){
   if (!groundY) return;
   for (let tx = 1; tx < w - 1; tx++) {
     if (shaftColumnL >= 1 && tx === shaftColumnL) continue;
-    const lipRow = clamp(groundY[tx], 1, h - 2);
-    for (let y = lipRow + 1; y < h - 1; y++) {
-      if (grid[y][tx] === "H") grid[y][tx] = "#";
-    }
-    if (h > 1 && grid[h - 1][tx] === "H") grid[h - 1][tx] = "#";
-    for (let y = 0; y < MAX_TRAVERSAL_LADDER_TOP_ROW && y < h; y++) {
-      if (grid[y][tx] === "H") grid[y][tx] = "#";
-    }
-    if (lipRow >= 1 && lipRow < h - 1 && grid[lipRow][tx] === "-") {
-      grid[lipRow][tx] = "#";
-    }
-    if (
-      lipRow >= 1 &&
-      lipRow < h - 1 &&
-      grid[lipRow][tx] === "-" &&
-      grid[lipRow + 1][tx] === "H"
-    ) {
-      grid[lipRow][tx] = "#";
-    }
-    truncateLadderRunsOnGrid(grid, h, tx, lipRow);
+    enforceTraversalColumnOnGrid(grid, w, h, tx, groundY);
   }
+}
+
+function hasArenaFloorBelowOnGrid(grid, w, h, x, y){
+  if (y + 1 >= h - 1) return false;
+  const below = grid[y + 1][x];
+  return below === "#" || below === "-";
+}
+
+function isFloorSurfaceOnGrid(grid, w, h, x, y){
+  if (y < 1 || y >= h - 1) return false;
+  const c = grid[y][x];
+  if (c !== "#" && c !== "-") return false;
+  if (c === "-" && hasArenaFloorBelowOnGrid(grid, w, h, x, y)) return false;
+  const above = grid[y - 1][x];
+  return above === "." || above === "D" || above === "H" || above === "B" || above === "-";
+}
+
+function arenaLipRowOnGrid(grid, w, h, tx, groundY){
+  const x = clamp(tx, 1, w - 2);
+  for (let y = 1; y < h - 1; y++) {
+    if (isFloorSurfaceOnGrid(grid, w, h, x, y)) return y;
+  }
+  return flankPlayFloorRowFromGroundY(groundY, x);
+}
+
+function clearRemovedLadderOnGrid(grid, tx, y, lipRow){
+  grid[y][tx] = y > lipRow ? "#" : ".";
+}
+
+function truncateTraversalLadderRunsOnGrid(grid, h, tx, lipRow){
+  let y = 1;
+  while (y < h - 1) {
+    while (y < h - 1 && grid[y][tx] !== "H") y++;
+    if (y >= h - 1) break;
+    const runTop = y;
+    while (y < h - 1 && grid[y][tx] === "H") y++;
+    const runBottom = y - 1;
+    const rungs = runBottom - runTop + 1;
+    if (rungs > MAX_TRAVERSAL_LADDER_RUNGS) {
+      const keepFrom = runBottom - MAX_TRAVERSAL_LADDER_RUNGS + 1;
+      for (let ry = runTop; ry < keepFrom; ry++) clearRemovedLadderOnGrid(grid, tx, ry, lipRow);
+    }
+  }
+}
+
+function capTraversalDecksOnGrid(grid, h, tx, lipRow){
+  let y = 1;
+  while (y < h - 1) {
+    while (y < h - 1 && grid[y][tx] !== "H") y++;
+    if (y >= h - 1) break;
+    const top = y;
+    while (y < h - 1 && grid[y][tx] === "H") y++;
+    const deckY = top - 1;
+    if (deckY >= 2 && deckY < h - 1 && deckY < lipRow - 1) {
+      const c = grid[deckY][tx];
+      if (c === "." || c === "#") grid[deckY][tx] = "-";
+    }
+  }
+}
+
+function enforceTraversalColumnOnGrid(grid, w, h, tx, groundY){
+  const lipRow = arenaLipRowOnGrid(grid, w, h, tx, groundY);
+  for (let y = lipRow + 1; y < h - 1; y++) {
+    if (grid[y][tx] === "H") grid[y][tx] = "#";
+  }
+  if (h > 1 && grid[h - 1][tx] === "H") grid[h - 1][tx] = "#";
+  if (lipRow >= 1 && lipRow < h - 1 && grid[lipRow][tx] === "-") {
+    grid[lipRow][tx] = "#";
+  }
+  for (let y = 0; y < MAX_TRAVERSAL_LADDER_TOP_ROW && y < h; y++) {
+    if (grid[y][tx] !== "H") continue;
+    if (y === 0) grid[y][tx] = "#";
+    else clearRemovedLadderOnGrid(grid, tx, y, lipRow);
+  }
+  if (
+    lipRow >= 1 &&
+    lipRow < h - 1 &&
+    grid[lipRow][tx] === "-" &&
+    grid[lipRow + 1][tx] === "H"
+  ) {
+    grid[lipRow][tx] = "#";
+  }
+  if (
+    lipRow > 1 &&
+    grid[lipRow - 1][tx] === "-" &&
+    grid[lipRow][tx] === "H"
+  ) {
+    let pitBelow = false;
+    for (let yy = lipRow + 1; yy < h - 1; yy++) {
+      if (grid[yy][tx] === "H") {
+        pitBelow = true;
+        break;
+      }
+    }
+    if (pitBelow) grid[lipRow - 1][tx] = "#";
+  }
+  truncateTraversalLadderRunsOnGrid(grid, h, tx, lipRow);
+  capTraversalDecksOnGrid(grid, h, tx, lipRow);
+  if (grid[0][tx] === "." || grid[0][tx] === "H") grid[0][tx] = "#";
+}
+
+function isShaftMouthCellPreserved(t){
+  return (
+    t === TILE_DOOR ||
+    t === TILE_BREAKABLE ||
+    t === TILE_KEYBLOCK ||
+    t === TILE_KEYBLOCK_CONNECTOR
+  );
+}
+
+function carveLadderRung(map, ladderTx, y){
+  const t = map.tileAt(ladderTx, y);
+  if (isShaftMouthCellPreserved(t)) return;
+  if (t === TILE_SOLID || t === TILE_PLATFORM) map.setTile(ladderTx, y, TILE_EMPTY);
+  if (map.tileAt(ladderTx, y) === TILE_EMPTY) map.setTile(ladderTx, y, TILE_LADDER);
+}
+
+function sealSouthDeadEndBelowFoot(map, ladderTx, footRow){
+  const h = map.getHeight();
+  for (let y = footRow + 1; y < h - 1; y++) {
+    if (isShaftMouthCellPreserved(map.tileAt(ladderTx, y))) continue;
+    map.setTile(ladderTx, y, TILE_SOLID);
+  }
+}
+
+function enforceRunwayCellAtShaft(
+  map,
+  ladderTx,
+  runwayRow,
+  ladderSouth,
+  _ladderNorth,
+  southFaceSecretSealed
+){
+  if (ladderTx < 1 || runwayRow < 1 || runwayRow >= map.getHeight() - 1) return;
+  if (ladderSouth && !southFaceSecretSealed) {
+    if (!isShaftMouthCellPreserved(map.tileAt(ladderTx, runwayRow))) {
+      map.setTile(ladderTx, runwayRow, TILE_PLATFORM);
+    }
+  } else if (!ladderSouth) {
+    if (!isShaftMouthCellPreserved(map.tileAt(ladderTx, runwayRow))) {
+      map.setTile(ladderTx, runwayRow, TILE_SOLID);
+    }
+    if (map.tileAt(ladderTx, runwayRow) === TILE_LADDER) {
+      map.setTile(ladderTx, runwayRow, TILE_SOLID);
+    }
+    sealSouthDeadEndBelowFoot(map, ladderTx, runwayRow);
+  }
+}
+
+function fillShaftColumnGaps(map, ladderTx, footRow, conn){
+  const h = map.getHeight();
+  for (let y = 1; y < h - 1; y++) {
+    if (map.tileAt(ladderTx, y) !== TILE_EMPTY) continue;
+    if (y === footRow) {
+      map.setTile(ladderTx, y, conn.ladderSouth ? TILE_PLATFORM : TILE_SOLID);
+      continue;
+    }
+    if (conn.ladderSouth || y < footRow) {
+      carveLadderRung(map, ladderTx, y);
+    } else {
+      map.setTile(ladderTx, y, TILE_SOLID);
+    }
+  }
+}
+
+function isNorthRoomSouthFaceSealed(layout, seams, roomId, ladderTx, mapWidth){
+  if (!layout.room(roomId).ladderSouth) return false;
+  for (const seam of seams ?? []) {
+    if (seam.kind !== SEAM_KIND_VERTICAL || seam.roomA !== roomId) continue;
+    if (clampLadderColumn(mapWidth, seam.ladderTx) !== ladderTx) continue;
+    return seam.breakablesRemaining > 0;
+  }
+  return false;
+}
+
+function hasArenaFloorBelow(map, x, y){
+  if (y + 1 >= map.getHeight() - 1) return false;
+  const below = map.tileAt(x, y + 1);
+  return below === TILE_SOLID || below === TILE_PLATFORM;
+}
+
+function isFloorSurface(map, x, y){
+  const t = map.tileAt(x, y);
+  if (t !== TILE_SOLID && t !== TILE_PLATFORM) return false;
+  if (t === TILE_PLATFORM && hasArenaFloorBelow(map, x, y)) return false;
+  const above = map.tileAt(x, y - 1);
+  return (
+    above === TILE_EMPTY ||
+    above === TILE_DOOR ||
+    above === TILE_LADDER ||
+    above === TILE_BREAKABLE ||
+    above === TILE_PLATFORM
+  );
+}
+
+function groundYFromMap(map){
+  const w = map.getWidth();
+  const h = map.getHeight();
+  const groundY = new Array(w);
+  for (let x = 0; x < w; x++) {
+    groundY[x] = h - 2;
+    for (let y = h - 2; y >= 1; y--) {
+      if (isFloorSurface(map, x, y)) {
+        groundY[x] = y;
+        break;
+      }
+    }
+  }
+  return groundY;
+}
+
+function arenaLipRowAt(map, tx){
+  const w = map.getWidth();
+  const h = map.getHeight();
+  const x = clamp(tx, 1, w - 2);
+  for (let y = 1; y < h - 1; y++) {
+    if (isFloorSurface(map, x, y)) return y;
+  }
+  return flankPlayFloorRowFromGroundY(groundYFromMap(map), x);
+}
+
+function clearRemovedLadderOnMap(map, tx, y, lipRow){
+  map.setTile(tx, y, y > lipRow ? TILE_SOLID : TILE_EMPTY);
+}
+
+function enforceTraversalColumnOnMap(map, tx, groundY, h){
+  const lipRow = arenaLipRowAt(map, tx);
+  for (let y = lipRow + 1; y < h - 1; y++) {
+    if (map.isLadderTile(tx, y)) map.setTile(tx, y, TILE_SOLID);
+  }
+  if (h > 1 && map.isLadderTile(tx, h - 1)) map.setTile(tx, h - 1, TILE_SOLID);
+  if (lipRow >= 1 && lipRow < h - 1 && map.isPlatformTile(tx, lipRow)) {
+    map.setTile(tx, lipRow, TILE_SOLID);
+  }
+  for (let y = 0; y < MAX_TRAVERSAL_LADDER_TOP_ROW && y < h; y++) {
+    if (!map.isLadderTile(tx, y)) continue;
+    if (y === 0) map.setTile(tx, y, TILE_SOLID);
+    else clearRemovedLadderOnMap(map, tx, y, lipRow);
+  }
+  if (
+    lipRow >= 1 &&
+    lipRow < h - 1 &&
+    map.isPlatformTile(tx, lipRow) &&
+    map.isLadderTile(tx, lipRow + 1)
+  ) {
+    map.setTile(tx, lipRow, TILE_SOLID);
+  }
+  truncateTraversalLadderRunsOnMap(map, tx, h, lipRow);
+}
+
+function truncateTraversalLadderRunsOnMap(map, tx, h, lipRow){
+  let y = 1;
+  while (y < h - 1) {
+    while (y < h - 1 && !map.isLadderTile(tx, y)) y++;
+    if (y >= h - 1) break;
+    const runTop = y;
+    while (y < h - 1 && map.isLadderTile(tx, y)) y++;
+    const runBottom = y - 1;
+    const rungs = runBottom - runTop + 1;
+    if (rungs > MAX_TRAVERSAL_LADDER_RUNGS) {
+      const keepFrom = runBottom - MAX_TRAVERSAL_LADDER_RUNGS + 1;
+      for (let ry = runTop; ry < keepFrom; ry++) clearRemovedLadderOnMap(map, tx, ry, lipRow);
+    }
+  }
+}
+
+function sealFlankDecksBesideDungeonMouth(map, shaftColumnL, dungeonMouthRow){
+  const w = map.getWidth();
+  const h = map.getHeight();
+  for (const dx of [-1, 1]) {
+    const tx = shaftColumnL + dx;
+    if (tx < 1 || tx >= w - 1) continue;
+    for (const dy of [-1, 0]) {
+      const y = dungeonMouthRow + dy;
+      if (y < 1 || y >= h - 1) continue;
+      if (map.isPlatformTile(tx, y)) map.setTile(tx, y, TILE_SOLID);
+    }
+  }
+}
+
+function stripSpuriousLaddersFromMap(map, shaftColumnL, dungeonMouthRow){
+  const w = map.getWidth();
+  const h = map.getHeight();
+  const groundY = groundYFromMap(map);
+  for (let tx = 1; tx < w - 1; tx++) {
+    if (shaftColumnL >= 1 && tx === shaftColumnL) continue;
+    enforceTraversalColumnOnMap(map, tx, groundY, h);
+  }
+  if (shaftColumnL >= 1 && dungeonMouthRow >= 1) {
+    sealFlankDecksBesideDungeonMouth(map, shaftColumnL, dungeonMouthRow);
+  }
+}
+
+function stripSpuriousVerticalShafts(layout, rooms){
+  const n = layout.roomCount();
+  for (let id = 0; id < n; id++) {
+    const node = layout.room(id);
+    if (!node.ladderNorth && !node.ladderSouth) continue;
+    const gen = rooms[id];
+    if (!gen?.map) continue;
+    const l = clampLadderColumn(gen.map.getWidth(), node.ladderColumnTx);
+    if (l < 0) continue;
+    const mouthRow = resolvedLadderRunwayRow(gen.map, l, node.ladderSouth);
+    stripSpuriousLaddersFromMap(gen.map, l, mouthRow);
+  }
+}
+
+function applyFinalShaftPass(layout, rooms, seams){
+  const n = layout.roomCount();
+  for (let id = 0; id < n; id++) {
+    const node = layout.room(id);
+    if (!node.ladderNorth && !node.ladderSouth) continue;
+    const gen = rooms[id];
+    if (!gen?.map) continue;
+    const map = gen.map;
+    const l = clampLadderColumn(map.getWidth(), gen.ladderColumnTx ?? node.ladderColumnTx);
+    if (l < 0) continue;
+    const conn = { ladderSouth: node.ladderSouth, ladderNorth: node.ladderNorth };
+    const footRow = resolvedLadderRunwayRow(map, l, node.ladderSouth);
+    const sealed = isNorthRoomSouthFaceSealed(layout, seams, id, l, map.getWidth());
+    enforceRunwayCellAtShaft(map, l, footRow, node.ladderSouth, node.ladderNorth, sealed);
+    fillShaftColumnGaps(map, l, footRow, conn);
+  }
+  stripSpuriousVerticalShafts(layout, rooms);
 }
 
 /** LADDER-MOUTH-2: south mouth deck at runway row so VERT-TRANS-SOUTH can pass. */
@@ -1741,6 +2046,7 @@ function buildDungeonContent(layout, dungeonFloorOrdinal = 1, tilesetRuntime = n
     }, dungeonFloorOrdinal, tilesetRuntime);
   }
   const seams = placeSecretEntranceSeams(layout, rooms);
+  applyFinalShaftPass(layout, rooms, seams);
   applyPostGenerationEnemies(layout, rooms, dungeonFloorOrdinal);
   return { rooms, seams };
 }
@@ -2088,8 +2394,9 @@ function playFloorRowAt(map, tx){
 function resolvedLadderRunwayRow(map, ladderTx, ladderSouth){
   const w = map.getWidth();
   const l = clamp(ladderTx, 1, w - 2);
-  const left = playFloorRowAt(map, l - 1);
-  const right = playFloorRowAt(map, l + 1);
+  const groundY = groundYFromMap(map);
+  const left = flankPlayFloorRowFromGroundY(groundY, l - 1);
+  const right = flankPlayFloorRowFromGroundY(groundY, l + 1);
   if (left !== right) return ladderSouth ? Math.max(left, right) : Math.min(left, right);
   return left;
 }
@@ -4992,6 +5299,17 @@ class GameSim {
       return;
     }
 
+    const dungeonShaftTx =
+      this.currentGeneratedRoom()?.ladderColumnTx >= 0
+        ? clampLadderColumn(this.map.getWidth(), this.currentGeneratedRoom().ladderColumnTx)
+        : -1;
+    if (
+      dungeonShaftTx >= 0 &&
+      playerOverlapsLadderColumn(this.map, this.player, dungeonShaftTx)
+    ) {
+      this.player.activeClimbShaftTx = dungeonShaftTx;
+    }
+
     this.player.update(dt, input, this.map);
 
     const spawnCtx = { projectiles: this.enemyProjectiles };
@@ -5201,7 +5519,10 @@ class GameSim {
     if (!wantDown && !wantUp) return;
 
     if (wantDown && node.ladderSouth && this.playerNearRoomSouthEdge()) {
-      if (this.southLadderMouthAllowsTransition(L)) {
+      if (
+        this.southLadderMouthAllowsTransition(L) &&
+        !this.southLadderPathBlockedByKeyblock(L)
+      ) {
         const south = this.layout.neighborSouth(this.currentRoomId);
         if (south >= 0 && !this.seamBlocksTransition(this.currentRoomId, south, "south")) {
           this.beginTransition(south, "south", input);
@@ -5210,7 +5531,10 @@ class GameSim {
       }
     }
     if (wantUp && node.ladderNorth && this.playerNearRoomNorthEdge()) {
-      if (this.northLadderSeamOpenAtTop(L)) {
+      if (
+        this.northLadderSeamOpenAtTop(L) &&
+        !this.northLadderPathBlockedByKeyblock(L)
+      ) {
         const north = this.layout.neighborNorth(this.currentRoomId);
         if (north >= 0 && !this.seamBlocksTransition(this.currentRoomId, north, "north")) {
           this.beginTransition(north, "north", input);
@@ -5224,12 +5548,42 @@ class GameSim {
   }
 
   playerNearRoomSouthEdge(){
+    const feetRow = Math.floor(this.player.feetY() / TILE_SIZE);
+    if (feetRow >= this.map.getHeight() - 2) return true;
     const feetDevY = Math.round(CAMERA_ZOOM * this.player.feetY() + this.worldCameraDeviceTy());
     return feetDevY >= WORLD_VIEWPORT_H;
   }
 
   playerNearRoomNorthEdge(){
+    const headRow = Math.floor(this.player.y / TILE_SIZE);
+    if (headRow <= 1) return true;
     return this.player.y <= LADDER_TRANSITION_NORTH_EDGE_PX;
+  }
+
+  northLadderPathBlockedByKeyblock(ladderTx){
+    const maxTy = clamp(
+      Math.floor(this.player.y / TILE_SIZE),
+      1,
+      this.map.getHeight() - 2
+    );
+    for (let ty = 1; ty <= maxTy; ty++) {
+      const t = this.map.tileAt(ladderTx, ty);
+      if (t === TILE_KEYBLOCK || t === TILE_KEYBLOCK_CONNECTOR) return true;
+    }
+    return false;
+  }
+
+  southLadderPathBlockedByKeyblock(ladderTx){
+    const minTy = clamp(
+      Math.floor(this.player.feetY() / TILE_SIZE),
+      1,
+      this.map.getHeight() - 2
+    );
+    for (let ty = minTy; ty <= this.map.getHeight() - 2; ty++) {
+      const t = this.map.tileAt(ladderTx, ty);
+      if (t === TILE_KEYBLOCK || t === TILE_KEYBLOCK_CONNECTOR) return true;
+    }
+    return false;
   }
 
   southLadderMouthAllowsTransition(ladderTx){
