@@ -386,9 +386,171 @@
     return bestId;
   }
 
-  function terrainConnects(map, tx, ty, terrainCode) {
+  function stackableTerrain(terrainCode) {
+    return terrainCode === TILE_SOLID || terrainCode === TILE_BREAKABLE;
+  }
+
+  function makeMassContext(connectObj, bridge, salt, roomKind, tileIdAllowed) {
+    if (!connectObj || str(connectObj, "objectType", "") !== "autotile") return null;
+    return { objectRow: connectObj, bridge, displaySalt: salt, roomKind, tileIdAllowed };
+  }
+
+  function terrainConnectsMass(map, tx, ty, terrainCode, massCtx, objects, bridge, salt, roomKind) {
     if (tx < 0 || ty < 0 || tx >= map.getWidth() || ty >= map.getHeight()) return false;
-    return map.tileAt(tx, ty) === terrainCode;
+    if (map.tileAt(tx, ty) !== terrainCode) return false;
+    if (!massCtx?.objectRow || !massCtx.bridge || !objects) return true;
+    const neighborPick = massCtx.bridge.displayTileIdForRoomKind(
+      terrainCode,
+      tx,
+      ty,
+      massCtx.displaySalt,
+      massCtx.roomKind,
+      massCtx.tileIdAllowed
+    );
+    return sameAutotilePackage(massCtx.objectRow, neighborPick, objects);
+  }
+
+  function terrainConnectNeighborId(
+    map,
+    ntx,
+    nty,
+    terrainCode,
+    connectId,
+    massCtx,
+    objects,
+    bridge,
+    salt,
+    roomKind
+  ) {
+    if (!connectId || !terrainConnectsMass(map, ntx, nty, terrainCode, massCtx, objects, bridge, salt, roomKind)) {
+      return "";
+    }
+    if (!massCtx?.objectRow || !massCtx.bridge) return connectId;
+    const neighborPick = massCtx.bridge.displayTileIdForRoomKind(
+      terrainCode,
+      ntx,
+      nty,
+      massCtx.displaySalt,
+      massCtx.roomKind,
+      massCtx.tileIdAllowed
+    );
+    if (!neighborPick || !sameAutotilePackage(massCtx.objectRow, neighborPick, objects)) return "";
+    return neighborPick.trim();
+  }
+
+  function orthoTerrainConnectNeighbors(
+    map,
+    tx,
+    ty,
+    terrainCode,
+    connectId,
+    massCtx,
+    objects,
+    bridge,
+    salt,
+    roomKind
+  ) {
+    return {
+      n: terrainConnectNeighborId(map, tx, ty - 1, terrainCode, connectId, massCtx, objects, bridge, salt, roomKind),
+      e: terrainConnectNeighborId(map, tx + 1, ty, terrainCode, connectId, massCtx, objects, bridge, salt, roomKind),
+      s: terrainConnectNeighborId(map, tx, ty + 1, terrainCode, connectId, massCtx, objects, bridge, salt, roomKind),
+      w: terrainConnectNeighborId(map, tx - 1, ty, terrainCode, connectId, massCtx, objects, bridge, salt, roomKind),
+    };
+  }
+
+  function horizontalRunLength(map, tx, ty, terrainCode, massCtx, objects, bridge, salt, roomKind) {
+    let runStart = tx;
+    while (
+      runStart > 0 &&
+      terrainConnectsMass(map, runStart - 1, ty, terrainCode, massCtx, objects, bridge, salt, roomKind)
+    ) {
+      runStart--;
+    }
+    let runEnd = tx;
+    while (
+      runEnd < map.getWidth() - 1 &&
+      terrainConnectsMass(map, runEnd + 1, ty, terrainCode, massCtx, objects, bridge, salt, roomKind)
+    ) {
+      runEnd++;
+    }
+    return runEnd - runStart + 1;
+  }
+
+  function verticalRunLength(map, tx, ty, terrainCode, massCtx, objects, bridge, salt, roomKind) {
+    let runStart = ty;
+    while (
+      runStart > 0 &&
+      terrainConnectsMass(map, tx, runStart - 1, terrainCode, massCtx, objects, bridge, salt, roomKind)
+    ) {
+      runStart--;
+    }
+    let runEnd = ty;
+    while (
+      runEnd < map.getHeight() - 1 &&
+      terrainConnectsMass(map, tx, runEnd + 1, terrainCode, massCtx, objects, bridge, salt, roomKind)
+    ) {
+      runEnd++;
+    }
+    return runEnd - runStart + 1;
+  }
+
+  function stripMemberForRunIndex(sorted, indexInRun, runLen) {
+    const n = sorted.length;
+    if (n === 0 || runLen <= 0 || indexInRun < 0 || indexInRun >= runLen) return sorted[0] || "";
+    if (runLen === 1) return sorted[0];
+    if (indexInRun === 0) return sorted[0];
+    if (indexInRun === runLen - 1) return sorted[n - 1];
+    if (n <= 2) return sorted[Math.min(indexInRun, n - 1)];
+    const innerSlots = n - 2;
+    const innerPos = 1 + Math.floor(((indexInRun - 1) * innerSlots) / Math.max(1, runLen - 2));
+    return sorted[Math.min(n - 2, Math.max(1, innerPos))];
+  }
+
+  function pickFromTerrainRun(
+    map,
+    tx,
+    ty,
+    terrainCode,
+    sorted,
+    horizontal,
+    massCtx,
+    objects,
+    bridge,
+    salt,
+    roomKind
+  ) {
+    const runLen = horizontal
+      ? horizontalRunLength(map, tx, ty, terrainCode, massCtx, objects, bridge, salt, roomKind)
+      : verticalRunLength(map, tx, ty, terrainCode, massCtx, objects, bridge, salt, roomKind);
+    if (runLen <= 1) return null;
+    let runStart;
+    let indexInRun;
+    if (horizontal) {
+      runStart = tx;
+      while (
+        runStart > 0 &&
+        terrainConnectsMass(map, runStart - 1, ty, terrainCode, massCtx, objects, bridge, salt, roomKind)
+      ) {
+        runStart--;
+      }
+      indexInRun = tx - runStart;
+    } else {
+      runStart = ty;
+      while (
+        runStart > 0 &&
+        terrainConnectsMass(map, tx, runStart - 1, terrainCode, massCtx, objects, bridge, salt, roomKind)
+      ) {
+        runStart--;
+      }
+      indexInRun = ty - runStart;
+    }
+    return stripMemberForRunIndex(sorted, indexInRun, runLen);
+  }
+
+  function sortedStripMembers(foot, horizontal) {
+    const copy = foot.slice();
+    copy.sort((a, b) => (horizontal ? a.dTx - b.dTx : a.dTy - b.dTy));
+    return copy.map((c) => c.tileId);
   }
 
   function pickHorizontalStrip(sorted, e, w, islandFoot, tileDefById) {
@@ -409,13 +571,52 @@
     return sorted[0];
   }
 
-  function resolveForIsland(island, pooledId, n, e, s, w, tileDefById) {
+  function resolveForIsland(
+    island,
+    pooledId,
+    n,
+    e,
+    s,
+    w,
+    tileDefById,
+    map,
+    tx,
+    ty,
+    terrainCode,
+    massCtx,
+    objects,
+    bridge,
+    salt,
+    roomKind
+  ) {
     const foot = island.cells;
     if (!foot.length) return null;
     if (foot.length === 1) return foot[0].tileId;
     const horizontal = isHorizontalStrip(foot);
     const vertical = !horizontal && isVerticalStrip(foot);
-    const sorted = foot.map((c) => c.tileId);
+    const sorted = sortedStripMembers(foot, horizontal);
+    if (
+      map &&
+      tx >= 0 &&
+      ty >= 0 &&
+      stackableTerrain(terrainCode) &&
+      (horizontal || vertical)
+    ) {
+      const fromRun = pickFromTerrainRun(
+        map,
+        tx,
+        ty,
+        terrainCode,
+        sorted,
+        horizontal,
+        massCtx,
+        objects,
+        bridge,
+        salt,
+        roomKind
+      );
+      if (fromRun) return fromRun;
+    }
     if (horizontal) return pickHorizontalStrip(sorted, e, w, foot, tileDefById);
     if (vertical) return pickVerticalStrip(sorted, n, s, foot, tileDefById);
     return scoreGridMember(foot, n, e, s, w, tileDefById) || pooledId;
@@ -448,7 +649,24 @@
     return owner != null && str(owner, "id", "") === str(connectObj, "id", "");
   }
 
-  function resolveTerrainDisplayTileId(pooledId, n, e, s, w, objects, tileDefById, connectObj) {
+  function resolveTerrainDisplayTileId(
+    pooledId,
+    n,
+    e,
+    s,
+    w,
+    objects,
+    tileDefById,
+    connectObj,
+    map,
+    tx,
+    ty,
+    terrainCode,
+    massCtx,
+    bridge,
+    salt,
+    roomKind
+  ) {
     if (!pooledId || !objects) return pooledId;
     let obj = findObjectRowOwningTileId(objects, pooledId);
     if (!obj && connectObj && pickBelongsToConnectObject(connectObj, pooledId, objects)) {
@@ -462,7 +680,24 @@
     let bestScore = -1;
     let bestExact = false;
     for (const island of islands) {
-      const picked = resolveForIsland(island, pooledId, n || "", e || "", s || "", w || "", tileDefById);
+      const picked = resolveForIsland(
+        island,
+        pooledId,
+        n || "",
+        e || "",
+        s || "",
+        w || "",
+        tileDefById,
+        map,
+        tx,
+        ty,
+        terrainCode,
+        massCtx,
+        objects,
+        bridge,
+        salt,
+        roomKind
+      );
       if (!picked) continue;
       const scored = scoreGridMember(island.cells, n || "", e || "", s || "", w || "", tileDefById);
       const exact = scored === picked;
@@ -477,26 +712,6 @@
       }
     }
     return bestId || pooledId;
-  }
-
-  function neighborConnectId(map, tx, ty, terrainCode, bridge, salt, roomKind, connectObj, objects) {
-    if (!terrainConnects(map, tx, ty, terrainCode)) return "";
-    const pick = bridgeDisplayTileId(map, tx, ty, terrainCode, bridge, salt, roomKind);
-    if (!pick) return "";
-    if (!connectObj) return pick;
-    if (sameAutotilePackage(connectObj, pick, objects) || pick === str(connectObj, "id", "")) return pick;
-    const owner = findObjectRowOwningTileId(objects, pick);
-    if (owner && str(owner, "id", "") === str(connectObj, "id", "")) return pick;
-    return "";
-  }
-
-  function orthoNeighbors(map, tx, ty, terrainCode, bridge, salt, roomKind, connectObj, objects) {
-    return {
-      n: neighborConnectId(map, tx, ty - 1, terrainCode, bridge, salt, roomKind, connectObj, objects),
-      e: neighborConnectId(map, tx + 1, ty, terrainCode, bridge, salt, roomKind, connectObj, objects),
-      s: neighborConnectId(map, tx, ty + 1, terrainCode, bridge, salt, roomKind, connectObj, objects),
-      w: neighborConnectId(map, tx - 1, ty, terrainCode, bridge, salt, roomKind, connectObj, objects),
-    };
   }
 
   function proceduralDecoSolidOrBreakableBelow(map, tx, ty) {
@@ -529,30 +744,54 @@
   }
 
   function resolveTerrainCell(map, tx, ty, terrainCode, bridge, salt, roomKind, objects, tileDefById) {
+    const tileIdAllowed = (id) => {
+      const def = tileDefById(id);
+      return !def || tileAllowedInRoomKind(def, roomKind);
+    };
     const displayId = bridgeDisplayTileId(map, tx, ty, terrainCode, bridge, salt, roomKind);
     if (!displayId) return null;
     const connectId = bridge.connectTileIdForRoomKind(terrainCode, roomKind);
     const connectObj = connectId ? findObjectRowOwningTileId(objects, connectId) : null;
-    let pooled = displayId;
+    const massCtx = makeMassContext(connectObj, bridge, salt, roomKind, tileIdAllowed);
     if (
       connectObj &&
       str(connectObj, "objectType", "") === "autotile" &&
       pickBelongsToConnectObject(connectObj, displayId, objects)
     ) {
-      pooled = connectId;
+      const anchor = connectId;
+      const nb = orthoTerrainConnectNeighbors(
+        map,
+        tx,
+        ty,
+        terrainCode,
+        anchor,
+        massCtx,
+        objects,
+        bridge,
+        salt,
+        roomKind
+      );
+      const resolved = resolveTerrainDisplayTileId(
+        anchor,
+        nb.n,
+        nb.e,
+        nb.s,
+        nb.w,
+        objects,
+        tileDefById,
+        connectObj,
+        map,
+        tx,
+        ty,
+        terrainCode,
+        massCtx,
+        bridge,
+        salt,
+        roomKind
+      );
+      return resolved || displayId;
     }
-    const nb = orthoNeighbors(map, tx, ty, terrainCode, bridge, salt, roomKind, connectObj, objects);
-    const resolved = resolveTerrainDisplayTileId(
-      pooled,
-      nb.n,
-      nb.e,
-      nb.s,
-      nb.w,
-      objects,
-      tileDefById,
-      connectObj
-    );
-    return resolved || displayId;
+    return displayId;
   }
 
   let runtimeRef = null;
@@ -683,6 +922,8 @@
       } = opts || {};
       const tileDefById = (id) => this.tileById(id);
       let drawn = 0;
+      const kind = String(roomKind || "").toUpperCase();
+      const skipGrassUnderlay = kind === "SECRET" || kind === "SUPER_SECRET";
       // Pass 1: background grass / empty underlay above solid
       for (let ty = y0; ty <= y1; ty++) {
         for (let tx = x0; tx <= x1; tx++) {
@@ -690,6 +931,7 @@
           if (t === TILE_SOLID || t === TILE_BREAKABLE || t === TILE_DOOR) continue;
           if (t === TILE_LADDER || t === TILE_PLATFORM) continue;
           if (t !== TILE_EMPTY) continue;
+          if (skipGrassUnderlay) continue;
           if (!proceduralDecoSolidOrBreakableBelow(map, tx, ty)) continue;
           const tileId = resolveTerrainCell(
             map,

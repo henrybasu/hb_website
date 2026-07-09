@@ -35,7 +35,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.28";
+const WEB_CLIENT_VERSION_STR = "0.1.29";
 
   // --- math/util.ts ---
 
@@ -293,30 +293,24 @@ function isFloorTerrainTile(map, tx, ty) {
 }
 
 function solidAutotileCell(map, tx, ty) {
-  const n = isFloorTerrainTile(map, tx, ty - 1);
-  const s = isFloorTerrainTile(map, tx, ty + 1);
-  const e = isFloorTerrainTile(map, tx + 1, ty);
-  const w = isFloorTerrainTile(map, tx - 1, ty);
-  const mask = (n ? 1 : 0) | (e ? 2 : 0) | (s ? 4 : 0) | (w ? 8 : 0);
-  const cells = [
-    [2, 2],
-    [3, 1],
-    [2, 1],
-    [3, 1],
-    [2, 0],
-    [3, 0],
-    [2, 0],
-    [3, 0],
-    [3, 2],
-    [3, 2],
-    [2, 2],
-    [3, 2],
-    [2, 2],
-    [3, 2],
-    [2, 2],
-    [2, 2],
-  ];
-  return cells[mask] || [2, 2];
+  const et = !isFloorTerrainTile(map, tx, ty - 1);
+  const eb = !isFloorTerrainTile(map, tx, ty + 1);
+  const el = !isFloorTerrainTile(map, tx - 1, ty);
+  const er = !isFloorTerrainTile(map, tx + 1, ty);
+  if (et && eb && el && er) return [4, 2];
+  if (et && el) return [2, 0];
+  if (et && er) return [6, 0];
+  if (et) return [4, 0];
+  if (eb && el) return [2, 4];
+  if (eb && er) return [6, 3];
+  if (eb) return [4, 3];
+  if (el) return [2, 1];
+  if (er) return [6, 1];
+  return [4, 2];
+}
+
+function forestBgSheetCol(mapTx, mapTy) {
+  return 2 + ((mapTx + mapTy * 3) % 4);
 }
 
 function resolveAssetUrl(assetBase, relPath){
@@ -3675,11 +3669,12 @@ class RenderPipeline {
     const sheet =
       underground && imageDrawable(underground) ? underground : forest;
 
-    this.drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet);
+    this.drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet, tilesetRuntime);
 
-    // Always paint forest/underground sprite terrain first so floors stay visible even
-    // when tileset v3 only manages partial draws (e.g. grass without solids).
-    this.drawTilesSpriteLayer(ctx, sim, map, x0, y0, x1, y1, sheet);
+    // v3 tileset draws grass underlay + terrain; legacy sprite layer only when tileset is unavailable.
+    if (!tilesetRuntime) {
+      this.drawTilesSpriteLayer(ctx, sim, map, x0, y0, x1, y1, sheet);
+    }
 
     if (tilesetRuntime) {
       try {
@@ -3697,12 +3692,15 @@ class RenderPipeline {
     }
   }
 
-  drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet) {
+  drawSkyBackground(ctx, map, x0, y0, x1, y1, sheet, tilesetRuntime) {
     if (!imageDrawable(sheet)) return;
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
         if (map.tileAt(tx, ty) !== TILE_EMPTY) continue;
-        drawForestTile(ctx, sheet, 0, 0, tx * TILE_SIZE, ty * TILE_SIZE);
+        if (tilesetRuntime && isFloorTerrainTile(map, tx, ty + 1)) continue;
+        const col = tilesetRuntime ? forestBgSheetCol(tx, ty) : 0;
+        const row = tilesetRuntime ? 7 : 0;
+        drawForestTile(ctx, sheet, col, row, tx * TILE_SIZE, ty * TILE_SIZE);
       }
     }
   }
