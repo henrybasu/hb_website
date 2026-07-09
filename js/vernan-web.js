@@ -30,7 +30,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.0";
+const WEB_CLIENT_VERSION_STR = "0.1.5";
 
   // --- math/util.ts ---
 
@@ -401,10 +401,10 @@ function layoutHash(layout){
 
 
 
-const WIDE_W = 32;
-const WIDE_H = 18;
-const SCREEN_W = 18;
-const SCREEN_H = 14;
+const WIDE_W = Math.max(64, WORLD_VIEWPORT_W / TILE_SIZE);
+const WIDE_H = Math.max(12, WORLD_VIEWPORT_H / TILE_SIZE);
+const SCREEN_W = Math.max(10, Math.ceil(WORLD_VIEWPORT_W / TILE_SIZE));
+const SCREEN_H = Math.max(8, Math.ceil(WORLD_VIEWPORT_H / TILE_SIZE));
 
 function isOneScreenRoomKind(k){
   return k !== RoomKind.NORMAL && k !== RoomKind.SECRET;
@@ -1383,7 +1383,7 @@ class GameSim {
     this.enemies = spawnEnemiesForRoom(this.map, node.contentSeed, 2);
     const spawn = spawnAtFloor(this.map, roomSpawnTx(node, this.map, false, false));
     this.player.resetAt(spawn.x, spawn.y);
-    this.camera.reset(this.player.anchorX(), this.player.anchorY());
+    this.camera.reset(this.cameraAnchorX(), this.cameraAnchorY());
   }
 
   getSeed(){
@@ -1425,8 +1425,8 @@ class GameSim {
 
     const bounds = this.scrollBounds();
     const follow = {
-      anchorX: this.player.anchorX(),
-      anchorY: this.player.anchorY(),
+      anchorX: this.cameraAnchorX(),
+      anchorY: this.cameraAnchorY(),
       vx: this.player.vx,
       vy: this.player.vy,
       facing: this.player.facing,
@@ -1438,7 +1438,7 @@ class GameSim {
       ladderColumnValid: false,
       ladderHighRow: 0,
       ladderLowRow: 0,
-      viewWorldH: WORLD_VIEWPORT_H,
+      viewWorldH: WORLD_VIEWPORT_H / CAMERA_ZOOM,
       tileSize: TILE_SIZE,
       focusMinX: 0,
       focusMaxX: 0,
@@ -1480,20 +1480,40 @@ class GameSim {
   }
 
   scrollBounds(){
-    const halfViewW = WORLD_VIEWPORT_W / 2;
-    const halfViewH = WORLD_VIEWPORT_H / 2;
+    const halfViewW = INTERNAL_WIDTH / (2 * CAMERA_ZOOM);
+    const halfViewH = WORLD_VIEWPORT_H / (2 * CAMERA_ZOOM);
     const mapW = this.map.getWidth() * TILE_SIZE;
     const mapH = this.map.getHeight() * TILE_SIZE;
     const buf = CAMERA_EDGE_BUFFER_WORLD;
+    let minAnchorX = halfViewW;
+    let maxAnchorX = mapW - halfViewW;
+    if (minAnchorX > maxAnchorX) {
+      const cx = mapW * 0.5;
+      minAnchorX = maxAnchorX = cx;
+    }
+    let minAnchorY = halfViewH;
+    let maxAnchorY = mapH - halfViewH;
+    if (minAnchorY > maxAnchorY) {
+      const cy = mapH * 0.5;
+      minAnchorY = maxAnchorY = cy;
+    }
     return {
       halfViewW,
       halfViewH,
-      minAnchorX: halfViewW - buf,
-      maxAnchorX: Math.max(halfViewW - buf, mapW - halfViewW + buf),
-      minAnchorY: halfViewH - buf,
-      maxAnchorY: Math.max(halfViewH - buf, mapH - HUD_HEIGHT / CAMERA_ZOOM - halfViewH + buf),
+      minAnchorX: minAnchorX + buf,
+      maxAnchorX: maxAnchorX >= minAnchorX ? maxAnchorX - buf : maxAnchorX,
+      minAnchorY: minAnchorY + buf,
+      maxAnchorY: maxAnchorY >= minAnchorY ? maxAnchorY - buf : maxAnchorY,
       edgeBufferWorld: buf,
     };
+  }
+
+  cameraAnchorY(){
+    return this.player.feetY() - PLAYER_STAND_H * 0.5;
+  }
+
+  cameraAnchorX(){
+    return this.player.x + this.player.w() * 0.5;
   }
 
   renderAlpha(alpha){
@@ -1553,7 +1573,11 @@ class GameLoop {
     callbacks,
     targetUps = FIXED_STEP_HZ,
     maxSubstepsPerFrame = 30
-  ) {}
+  ) {
+    this.callbacks = callbacks;
+    this.targetUps = targetUps;
+    this.maxSubstepsPerFrame = maxSubstepsPerFrame;
+  }
 
   start(){
     if (this.running) return;
@@ -1623,15 +1647,11 @@ class GameLoop {
 class RenderPipeline {
   constructor(displayCanvas) {
     this.displayCanvas = displayCanvas;
-    if (typeof OffscreenCanvas !== "undefined") {
-      this.backbuffer = new OffscreenCanvas(INTERNAL_WIDTH, INTERNAL_HEIGHT);
-    } else {
-      const c = document.createElement("canvas");
-      c.width = INTERNAL_WIDTH;
-      c.height = INTERNAL_HEIGHT;
-      this.backbuffer = c;
-    }
-    const ctx = this.backbuffer.getContext("2d");
+    const c = document.createElement("canvas");
+    c.width = INTERNAL_WIDTH;
+    c.height = INTERNAL_HEIGHT;
+    this.backbuffer = c;
+    const ctx = c.getContext("2d");
     if (!ctx) throw new Error("2d context unavailable");
     this.ctx = ctx;
     this.ctx.imageSmoothingEnabled = false;
@@ -1639,23 +1659,20 @@ class RenderPipeline {
 
   draw(sim, snap, assets){
     const ctx = this.ctx;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = "#0d0d14";
     ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
 
-    const camX = snap.cameraX;
-    const camY = snap.cameraY;
-    const viewLeft = camX - WORLD_VIEWPORT_W / 2;
-    const viewTop = camY - WORLD_VIEWPORT_H / 2;
+    const tx = Math.floor(INTERNAL_WIDTH / 2 - CAMERA_ZOOM * snap.cameraX);
+    const ty = Math.floor(WORLD_VIEWPORT_H / 2 - CAMERA_ZOOM * snap.cameraY);
 
-    // World layer
     ctx.save();
-    ctx.translate(
-      Math.floor(INTERNAL_WIDTH / 2 - camX * CAMERA_ZOOM),
-      Math.floor(WORLD_VIEWPORT_H / 2 - camY * CAMERA_ZOOM + 0)
-    );
-    ctx.scale(CAMERA_ZOOM, CAMERA_ZOOM);
+    ctx.beginPath();
+    ctx.rect(0, 0, INTERNAL_WIDTH, WORLD_VIEWPORT_H);
+    ctx.clip();
+    ctx.setTransform(CAMERA_ZOOM, 0, 0, CAMERA_ZOOM, tx, ty);
 
-    this.drawTiles(ctx, sim, viewLeft, viewTop, assets);
+    this.drawTiles(ctx, sim, snap.cameraX, snap.cameraY, assets);
     this.drawEnemies(ctx, snap, assets);
     this.drawPlayer(ctx, snap, assets);
 
@@ -1692,19 +1709,17 @@ class RenderPipeline {
     );
   }
 
-  drawTiles(
-    ctx,
-    sim,
-    viewLeft,
-    viewTop,
-    assets
-  ){
+  drawTiles(ctx, sim, camX, camY, assets){
     const map = sim.map;
     const tileset = assets.get("tiles/forest tileset.png");
+    const viewWorldW = WORLD_VIEWPORT_W;
+    const viewWorldH = WORLD_VIEWPORT_H / CAMERA_ZOOM;
+    const viewLeft = camX - viewWorldW / 2;
+    const viewTop = camY - viewWorldH / 2;
     const x0 = Math.max(0, Math.floor(viewLeft / TILE_SIZE) - 1);
     const y0 = Math.max(0, Math.floor(viewTop / TILE_SIZE) - 1);
-    const x1 = Math.min(map.getWidth() - 1, Math.ceil((viewLeft + WORLD_VIEWPORT_W) / TILE_SIZE) + 1);
-    const y1 = Math.min(map.getHeight() - 1, Math.ceil((viewTop + WORLD_VIEWPORT_H) / TILE_SIZE) + 1);
+    const x1 = Math.min(map.getWidth() - 1, Math.ceil((viewLeft + viewWorldW) / TILE_SIZE) + 1);
+    const y1 = Math.min(map.getHeight() - 1, Math.ceil((viewTop + viewWorldH) / TILE_SIZE) + 1);
 
     for (let ty = y0; ty <= y1; ty++) {
       for (let tx = x0; tx <= x1; tx++) {
