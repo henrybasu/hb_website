@@ -30,7 +30,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.11";
+const WEB_CLIENT_VERSION_STR = "0.1.12";
 
   // --- math/util.ts ---
 
@@ -52,6 +52,25 @@ function rectsOverlap(a, b){
     a.x + a.w > b.x &&
     a.y < b.y + b.h &&
     a.y + a.h > b.y
+  );
+}
+
+/** PLAYER_HURT / ENEMY_CRAWLER_HIT bounds with touch slop for sprite vs hitbox gap. */
+function playerHurtRect(x, y, standH){
+  const topInset = 5;
+  return { x, y: y - topInset, w: 10, h: standH + topInset };
+}
+
+function crawlerContactRect(x, y){
+  return { x: x - 1, y, w: 10, h: 12 };
+}
+
+function rectsOverlapSlack(a, b, slack = 4){
+  return (
+    a.x < b.x + b.w + slack &&
+    a.x + a.w > b.x - slack &&
+    a.y < b.y + b.h + slack &&
+    a.y + a.h > b.y - slack
   );
 }
 
@@ -866,6 +885,12 @@ class Player {
     return this.y + this.h();
   }
 
+  applyContactKnockback(horizontalSign){
+    this.vx = horizontalSign * 74;
+    this.vy = -98;
+    this.onGround = false;
+  }
+
   update(dt, input, map){
     this.prevX = this.x;
     this.prevY = this.y;
@@ -1153,13 +1178,18 @@ class CrawlerEnemy {
   }
 
   contactDamage(player){
-    const pad = 2;
-    const pr = { x: player.x - pad, y: player.y - pad, w: player.w() + pad * 2, h: player.h() + pad * 2 };
-    const er = { x: this.x - pad, y: this.y - pad, w: this.w + pad * 2, h: this.h + pad * 2 };
-    if (rectsOverlap(pr, er)) {
-      if (player.health.tryDamage(1, 1.125)) {
-        player.hurtTint = 0.35;
-      }
+    if (this.dead || !this.health.isAlive() || this.hurtTint > 0) return;
+
+    const pr = playerHurtRect(player.x, player.y, player.h());
+    const er = crawlerContactRect(this.x, this.y);
+    if (!rectsOverlapSlack(pr, er)) return;
+
+    if (player.health.tryDamage(1, 1.125)) {
+      player.hurtTint = 0.35;
+      const pcx = player.x + player.w() * 0.5;
+      const ecx = this.x + 4;
+      const sign = pcx < ecx ? -1 : 1;
+      player.applyContactKnockback(sign);
     }
   }
 
@@ -1863,9 +1893,6 @@ class RenderPipeline {
     if (sheet) {
       const frame = snap.spriteFrame;
       const fw = SPRITE_FRAME_W;
-      if (snap.playerHurtTint > 0) {
-        ctx.globalAlpha = 0.65 + 0.35 * (snap.playerHurtTint / 0.35);
-      }
       ctx.save();
       if (snap.facing < 0) {
         ctx.translate(drawX + fw, drawY);
@@ -1874,8 +1901,13 @@ class RenderPipeline {
       } else {
         ctx.drawImage(sheet, frame * fw, 0, fw, SPRITE_FRAME_H, drawX, drawY, fw, SPRITE_FRAME_H);
       }
+      if (snap.playerHurtTint > 0) {
+        const a = snap.playerHurtTint / 0.35;
+        ctx.globalCompositeOperation = "source-atop";
+        ctx.fillStyle = `rgba(255,64,64,${0.35 + 0.45 * a})`;
+        ctx.fillRect(0, 0, fw, SPRITE_FRAME_H);
+      }
       ctx.restore();
-      ctx.globalAlpha = 1;
     } else {
       ctx.fillStyle = snap.playerHurtTint > 0 ? "#ffaaaa" : "#e8a87c";
       ctx.fillRect(snap.playerX, snap.playerY, 10, 18);
