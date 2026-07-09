@@ -24,6 +24,15 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Sync Vernan assets (monorepo)
+        run: |
+          if [ -f ../scripts/sync-vernan-assets.sh ] && [ -d ../new-vernan-2/sprites ]; then
+            chmod +x ../scripts/sync-vernan-assets.sh
+            (cd .. && ./scripts/sync-vernan-assets.sh)
+          else
+            echo "Using committed assets/vernan (standalone hb_website repo or assets already present)."
+          fi
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:

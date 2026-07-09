@@ -1,0 +1,177 @@
+{
+  "categories": {
+    "LEGGINGS": {
+      "stackTier": 20,
+      "exclusiveGroup": "leggings"
+    },
+    "PANTIES": {
+      "stackTier": 10,
+      "exclusiveGroup": "panties"
+    },
+    "ACCESSORY": {
+      "stackTier": 1000
+    },
+    "SHIRT": {
+      "stackTier": 70,
+      "exclusiveGroup": "shirt"
+    },
+    "UNDERSHIRT": {
+      "stackTier": 60,
+      "exclusiveGroup": "undershirt"
+    },
+    "SOCKS": {
+      "stackTier": 40,
+      "exclusiveGroup": "socks"
+    },
+    "HOODIE2": {
+      "stackTier": 90,
+      "exclusiveGroup": "hoodie2",
+      "suppresses": [
+        "UNDERSHIRT",
+        "SHIRT"
+      ]
+    },
+    "SHORTS": {
+      "stackTier": 30,
+      "exclusiveGroup": "outer_legs"
+    },
+    "PANTS": {
+      "stackTier": 30,
+      "exclusiveGroup": "outer_legs"
+    },
+    "SHOES": {
+      "stackTier": 50,
+      "exclusiveGroup": "shoes"
+    },
+    "HOODIE": {
+      "stackTier": 80,
+      "exclusiveGroup": "hoodie",
+      "suppresses": [
+        "UNDERSHIRT",
+        "SHIRT"
+      ]
+    }
+  },
+  "layers": [
+    {
+      "itemId": "LEOTARD",
+      "folderName": "leotard",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "PANTIES",
+      "folderName": "panties",
+      "category": "PANTIES"
+    },
+    {
+      "itemId": "BLACK_PANTIES",
+      "folderName": "black panties",
+      "category": "PANTIES"
+    },
+    {
+      "itemId": "SLIPPERY_SOCKS",
+      "folderName": "slippery socks",
+      "category": "LEGGINGS"
+    },
+    {
+      "itemId": "STRONG_LEGGINGS",
+      "folderName": "strong leggings",
+      "category": "PANTS",
+      "suppresses": [
+        "PANTIES"
+      ]
+    },
+    {
+      "itemId": "SHORTS",
+      "folderName": "shorts",
+      "category": "SHORTS",
+      "suppresses": [
+        "PANTIES"
+      ]
+    },
+    {
+      "itemId": "KURIBO_SHOE",
+      "folderName": "kuribo shoe",
+      "category": "SHOES"
+    },
+    {
+      "itemId": "HEELIES",
+      "folderName": "heelys",
+      "category": "SHOES"
+    },
+    {
+      "itemId": "STRIPED_SHIRT",
+      "folderName": "striped shirt",
+      "category": "UNDERSHIRT"
+    },
+    {
+      "itemId": "COOL_SHIRT",
+      "folderName": "cool shirt",
+      "category": "SHIRT"
+    },
+    {
+      "itemId": "HOODIE",
+      "folderName": "hoodie",
+      "category": "HOODIE"
+    },
+    {
+      "itemId": "PONCHO",
+      "folderName": "poncho",
+      "category": "HOODIE2",
+      "suppresses": [
+        "UNDERSHIRT",
+        "SHIRT"
+      ]
+    },
+    {
+      "itemId": "CHOKER",
+      "folderName": "choker",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "HEADBAND",
+      "folderName": "headband",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "PINK_SCARF",
+      "folderName": "scarf",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "FUZZY_HAT",
+      "folderName": "fuzzy hat",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "CRAWLER_HAT",
+      "folderName": "crawler hat",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "CAT_EARS",
+      "folderName": "cat ears",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "CAT_TAIL",
+      "folderName": "cat tail",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "ACRYLICS",
+      "folderName": "acrylic nails",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "OOPART_BRACELET",
+      "folderName": "OOPArt bracelet",
+      "category": "ACCESSORY"
+    },
+    {
+      "itemId": "SHY_MASK",
+      "folderName": "shy mask",
+      "category": "ACCESSORY"
+    }
+  ]
+}

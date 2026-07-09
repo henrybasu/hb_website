@@ -1,0 +1,37 @@
+{
+  "layers": {
+    "crawler hat": {
+      "slot": "AFTER_FACE"
+    },
+    "cat ears": {
+      "slot": "AFTER_HAIR"
+    },
+    "panties": {
+      "slot": "AFTER_LEGS"
+    },
+    "shorts": {
+      "slot": "AFTER_LEGS"
+    },
+    "hoodie": {
+      "slot": "AFTER_HAIR"
+    },
+    "poncho": {
+      "slot": "AFTER_HAIR"
+    },
+    "OOPArt bracelet": {
+      "slot": "AFTER_FACE"
+    },
+    "scarf": {
+      "slot": "AFTER_FACE"
+    },
+    "cool shirt": {
+      "slot": "AFTER_BASE"
+    },
+    "shy mask": {
+      "slot": "AFTER_FACE"
+    },
+    "leotard": {
+      "slot": "AFTER_ARM"
+    }
+  }
+}

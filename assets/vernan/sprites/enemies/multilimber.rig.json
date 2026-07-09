@@ -1,0 +1,47 @@
+{
+  "_doc": "Multilimber regular enemy — stacked eye/head/body strips share pivot; hulls authored in tools.EnemyEditor. Texture-local hull points; pose offsets unused (parts stack at anchor). Per-part sheet files hold 3-frame strips.",
+  "version": 1,
+  "enemy": "multilimber",
+  "frameSize": [32, 32],
+  "parts": [
+    {
+      "name": "body",
+      "sheet": "multilimber body.png",
+      "frame": 0,
+      "pivot": [16, 24],
+      "hulls": {
+        "collision": [[6, 10], [26, 10], [28, 18], [26, 28], [6, 28], [4, 18]],
+        "hit": [[8, 12], [24, 12], [26, 20], [24, 26], [8, 26], [6, 20]],
+        "hurt": [[4, 6], [28, 6], [30, 16], [28, 30], [4, 30], [2, 16]]
+      }
+    },
+    {
+      "name": "head",
+      "sheet": "multilimber head.png",
+      "frame": 0,
+      "pivot": [16, 24],
+      "hulls": {
+        "hurt": [[10, 8], [22, 8], [24, 16], [22, 26], [10, 26], [8, 16]]
+      }
+    },
+    {
+      "name": "eye",
+      "sheet": "multilimber eye.png",
+      "frame": 0,
+      "pivot": [16, 24],
+      "hulls": {
+        "hurt": [[12, 10], [20, 10], [22, 16], [20, 22], [12, 22], [10, 16]]
+      }
+    }
+  ],
+  "drawOrder": ["body", "head", "eye"],
+  "poses": {
+    "idle": {
+      "body": {"dx": 0, "dy": 0, "angle": 0},
+      "head": {"dx": 0, "dy": 0, "angle": 0},
+      "eye": {"dx": 0, "dy": 0, "angle": 0}
+    }
+  },
+  "idleSequence": ["idle"],
+  "sequences": {"idle": ["idle"]}
+}

@@ -1,0 +1,12 @@
+{
+  "formatVersion": 1,
+  "defaultTilesetPath": "tileset.json",
+  "floors": {
+    "0": [
+      {
+        "tilesetPath": "tileset.json",
+        "weight": 1
+      }
+    ]
+  }
+}

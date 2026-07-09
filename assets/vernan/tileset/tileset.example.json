@@ -1,0 +1,3265 @@
+{
+  "formatVersion": 1,
+  "defaultTilePrototype": {
+    "mapTerrain": "EMPTY"
+  },
+  "sheets": [
+    {
+      "id": "main",
+      "imagePath": "tiles/forest tileset.png",
+      "tileWidthPx": 16,
+      "tileHeightPx": 16
+    }
+  ],
+  "tiles": [
+    {
+      "id": "grass",
+      "label": "Grass",
+      "mapTerrain": "EMPTY",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 0,
+              "col": 1
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": false,
+        "profileId": "",
+        "connectsWithTileIds": []
+      },
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "sceneRoles": [
+        "background"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "block",
+      "label": "",
+      "mapTerrain": "SOLID",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 0,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        },
+        {
+          "layerId": "part",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 0,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        },
+        {
+          "layerId": "part",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 1,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        },
+        {
+          "layerId": "part",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 1,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        },
+        {
+          "layerId": "part",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 2,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        },
+        {
+          "layerId": "part",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 2,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": []
+      },
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      }
+    },
+    {
+      "id": "flame",
+      "label": "",
+      "roomScope": {
+        "allowRoomKinds": [
+          "ITEM",
+          "SHOP",
+          "BOSS"
+        ]
+      },
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 7,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": false,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "flame",
+          "main_2_2",
+          "main_2_3",
+          "main_0_2",
+          "main_1_3",
+          "main_0_3",
+          "main_1_2"
+        ]
+      },
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "sceneRoles": [
+        "background"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      },
+      "visualPlayback": {
+        "defaultClipId": "anim"
+      },
+      "visualClips": [
+        {
+          "id": "anim",
+          "ticksPerFrame": 5,
+          "loop": true,
+          "pingpong": true,
+          "frames": [
+            {
+              "layerSprites": {
+                "base": {
+                  "sheetId": "main",
+                  "cell": {
+                    "row": 7,
+                    "col": 3
+                  }
+                }
+              }
+            },
+            {
+              "layerSprites": {
+                "base": {
+                  "sheetId": "main",
+                  "cell": {
+                    "row": 7,
+                    "col": 4
+                  }
+                }
+              }
+            },
+            {
+              "layerSprites": {
+                "base": {
+                  "sheetId": "main",
+                  "cell": {
+                    "row": 7,
+                    "col": 5
+                  }
+                }
+              }
+            }
+          ]
+        }
+      ],
+      "mapTerrain": "EMPTY"
+    },
+    {
+      "id": "main_0_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 0,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_2_2",
+          "main_2_3",
+          "main_0_2",
+          "main_1_3",
+          "main_0_3",
+          "main_1_2"
+        ],
+        "hvstGroupId": "hvst_v_4"
+      },
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      },
+      "tags": [
+        "corner_tl"
+      ]
+    },
+    {
+      "id": "main_0_3",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 0,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "corner_tr"
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_2_2",
+          "main_2_3",
+          "main_0_2",
+          "main_1_3",
+          "main_0_3",
+          "main_1_2"
+        ],
+        "hvstGroupId": "hvst_v_4"
+      }
+    },
+    {
+      "id": "main_1_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 1,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "interior"
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_2_2",
+          "main_2_3",
+          "main_0_2",
+          "main_1_3",
+          "main_0_3",
+          "main_1_2"
+        ],
+        "hvstGroupId": "hvst_v_4"
+      }
+    },
+    {
+      "id": "main_1_3",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 1,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "interior"
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_2_2",
+          "main_2_3",
+          "main_0_2",
+          "main_1_3",
+          "main_0_3",
+          "main_1_2"
+        ],
+        "hvstGroupId": "hvst_v_4"
+      }
+    },
+    {
+      "id": "main_2_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 2,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "corner_bl"
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_2_2",
+          "main_2_3",
+          "main_0_2",
+          "main_1_3",
+          "main_0_3",
+          "main_1_2"
+        ],
+        "hvstGroupId": "hvst_v_4"
+      },
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "main_2_3",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 2,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "corner_br"
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_2_2",
+          "main_2_3",
+          "main_0_2",
+          "main_1_3",
+          "main_0_3",
+          "main_1_2"
+        ],
+        "hvstGroupId": "hvst_v_4"
+      }
+    },
+    {
+      "id": "main_4_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 4,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "cap_left"
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_4_0",
+          "main_4_1",
+          "main_4_2"
+        ],
+        "hvstGroupId": "hvst_h_3"
+      },
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "main_4_1",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 4,
+              "col": 1
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "interior"
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_4_0",
+          "main_4_1",
+          "main_4_2"
+        ],
+        "hvstGroupId": "hvst_h_3"
+      }
+    },
+    {
+      "id": "main_4_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 4,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "cap_right"
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_4_0",
+          "main_4_1",
+          "main_4_2"
+        ],
+        "hvstGroupId": "hvst_h_3"
+      }
+    },
+    {
+      "id": "main_5_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 5,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "cap_top"
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_5_0",
+          "main_6_0",
+          "main_7_0"
+        ],
+        "hvstGroupId": "hvst_v_5"
+      },
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "main_6_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 6,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "interior"
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_5_0",
+          "main_6_0",
+          "main_7_0"
+        ],
+        "hvstGroupId": "hvst_v_5"
+      }
+    },
+    {
+      "id": "main_7_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 7,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "cap_bottom"
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_5_0",
+          "main_6_0",
+          "main_7_0"
+        ],
+        "hvstGroupId": "hvst_v_5"
+      }
+    },
+    {
+      "id": "main_6_1",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 6,
+              "col": 1
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "tags": [
+        "isolated"
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_6_1"
+        ],
+        "hvstGroupId": "hvst_t_3"
+      },
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      },
+      "mapTerrain": "SOLID"
+    },
+    {
+      "id": "main_7_4",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 7,
+              "col": 4
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_7_5",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 7,
+              "col": 5
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_5_4",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 5,
+              "col": 4
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": false,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_5_4",
+          "main_2_2",
+          "main_2_3",
+          "main_0_2",
+          "main_1_3",
+          "main_0_3",
+          "main_1_2"
+        ]
+      },
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      },
+      "mapTerrain": "BREAKABLE"
+    },
+    {
+      "id": "main_0_4",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 0,
+              "col": 4
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_0_4",
+          "main_1_4",
+          "main_2_4",
+          "main_3_4"
+        ],
+        "hvstGroupId": "hvst_v_6"
+      },
+      "tags": [
+        "cap_top"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      },
+      "mapTerrain": "SOLID"
+    },
+    {
+      "id": "main_1_4",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 1,
+              "col": 4
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_0_4",
+          "main_1_4",
+          "main_2_4",
+          "main_3_4"
+        ],
+        "hvstGroupId": "hvst_v_6"
+      },
+      "tags": [
+        "interior"
+      ],
+      "mapTerrain": "SOLID",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      }
+    },
+    {
+      "id": "main_2_4",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 2,
+              "col": 4
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_0_4",
+          "main_1_4",
+          "main_2_4",
+          "main_3_4"
+        ],
+        "hvstGroupId": "hvst_v_6"
+      },
+      "tags": [
+        "interior"
+      ],
+      "mapTerrain": "SOLID",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      }
+    },
+    {
+      "id": "main_3_4",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 3,
+              "col": 4
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_0_4",
+          "main_1_4",
+          "main_2_4",
+          "main_3_4"
+        ],
+        "hvstGroupId": "hvst_v_6"
+      },
+      "tags": [
+        "cap_bottom"
+      ],
+      "mapTerrain": "SOLID",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      }
+    },
+    {
+      "id": "main_9_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 9,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_9_0",
+          "main_10_1",
+          "main_9_1",
+          "main_10_0"
+        ],
+        "hvstGroupId": "hvst_s_1"
+      },
+      "tags": [
+        "corner_tl"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "sceneRoles": [
+        "background"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      },
+      "mapTerrain": "EMPTY",
+      "roomScope": {
+        "allowRoomKinds": [
+          "NORMAL",
+          "START"
+        ]
+      }
+    },
+    {
+      "id": "main_9_1",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 9,
+              "col": 1
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_9_0",
+          "main_10_1",
+          "main_9_1",
+          "main_10_0"
+        ],
+        "hvstGroupId": "hvst_s_1"
+      },
+      "tags": [
+        "corner_tr"
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "main_10_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 10,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_9_0",
+          "main_10_1",
+          "main_9_1",
+          "main_10_0"
+        ],
+        "hvstGroupId": "hvst_s_1"
+      },
+      "tags": [
+        "corner_bl"
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_10_1",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 10,
+              "col": 1
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_9_0",
+          "main_10_1",
+          "main_9_1",
+          "main_10_0"
+        ],
+        "hvstGroupId": "hvst_s_1"
+      },
+      "tags": [
+        "corner_br"
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_11_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 11,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_11_0",
+          "main_12_1",
+          "main_11_1",
+          "main_12_0"
+        ],
+        "hvstGroupId": "hvst_s_2"
+      },
+      "tags": [
+        "corner_tl"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "sceneRoles": [
+        "background"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      },
+      "mapTerrain": "EMPTY",
+      "roomScope": {
+        "allowRoomKinds": [
+          "BOSS"
+        ]
+      }
+    },
+    {
+      "id": "main_11_1",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 11,
+              "col": 1
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_11_0",
+          "main_12_1",
+          "main_11_1",
+          "main_12_0"
+        ],
+        "hvstGroupId": "hvst_s_2"
+      },
+      "tags": [
+        "corner_tr"
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_12_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 12,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_11_0",
+          "main_12_1",
+          "main_11_1",
+          "main_12_0"
+        ],
+        "hvstGroupId": "hvst_s_2"
+      },
+      "tags": [
+        "corner_bl"
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_12_1",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 12,
+              "col": 1
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_11_0",
+          "main_12_1",
+          "main_11_1",
+          "main_12_0"
+        ],
+        "hvstGroupId": "hvst_s_2"
+      },
+      "tags": [
+        "corner_br"
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_13_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 13,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_13_0",
+          "main_14_1",
+          "main_13_1",
+          "main_14_0"
+        ],
+        "hvstGroupId": "hvst_s_3"
+      },
+      "tags": [
+        "corner_tl"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "sceneRoles": [
+        "background"
+      ],
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      },
+      "mapTerrain": "EMPTY",
+      "roomScope": {
+        "allowRoomKinds": [
+          "ITEM"
+        ]
+      }
+    },
+    {
+      "id": "main_13_1",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 13,
+              "col": 1
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_13_0",
+          "main_14_1",
+          "main_13_1",
+          "main_14_0"
+        ],
+        "hvstGroupId": "hvst_s_3"
+      },
+      "tags": [
+        "corner_tr"
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_14_0",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 14,
+              "col": 0
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_13_0",
+          "main_14_1",
+          "main_13_1",
+          "main_14_0"
+        ],
+        "hvstGroupId": "hvst_s_3"
+      },
+      "tags": [
+        "corner_bl"
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_14_1",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 14,
+              "col": 1
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_13_0",
+          "main_14_1",
+          "main_13_1",
+          "main_14_0"
+        ],
+        "hvstGroupId": "hvst_s_3"
+      },
+      "tags": [
+        "corner_br"
+      ],
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      }
+    },
+    {
+      "id": "main_9_3",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 9,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": false,
+        "profileId": "",
+        "connectsWithTileIds": []
+      },
+      "mapTerrain": "DOOR",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "main_10_3",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 10,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "mapTerrain": "DOOR",
+      "sceneRoles": [
+        "tilemap",
+        "door"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      }
+    },
+    {
+      "id": "main_9_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 9,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": false,
+        "profileId": "",
+        "connectsWithTileIds": []
+      },
+      "mapTerrain": "DOOR",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "main_10_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 10,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "mapTerrain": "DOOR",
+      "sceneRoles": [
+        "tilemap",
+        "door"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      }
+    },
+    {
+      "id": "main_5_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 5,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": false,
+        "profileId": "",
+        "connectsWithTileIds": []
+      },
+      "mapTerrain": "LADDER",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "main_3_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 3,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": false,
+        "profileId": "",
+        "connectsWithTileIds": []
+      },
+      "mapTerrain": "PLATFORM",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16,
+        "platformTopSurfaceOnly": true
+      },
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "main_3_3",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 3,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "mapTerrain": "PLATFORM",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16,
+        "platformTopSurfaceOnly": true
+      }
+    },
+    {
+      "id": "main_7_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 7,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": false,
+        "profileId": "",
+        "connectsWithTileIds": []
+      },
+      "mapTerrain": "EMPTY",
+      "sceneRoles": [
+        "background"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 1,
+        "h": 1
+      },
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      }
+    },
+    {
+      "id": "main_6_2",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 6,
+              "col": 2
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "autotile": {
+        "enabled": true,
+        "profileId": "",
+        "connectsWithTileIds": [
+          "main_6_2",
+          "main_6_3",
+          "main_6_4",
+          "main_6_5"
+        ],
+        "hvstGroupId": "hvst_h_4"
+      },
+      "mapTerrain": "SOLID",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "parallax": {
+        "cameraMulX": 256,
+        "cameraMulY": 256
+      },
+      "rearrangement": {
+        "authoring": {
+          "layersReorderable": true,
+          "layersZEditable": true,
+          "layersStructureMutable": true
+        },
+        "instance": {
+          "kind": "static"
+        }
+      },
+      "tags": [
+        "cap_left"
+      ]
+    },
+    {
+      "id": "main_6_3",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 6,
+              "col": 3
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "mapTerrain": "SOLID",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_6_2",
+          "main_6_3",
+          "main_6_4",
+          "main_6_5"
+        ],
+        "hvstGroupId": "hvst_h_4"
+      },
+      "tags": [
+        "interior"
+      ]
+    },
+    {
+      "id": "main_6_4",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 6,
+              "col": 4
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "mapTerrain": "SOLID",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_6_2",
+          "main_6_3",
+          "main_6_4",
+          "main_6_5"
+        ],
+        "hvstGroupId": "hvst_h_4"
+      },
+      "tags": [
+        "interior"
+      ]
+    },
+    {
+      "id": "main_6_5",
+      "label": "",
+      "renderLayers": [
+        {
+          "layerId": "base",
+          "z": 0,
+          "sprite": {
+            "sheetId": "main",
+            "cell": {
+              "row": 6,
+              "col": 5
+            }
+          },
+          "offsetXPx": 0,
+          "offsetYPx": 0,
+          "flipH": false,
+          "flipV": false,
+          "rotationMilliDeg": 0
+        }
+      ],
+      "mapTerrain": "SOLID",
+      "sceneRoles": [
+        "tilemap"
+      ],
+      "hitbox": {
+        "kind": "aabb",
+        "x": 0,
+        "y": 0,
+        "w": 16,
+        "h": 16
+      },
+      "autotile": {
+        "enabled": true,
+        "connectsWithTileIds": [
+          "main_6_2",
+          "main_6_3",
+          "main_6_4",
+          "main_6_5"
+        ],
+        "hvstGroupId": "hvst_h_4"
+      },
+      "tags": [
+        "cap_right"
+      ]
+    }
+  ],
+  "groups": [],
+  "physicsProfiles": [],
+  "autotileProfiles": [],
+  "autotileConnectGroups": [],
+  "terrainBridge": {
+    "formatVersion": 1,
+    "byTerrain": {
+      "EMPTY": {
+        "displayTileId": "grass",
+        "connectAsTileId": "grass"
+      },
+      "SOLID": {
+        "displayTileId": "block",
+        "connectAsTileId": "block"
+      },
+      "BREAKABLE": {
+        "displayTileId": "block",
+        "connectAsTileId": "block"
+      },
+      "DOOR": {
+        "displayTileId": "block",
+        "connectAsTileId": "block"
+      },
+      "PLATFORM": {
+        "displayTileId": "block",
+        "connectAsTileId": "block"
+      },
+      "LADDER": {
+        "displayTileId": "block",
+        "connectAsTileId": "block"
+      }
+    }
+  },
+  "decoTilePool": [
+    "grass",
+    "flame"
+  ],
+  "decoTilePlacementRules": {
+    "grass": {
+      "groundOnly": true,
+      "preferAboveObjects": [
+        "log",
+        "logh"
+      ],
+      "preferAboveWeight": 0.8
+    }
+  },
+  "objects": [
+    {
+      "id": "grass",
+      "label": "Grass",
+      "tileIds": [
+        "grass"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "block",
+      "label": "",
+      "tileIds": [
+        "main_6_1"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "flame",
+      "label": "",
+      "tileIds": [
+        "flame",
+        "main_7_4",
+        "main_7_5"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "breakable",
+      "label": "",
+      "tileIds": [
+        "main_5_4"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "log",
+      "label": "",
+      "tileIds": [
+        "main_0_4",
+        "main_1_4",
+        "main_2_4",
+        "main_3_4"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "background tiles blue",
+      "label": "",
+      "tileIds": [
+        "main_9_0",
+        "main_9_1",
+        "main_10_0",
+        "main_10_1"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "background tiles red",
+      "label": "",
+      "tileIds": [
+        "main_11_0",
+        "main_11_1",
+        "main_12_0",
+        "main_12_1"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "background tiles yellow",
+      "label": "",
+      "tileIds": [
+        "main_13_0",
+        "main_13_1",
+        "main_14_0",
+        "main_14_1"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "door",
+      "label": "",
+      "tileIds": [
+        "main_9_3",
+        "main_10_3"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "door_special",
+      "label": "",
+      "tileIds": [
+        "main_9_2",
+        "main_10_2"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "ladder",
+      "label": "",
+      "tileIds": [
+        "main_5_2"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "platform",
+      "label": "",
+      "tileIds": [
+        "main_3_2",
+        "main_3_3"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "skull",
+      "label": "",
+      "tileIds": [
+        "main_7_2"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    },
+    {
+      "id": "logh",
+      "label": "",
+      "tileIds": [
+        "main_6_2",
+        "main_6_3",
+        "main_6_4",
+        "main_6_5"
+      ],
+      "editorUi": {
+        "expandable": false,
+        "weight": 1.0,
+        "layerTag": "Layer1",
+        "solidTag": "Solid",
+        "segments": [
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": true,
+            "repeat": 0
+          },
+          {
+            "pair": true,
+            "loop": false,
+            "repeat": 0
+          }
+        ]
+      }
+    }
+  ],
+  "hvstAutotileGroups": [
+    {
+      "id": "hvst_select",
+      "label": "Select",
+      "orientation": "TILE",
+      "memberTileIds": []
+    },
+    {
+      "id": "hvst_v_1",
+      "label": "HVST Vertical (6 tiles)",
+      "orientation": "VERTICAL",
+      "memberTileIds": [
+        "main_2_2",
+        "main_2_3",
+        "main_0_2",
+        "main_1_3",
+        "main_0_3",
+        "main_1_2"
+      ]
+    },
+    {
+      "id": "hvst_h_1",
+      "label": "HVST Horizontal (3 tiles)",
+      "orientation": "HORIZONTAL",
+      "memberTileIds": [
+        "main_4_0",
+        "main_4_1",
+        "main_4_2"
+      ]
+    },
+    {
+      "id": "hvst_v_2",
+      "label": "HVST Vertical (3 tiles)",
+      "orientation": "VERTICAL",
+      "memberTileIds": [
+        "main_5_0",
+        "main_6_0",
+        "main_7_0"
+      ]
+    },
+    {
+      "id": "hvst_t_1",
+      "label": "HVST Tile (1 tiles)",
+      "orientation": "TILE",
+      "memberTileIds": [
+        "main_6_1"
+      ]
+    },
+    {
+      "id": "hvst_h_2",
+      "label": "HVST Horizontal (3 tiles)",
+      "orientation": "HORIZONTAL",
+      "memberTileIds": [
+        "main_4_0",
+        "main_4_1",
+        "main_4_2"
+      ]
+    },
+    {
+      "id": "hvst_v_3",
+      "label": "HVST Vertical (3 tiles)",
+      "orientation": "VERTICAL",
+      "memberTileIds": [
+        "main_5_0",
+        "main_6_0",
+        "main_7_0"
+      ]
+    },
+    {
+      "id": "hvst_t_2",
+      "label": "HVST Tile (1 tiles)",
+      "orientation": "TILE",
+      "memberTileIds": [
+        "main_6_1"
+      ]
+    },
+    {
+      "id": "hvst_v_4",
+      "label": "HVST Vertical (6 tiles)",
+      "orientation": "VERTICAL",
+      "layoutCols": 2,
+      "layoutRows": 3,
+      "layoutPlacements": [
+        {
+          "tileId": "main_2_2",
+          "col": 0,
+          "row": 2
+        },
+        {
+          "tileId": "main_2_3",
+          "col": 1,
+          "row": 2
+        },
+        {
+          "tileId": "main_0_2",
+          "col": 0,
+          "row": 0
+        },
+        {
+          "tileId": "main_1_3",
+          "col": 1,
+          "row": 1
+        },
+        {
+          "tileId": "main_0_3",
+          "col": 1,
+          "row": 0
+        },
+        {
+          "tileId": "main_1_2",
+          "col": 0,
+          "row": 1
+        }
+      ],
+      "memberTileIds": [
+        "main_0_2",
+        "main_0_3",
+        "main_1_2",
+        "main_1_3",
+        "main_2_2",
+        "main_2_3"
+      ]
+    },
+    {
+      "id": "hvst_h_3",
+      "label": "HVST Horizontal (3 tiles)",
+      "orientation": "HORIZONTAL",
+      "layoutCols": 3,
+      "layoutRows": 1,
+      "layoutPlacements": [
+        {
+          "tileId": "main_4_0",
+          "col": 0,
+          "row": 0
+        },
+        {
+          "tileId": "main_4_1",
+          "col": 1,
+          "row": 0
+        },
+        {
+          "tileId": "main_4_2",
+          "col": 2,
+          "row": 0
+        }
+      ],
+      "memberTileIds": [
+        "main_4_0",
+        "main_4_1",
+        "main_4_2"
+      ]
+    },
+    {
+      "id": "hvst_v_5",
+      "label": "HVST Vertical (3 tiles)",
+      "orientation": "VERTICAL",
+      "layoutCols": 1,
+      "layoutRows": 3,
+      "layoutPlacements": [
+        {
+          "tileId": "main_5_0",
+          "col": 0,
+          "row": 0
+        },
+        {
+          "tileId": "main_6_0",
+          "col": 0,
+          "row": 1
+        },
+        {
+          "tileId": "main_7_0",
+          "col": 0,
+          "row": 2
+        }
+      ],
+      "memberTileIds": [
+        "main_5_0",
+        "main_6_0",
+        "main_7_0"
+      ]
+    },
+    {
+      "id": "hvst_t_3",
+      "label": "HVST Tile (1 tiles)",
+      "orientation": "TILE",
+      "layoutCols": 1,
+      "layoutRows": 1,
+      "layoutPlacements": [
+        {
+          "tileId": "main_6_1",
+          "col": 0,
+          "row": 0
+        }
+      ],
+      "memberTileIds": [
+        "main_6_1"
+      ]
+    },
+    {
+      "id": "hvst_v_6",
+      "label": "HVST Vertical (4 tiles)",
+      "orientation": "VERTICAL",
+      "layoutCols": 1,
+      "layoutRows": 4,
+      "layoutPlacements": [
+        {
+          "tileId": "main_0_4",
+          "col": 0,
+          "row": 0
+        },
+        {
+          "tileId": "main_1_4",
+          "col": 0,
+          "row": 1
+        },
+        {
+          "tileId": "main_2_4",
+          "col": 0,
+          "row": 2
+        },
+        {
+          "tileId": "main_3_4",
+          "col": 0,
+          "row": 3
+        }
+      ],
+      "memberTileIds": [
+        "main_0_4",
+        "main_1_4",
+        "main_2_4",
+        "main_3_4"
+      ]
+    },
+    {
+      "id": "hvst_s_1",
+      "label": "HVST Square (4 tiles)",
+      "orientation": "SQUARE",
+      "layoutCols": 2,
+      "layoutRows": 2,
+      "layoutPlacements": [
+        {
+          "tileId": "main_9_0",
+          "col": 0,
+          "row": 0
+        },
+        {
+          "tileId": "main_10_1",
+          "col": 1,
+          "row": 1
+        },
+        {
+          "tileId": "main_9_1",
+          "col": 1,
+          "row": 0
+        },
+        {
+          "tileId": "main_10_0",
+          "col": 0,
+          "row": 1
+        }
+      ],
+      "memberTileIds": [
+        "main_9_0",
+        "main_9_1",
+        "main_10_0",
+        "main_10_1"
+      ]
+    },
+    {
+      "id": "hvst_s_2",
+      "label": "HVST Square (4 tiles)",
+      "orientation": "SQUARE",
+      "layoutCols": 2,
+      "layoutRows": 2,
+      "layoutPlacements": [
+        {
+          "tileId": "main_11_0",
+          "col": 0,
+          "row": 0
+        },
+        {
+          "tileId": "main_12_1",
+          "col": 1,
+          "row": 1
+        },
+        {
+          "tileId": "main_11_1",
+          "col": 1,
+          "row": 0
+        },
+        {
+          "tileId": "main_12_0",
+          "col": 0,
+          "row": 1
+        }
+      ],
+      "memberTileIds": [
+        "main_11_0",
+        "main_11_1",
+        "main_12_0",
+        "main_12_1"
+      ]
+    },
+    {
+      "id": "hvst_s_3",
+      "label": "HVST Square (4 tiles)",
+      "orientation": "SQUARE",
+      "layoutCols": 2,
+      "layoutRows": 2,
+      "layoutPlacements": [
+        {
+          "tileId": "main_13_0",
+          "col": 0,
+          "row": 0
+        },
+        {
+          "tileId": "main_14_1",
+          "col": 1,
+          "row": 1
+        },
+        {
+          "tileId": "main_13_1",
+          "col": 1,
+          "row": 0
+        },
+        {
+          "tileId": "main_14_0",
+          "col": 0,
+          "row": 1
+        }
+      ],
+      "memberTileIds": [
+        "main_13_0",
+        "main_13_1",
+        "main_14_0",
+        "main_14_1"
+      ]
+    },
+    {
+      "id": "hvst_h_4",
+      "label": "HVST Horizontal (4 tiles)",
+      "orientation": "HORIZONTAL",
+      "layoutCols": 4,
+      "layoutRows": 1,
+      "layoutPlacements": [
+        {
+          "tileId": "main_6_2",
+          "col": 0,
+          "row": 0
+        },
+        {
+          "tileId": "main_6_3",
+          "col": 1,
+          "row": 0
+        },
+        {
+          "tileId": "main_6_4",
+          "col": 2,
+          "row": 0
+        },
+        {
+          "tileId": "main_6_5",
+          "col": 3,
+          "row": 0
+        }
+      ],
+      "memberTileIds": [
+        "main_6_2",
+        "main_6_3",
+        "main_6_4",
+        "main_6_5"
+      ]
+    }
+  ]
+}

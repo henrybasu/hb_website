@@ -1,0 +1,185 @@
+{
+  "id": "boss3",
+  "layers": [
+    {
+      "sprite": "boss3",
+      "frameMode": "single",
+      "frameIndex": 0,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 4,
+      "opacity": 120,
+      "blend": "normal",
+      "zIndex": 1,
+      "transforms": [
+        {
+          "kind": "fisheye",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 166,
+          "strength": 2.0,
+          "rippleAmp": 1.0,
+          "rippleFreq": 15.0,
+          "timeRadPerTick": 0.01,
+          "phaseOffsetRad": 2.4
+        },
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": 32,
+          "vySubpxPerTick": 12
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 24,
+          "mulY": 128
+        },
+        {
+          "kind": "scanlineWarp",
+          "enabled": true,
+          "ampPx": 2.5,
+          "phasePerRowRad": 0.4,
+          "timeRadPerTick": 0.05,
+          "pinnedRow": 8,
+          "strength": 1.0,
+          "phaseOffsetRad": 0.0
+        }
+      ]
+    },
+    {
+      "sprite": "boss3",
+      "frameMode": "single",
+      "frameIndex": 1,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 4,
+      "opacity": 90,
+      "blend": "screen",
+      "zIndex": 2,
+      "transforms": [
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": -24,
+          "vySubpxPerTick": 8
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 24,
+          "mulY": 160
+        },
+        {
+          "kind": "scanlineWarp",
+          "enabled": true,
+          "ampPx": 4.0,
+          "phasePerRowRad": 0.55,
+          "timeRadPerTick": 0.04,
+          "pinnedRow": 4,
+          "strength": 1.0,
+          "phaseOffsetRad": 2.399963229728653
+        },
+        {
+          "kind": "fisheye",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 314.8383712319704,
+          "strength": -0.8,
+          "rippleAmp": 0.12,
+          "rippleFreq": 5.0,
+          "timeRadPerTick": 0.03,
+          "phaseOffsetRad": 2.399963229728653
+        }
+      ]
+    },
+    {
+      "sprite": "boss3",
+      "frameMode": "single",
+      "frameIndex": 3,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 4,
+      "opacity": 75,
+      "blend": "overlay",
+      "zIndex": 2,
+      "transforms": [
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": 120,
+          "vySubpxPerTick": -8
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 24,
+          "mulY": 160
+        },
+        {
+          "kind": "scanlineWarp",
+          "enabled": true,
+          "ampPx": 4.0,
+          "phasePerRowRad": 0.55,
+          "timeRadPerTick": 0.04,
+          "pinnedRow": 4,
+          "strength": 1.0,
+          "phaseOffsetRad": 2.399963229728653
+        },
+        {
+          "kind": "fisheye",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 254,
+          "strength": -0.8,
+          "rippleAmp": 0.22,
+          "rippleFreq": 5.0,
+          "timeRadPerTick": 0.03,
+          "phaseOffsetRad": 2.399963229728653
+        }
+      ]
+    },
+    {
+      "sprite": "boss3",
+      "frameMode": "single",
+      "frameIndex": 2,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 4,
+      "opacity": 255,
+      "blend": "normal",
+      "zIndex": 5,
+      "transforms": [
+        {
+          "kind": "fisheye",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 166,
+          "strength": 2.0,
+          "rippleAmp": 1.0,
+          "rippleFreq": 24.0,
+          "timeRadPerTick": 0.01,
+          "phaseOffsetRad": 2.4
+        },
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": -32,
+          "vySubpxPerTick": -12
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 24,
+          "mulY": 128
+        },
+        {
+          "kind": "scanlineWarp",
+          "enabled": true,
+          "ampPx": 0.5,
+          "phasePerRowRad": 0.4,
+          "timeRadPerTick": 0.05,
+          "pinnedRow": 8,
+          "strength": 1.0,
+          "phaseOffsetRad": 0.0
+        }
+      ]
+    }
+  ]
+}

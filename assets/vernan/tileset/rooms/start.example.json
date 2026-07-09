@@ -1,0 +1,13 @@
+{
+  "_note": "Rename to start.json only after resizing tiles[][] to match runtime START room width/height (GamePanel specialRoomWidthTiles × specialRoomHeightTiles). All rows must have the same length.",
+  "tiles": [
+    ["grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass", "grass"],
+    ["", "", "", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", "", "", ""],
+    ["", "", "", "", "", "", "", "", "", ""],
+    ["block", "block", "block", "block", "block", "block", "block", "block", "block", "block"]
+  ],
+  "placedObjects": []
+}

@@ -1,0 +1,130 @@
+{
+  "id": "boss1",
+  "layers": [
+    {
+      "sprite": "boss1",
+      "frameMode": "single",
+      "frameIndex": 0,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 3,
+      "opacity": 60,
+      "blend": "normal",
+      "zIndex": 2,
+      "transforms": [
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": -24,
+          "vySubpxPerTick": 40
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 160,
+          "mulY": 88
+        },
+        {
+          "kind": "scanlineWarp",
+          "enabled": true,
+          "ampPx": 6.5,
+          "phasePerRowRad": 0.3,
+          "timeRadPerTick": 0.01,
+          "pinnedRow": 6,
+          "strength": 3.4,
+          "phaseOffsetRad": 0.0
+        },
+        {
+          "kind": "fisheye",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 314.8383712319704,
+          "strength": -0.65,
+          "rippleAmp": 0.12,
+          "rippleFreq": 5.0,
+          "timeRadPerTick": 0.03,
+          "phaseOffsetRad": 0.0
+        }
+      ]
+    },
+    {
+      "sprite": "boss1",
+      "frameMode": "single",
+      "frameIndex": 1,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 3,
+      "opacity": 255,
+      "blend": "subtract",
+      "zIndex": 2,
+      "transforms": [
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": 72,
+          "vySubpxPerTick": -36
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 128,
+          "mulY": 40
+        },
+        {
+          "kind": "scanlineWarp",
+          "enabled": true,
+          "ampPx": 1.5,
+          "phasePerRowRad": 0.55,
+          "timeRadPerTick": 0.05,
+          "pinnedRow": 8,
+          "strength": 1.0,
+          "phaseOffsetRad": 2.399963229728653
+        }
+      ]
+    },
+    {
+      "sprite": "boss1",
+      "frameMode": "single",
+      "frameIndex": 2,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 3,
+      "opacity": 90,
+      "blend": "difference",
+      "zIndex": 1,
+      "transforms": [
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": -112,
+          "vySubpxPerTick": 96
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 256,
+          "mulY": 256
+        },
+        {
+          "kind": "swirl",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 166,
+          "twistRad": 2.2,
+          "rippleAmp": 0.99,
+          "rippleFreq": 1.5,
+          "timeRadPerTick": 0.005,
+          "phaseOffsetRad": 4.1000000000000005
+        },
+        {
+          "kind": "fisheye",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 106,
+          "strength": 2.0,
+          "rippleAmp": 1.0,
+          "rippleFreq": 23.5,
+          "timeRadPerTick": 0.01,
+          "phaseOffsetRad": 7.6000000000000005
+        }
+      ]
+    }
+  ]
+}

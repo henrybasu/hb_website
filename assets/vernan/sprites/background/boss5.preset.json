@@ -1,0 +1,81 @@
+{
+  "id": "boss5",
+  "layers": [
+    {
+      "sprite": "boss5",
+      "frameMode": "animate",
+      "frameIndex": 0,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 5,
+      "opacity": 50,
+      "blend": "lighten",
+      "zIndex": 0,
+      "transforms": [
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": 32,
+          "vySubpxPerTick": -12
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 72,
+          "mulY": 72
+        },
+        {
+          "kind": "scanlineWarp",
+          "enabled": true,
+          "ampPx": 1.0,
+          "phasePerRowRad": 0.4,
+          "timeRadPerTick": 0.05,
+          "pinnedRow": 8,
+          "strength": 4.0,
+          "phaseOffsetRad": 0.0
+        }
+      ],
+      "animateFrames": [
+        0,
+        1,
+        2,
+        3
+      ],
+      "ticksPerFrame": 24,
+      "animateLoop": true
+    },
+    {
+      "sprite": "boss5",
+      "frameMode": "single",
+      "frameIndex": 4,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 5,
+      "opacity": 100,
+      "blend": "normal",
+      "zIndex": -1,
+      "transforms": [
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": 16,
+          "vySubpxPerTick": 216
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 256,
+          "mulY": 256
+        },
+        {
+          "kind": "wave2d",
+          "enabled": true,
+          "ampXPx": 2.0,
+          "ampYPx": 1.5,
+          "phasePerColRad": 0.35,
+          "phasePerRowRad": 0.45,
+          "pinnedCol": 0,
+          "pinnedRow": 8,
+          "timeRadPerTick": 0.05,
+          "phaseOffsetRad": 2.399963229728653
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,821 @@
+{
+  "version": 1,
+  "entries": {
+    "airdodge": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ]
+        }
+      ]
+    },
+    "attack0": {
+      "kind": "phase",
+      "trigger": "phase",
+      "slots": [
+        {
+          "label": "windup",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "active",
+          "stripFrames": [
+            1
+          ],
+          "cue": {
+            "scaleX": 1.1,
+            "scaleY": 0.9,
+            "recoverFrames": 5
+          }
+        },
+        {
+          "label": "early recover",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "late recover",
+          "stripFrames": [
+            3
+          ]
+        }
+      ]
+    },
+    "attack1": {
+      "kind": "phase",
+      "trigger": "phase",
+      "slots": [
+        {
+          "label": "windup",
+          "stripFrames": [
+            0,
+            1
+          ]
+        },
+        {
+          "label": "active",
+          "stripFrames": [
+            2,
+            3
+          ],
+          "cue": {
+            "scaleX": 1.2,
+            "scaleY": 0.8,
+            "recoverFrames": 5
+          }
+        },
+        {
+          "label": "early recover",
+          "stripFrames": [
+            4,
+            5
+          ]
+        },
+        {
+          "label": "late recover",
+          "stripFrames": [
+            6,
+            7
+          ]
+        }
+      ]
+    },
+    "climb": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        }
+      ]
+    },
+    "crouch": {
+      "kind": "single",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ],
+          "cue": {
+            "scaleX": 1.1,
+            "scaleY": 0.9,
+            "recoverFrames": 4
+          }
+        }
+      ]
+    },
+    "crouchattack0": {
+      "kind": "phase",
+      "trigger": "phase",
+      "slots": [
+        {
+          "label": "windup",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "active",
+          "stripFrames": [
+            1
+          ],
+          "cue": {
+            "scaleX": 1.1,
+            "scaleY": 0.9,
+            "recoverFrames": 5
+          }
+        },
+        {
+          "label": "early recover",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "late recover",
+          "stripFrames": [
+            3
+          ]
+        }
+      ]
+    },
+    "crouchattack1": {
+      "kind": "phase",
+      "trigger": "phase",
+      "slots": [
+        {
+          "label": "windup",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "active",
+          "stripFrames": [
+            1
+          ],
+          "cue": {
+            "scaleX": 1.1,
+            "scaleY": 0.9,
+            "recoverFrames": 5
+          }
+        },
+        {
+          "label": "early recover",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "late recover",
+          "stripFrames": [
+            3
+          ]
+        }
+      ]
+    },
+    "doorenter": {
+      "kind": "single",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        }
+      ]
+    },
+    "doorexit": {
+      "kind": "single",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        }
+      ]
+    },
+    "getup": {
+      "kind": "single",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        }
+      ]
+    },
+    "grabbed": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ]
+        }
+      ]
+    },
+    "hurt": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ]
+        },
+        {
+          "label": "frame 4",
+          "stripFrames": [
+            4
+          ]
+        },
+        {
+          "label": "frame 5",
+          "stripFrames": [
+            5
+          ]
+        }
+      ]
+    },
+    "idle": {
+      "kind": "single",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        }
+      ]
+    },
+    "item": {
+      "kind": "single",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        }
+      ]
+    },
+    "jump": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ],
+          "cue": {
+            "scaleY": 1.2,
+            "recoverFrames": 20
+          }
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ]
+        }
+      ]
+    },
+    "jumpsquat": {
+      "spriteAnimKey": "crouch",
+      "kind": "virtual",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        }
+      ]
+    },
+    "land": {
+      "spriteAnimKey": "crouch",
+      "kind": "virtual",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ],
+          "cue": {
+            "scaleX": 1.2,
+            "recoverFrames": 20
+          }
+        }
+      ]
+    },
+    "level": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ]
+        }
+      ]
+    },
+    "leveltransition": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ]
+        },
+        {
+          "label": "frame 4",
+          "stripFrames": [
+            4
+          ]
+        },
+        {
+          "label": "frame 5",
+          "stripFrames": [
+            5
+          ]
+        },
+        {
+          "label": "frame 6",
+          "stripFrames": [
+            6
+          ]
+        },
+        {
+          "label": "frame 7",
+          "stripFrames": [
+            7
+          ]
+        },
+        {
+          "label": "frame 8",
+          "stripFrames": [
+            8
+          ]
+        },
+        {
+          "label": "frame 9",
+          "stripFrames": [
+            9
+          ]
+        },
+        {
+          "label": "frame 10",
+          "stripFrames": [
+            10
+          ]
+        }
+      ]
+    },
+    "pluck": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ],
+          "cue": {
+            "scaleX": 1.1,
+            "scaleY": 0.9,
+            "recoverFrames": 5
+          }
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ],
+          "cue": {
+            "scaleX": 0.9,
+            "scaleY": 1.1,
+            "recoverFrames": 5
+          }
+        }
+      ]
+    },
+    "sideattack0": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ],
+          "cue": {
+            "scaleX": 1.1,
+            "scaleY": 0.9,
+            "recoverFrames": 5
+          }
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ]
+        },
+        {
+          "label": "frame 4",
+          "stripFrames": [
+            4
+          ]
+        },
+        {
+          "label": "frame 5",
+          "stripFrames": [
+            5
+          ],
+          "cue": {
+            "scaleX": 1.1,
+            "scaleY": 0.9,
+            "recoverFrames": 5
+          }
+        }
+      ]
+    },
+    "skate": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ]
+        }
+      ]
+    },
+    "slide": {
+      "kind": "single",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        }
+      ]
+    },
+    "specialattack0": {
+      "kind": "phase",
+      "trigger": "phase",
+      "slots": [
+        {
+          "label": "windup",
+          "stripFrames": [
+            0,
+            1
+          ]
+        },
+        {
+          "label": "active",
+          "stripFrames": [
+            2
+          ],
+          "cue": {
+            "scaleX": 1.1,
+            "scaleY": 0.9,
+            "recoverFrames": 5
+          }
+        },
+        {
+          "label": "early recover",
+          "stripFrames": [
+            3
+          ]
+        },
+        {
+          "label": "late recover",
+          "stripFrames": [
+            4
+          ]
+        }
+      ]
+    },
+    "throw": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ],
+          "cue": {
+            "scaleX": 1.1,
+            "scaleY": 0.9,
+            "recoverFrames": 5
+          }
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ]
+        },
+        {
+          "label": "frame 4",
+          "stripFrames": [
+            4
+          ]
+        }
+      ]
+    },
+    "turn": {
+      "kind": "single",
+      "trigger": "on_enter",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        }
+      ]
+    },
+    "upattack0": {
+      "kind": "phase",
+      "trigger": "phase",
+      "slots": [
+        {
+          "label": "windup",
+          "stripFrames": [
+            0,
+            1
+          ]
+        },
+        {
+          "label": "active",
+          "stripFrames": [
+            2
+          ],
+          "cue": {
+            "vx": 16.0,
+            "vy": -220.0,
+            "scaleX": 0.9,
+            "scaleY": 1.1,
+            "recoverFrames": 5,
+            "vySet": true
+          }
+        },
+        {
+          "label": "early recover",
+          "stripFrames": [
+            3,
+            4
+          ],
+          "cue": {
+            "vx": 8.0
+          }
+        },
+        {
+          "label": "late recover",
+          "stripFrames": [
+            5,
+            6
+          ]
+        }
+      ]
+    },
+    "walk": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        },
+        {
+          "label": "frame 2",
+          "stripFrames": [
+            2
+          ]
+        },
+        {
+          "label": "frame 3",
+          "stripFrames": [
+            3
+          ]
+        }
+      ]
+    },
+    "wallslide": {
+      "kind": "strip",
+      "trigger": "on_index_change",
+      "slots": [
+        {
+          "label": "frame 0",
+          "stripFrames": [
+            0
+          ]
+        },
+        {
+          "label": "frame 1",
+          "stripFrames": [
+            1
+          ]
+        }
+      ]
+    }
+  }
+}

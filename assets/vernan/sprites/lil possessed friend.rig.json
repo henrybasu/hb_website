@@ -1,0 +1,167 @@
+{
+  "_doc": "lil possessed familiar rig: a half-pint Possessed that trails Vernan and fires one aimed bullet when she attacks. Same 4-part layout as the boss (head, body, handL, handR) but smaller art, bobs without scanline warp, and is not damageable. Pose offsets are world px relative to the anchor (body center), art-faces-LEFT (+x right, +y down), mirrored when facing a target. 'angle' is degrees, positive = clockwise. Author poses in ./lil-possessed-editor.sh (art-left preview); in-game matches that when Vernan faces left, and mirrors when she faces right. Bullet hulls are texture-local px within the 8x8 bullet frame.",
+  "version": 1,
+  "enemy": "lil possessed friend",
+  "sheet": "lil possessed friend.png",
+  "frameSize": [
+    16,
+    16
+  ],
+  "parts": [
+    {
+      "name": "head",
+      "frame": 0,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.5,
+      "scanlineScale": 0.0,
+      "hulls": {      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "body",
+      "frame": 1,
+      "pivot": [
+        8,
+        7
+      ],
+      "hulls": {      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "handL",
+      "frame": 2,
+      "pivot": [
+        9,
+        7
+      ],
+      "hulls": {      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "handR",
+      "frame": 3,
+      "pivot": [
+        7,
+        7
+      ],
+      "hulls": {      },
+      "chainAttach": {      }
+    }
+  ],
+  "drawOrder": [
+    "handL",
+    "handR",
+    "body",
+    "head"
+  ],
+  "bob": {
+    "ampPx": 1.0,
+    "speedRadPerSec": 2.6,
+    "scanlineAmpPx": 0.0,
+    "perPartPhase": true
+  },
+  "poses": {
+    "idle": {
+      "head": {
+        "dx": -2,
+        "dy": -7,
+        "angle": 0
+      },
+      "body": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 0
+      },
+      "handL": {
+        "dx": -4,
+        "dy": 1,
+        "angle": 0
+      },
+      "handR": {
+        "dx": 5,
+        "dy": 1,
+        "angle": 0
+      }
+    },
+    "fire": {
+      "head": {
+        "dx": -1,
+        "dy": -7,
+        "angle": -4
+      },
+      "body": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 0
+      },
+      "handL": {
+        "dx": -5,
+        "dy": 2,
+        "angle": -18
+      },
+      "handR": {
+        "dx": 3,
+        "dy": 2,
+        "angle": 22
+      }
+    }
+  },
+  "idleSequence": [
+    "idle"
+  ],
+  "bullet": {
+    "sheet": "lil possessed bullet.png",
+    "dieSheet": "lil possessed bullet die.png",
+    "frameSize": [
+      8,
+      8
+    ],
+    "frames": 2,
+    "hulls": {
+      "collision": [
+        [
+          2,
+          2
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          2,
+          6
+        ]
+      ],
+      "hit": [
+        [
+          1,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          1,
+          7
+        ]
+      ]
+    }
+  },
+  "sequences": {
+    "idle": [
+      "idle"
+    ]
+  }
+}

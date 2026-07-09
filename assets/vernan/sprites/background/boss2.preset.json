@@ -1,0 +1,127 @@
+{
+  "id": "boss2",
+  "layers": [
+    {
+      "sprite": "boss2",
+      "frameMode": "animate",
+      "frameIndex": 1,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 3,
+      "opacity": 80,
+      "blend": "normal",
+      "zIndex": 0,
+      "transforms": [
+        {
+          "kind": "fisheye",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 186,
+          "strength": 1.5,
+          "rippleAmp": 0.12,
+          "rippleFreq": 0.5,
+          "timeRadPerTick": 0.01,
+          "phaseOffsetRad": 0.0
+        },
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": -24,
+          "vySubpxPerTick": 8
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 160,
+          "mulY": 160
+        },
+        {
+          "kind": "swirl",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 314.8383712319704,
+          "twistRad": 1.2,
+          "rippleAmp": 0.15,
+          "rippleFreq": 4.0,
+          "timeRadPerTick": 0.004999999999999999,
+          "phaseOffsetRad": 0.0
+        },
+        {
+          "kind": "wave2d",
+          "enabled": true,
+          "ampXPx": 2.0,
+          "ampYPx": 1.5,
+          "phasePerColRad": 0.35,
+          "phasePerRowRad": 0.45,
+          "pinnedCol": 15,
+          "pinnedRow": 19,
+          "timeRadPerTick": 0.23,
+          "phaseOffsetRad": 0.0
+        }
+      ],
+      "animateFrames": [
+        0,
+        1
+      ],
+      "ticksPerFrame": 60,
+      "animateLoop": true
+    },
+    {
+      "sprite": "boss2",
+      "frameMode": "single",
+      "frameIndex": 2,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 3,
+      "opacity": 160,
+      "blend": "lighten",
+      "zIndex": 1,
+      "transforms": [
+        {
+          "kind": "wave2d",
+          "enabled": true,
+          "ampXPx": 1.5,
+          "ampYPx": 13.0,
+          "phasePerColRad": 1.2,
+          "phasePerRowRad": 3.1,
+          "pinnedCol": 0,
+          "pinnedRow": 21,
+          "timeRadPerTick": 0.03,
+          "phaseOffsetRad": 4.799926459457306
+        },
+        {
+          "kind": "ripple",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 510,
+          "ampPx": 5.0,
+          "rings": 6.0,
+          "timeRadPerTick": 0.01,
+          "phaseOffsetRad": 7.1
+        },
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": -16,
+          "vySubpxPerTick": 16
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 16,
+          "mulY": 16
+        },
+        {
+          "kind": "polarScroll",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 510,
+          "angleRadPerTick": 0.01,
+          "radialPxPerTick": 0.0,
+          "strength": 0.1,
+          "phaseOffsetRad": 4.300000000000001
+        }
+      ]
+    }
+  ]
+}

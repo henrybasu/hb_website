@@ -1,0 +1,569 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/tileset.schema.json",
+  "title": "Vernan tileset.json",
+  "type": "object",
+  "required": ["formatVersion", "sheets", "tiles"],
+  "additionalProperties": true,
+  "properties": {
+    "formatVersion": { "type": "integer", "minimum": 1 },
+    "defaultTilePrototype": {
+      "type": "object",
+      "description": "Base tile JSON for Tile Editor v4 when creating tiles or re-applying; id/label are set by the editor."
+    },
+    "sheets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "required": ["id", "imagePath", "tileWidthPx", "tileHeightPx"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "imagePath": { "type": "string" },
+          "tileWidthPx": { "type": "integer", "minimum": 1 },
+          "tileHeightPx": { "type": "integer", "minimum": 1 },
+          "floorRange": { "$ref": "#/$defs/floorRange" }
+        }
+      }
+    },
+    "tiles": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/tileDef" }
+    },
+    "objects": {
+      "type": "array",
+      "description": "Logical objects: { id, tileIds[] } plus optional editor/runtime flags.",
+      "items": {
+        "type": "object",
+        "required": ["id", "tileIds"],
+        "additionalProperties": true,
+        "properties": {
+          "id": { "type": "string", "minLength": 1 },
+          "label": { "type": "string" },
+          "tileIds": { "type": "array", "items": { "type": "string", "minLength": 1 } },
+          "floorRange": { "$ref": "#/$defs/floorRange" },
+          "spawnFirstMemberOnly": {
+            "type": "boolean",
+            "description": "When true, procedural placement that picks a random member tile will only ever pick tileIds[0]."
+          },
+          "spawnAirOnly": {
+            "type": "boolean",
+            "description": "Legacy: air-only spawn hint. Prefer canSpawnOnGround + canSpawnInAir; readers still honor this when the new keys are absent."
+          },
+          "objectType": {
+            "type": "string",
+            "description": "Logical layout kind: tile+variations (default) = procedural EMPTY deco picks any member with equal chance; candle = only tileIds[0] in procedural picks; full object = multi-tile package (random deco uses first member only as anchor); autotile = neighbor-role pieces (random deco uses first member only; draw uses each tile's autotile JSON)."
+          },
+          "roomKinds": {
+            "type": "array",
+            "items": { "type": "string", "minLength": 1 },
+            "description": "Optional whitelist of room kinds for this object; mirrors member tile roomScope allowRoomKinds when synced."
+          },
+          "canSpawnOnGround": {
+            "type": "boolean",
+            "description": "When false, procedural deco placement skips grounded cells for this object's tiles (unless legacy spawnAirOnly implies false)."
+          },
+          "canSpawnInAir": {
+            "type": "boolean",
+            "description": "When true with canSpawnOnGround false, member tiles get implicit air-only deco placement rules (legacy spawnAirOnly)."
+          },
+          "gardeningPluckable": {
+            "type": "boolean",
+            "description": "When true, EMPTY deco from this object may be plucked with gardening gloves (grass-like pickup and loot). Legacy tilesets treat objects id grass and blue grass as pluckable when this key is absent."
+          },
+          "mapTerrain": {
+            "type": "string",
+            "description": "Object-level gameplay terrain; synced to every member tile mapTerrain in the editor save path."
+          },
+          "decoBlobClusterChannel": {
+            "type": "string",
+            "enum": ["red", "blue"],
+            "description": "Ambient procedural deco clusters: restrict this object's tiles to red- or blue-tinted ARGB blob sampling only. Omit for both channels (tiles not owned by any object still appear in both)."
+          },
+          "memberGraphLayout": {
+            "type": "object",
+            "description": "Tile Editor v4: logical member positions on a square grid (grid side ≥ member count, min 4). cells[] lists { tileId, x, y }; OK on Member layout derives orthogonal autotile.connectsWithTileIds from adjacency within each connected island. Disconnected islands each autotile independently at runtime.",
+            "additionalProperties": true,
+            "properties": {
+              "grid": { "type": "integer", "minimum": 1, "description": "Square board width/height in cells." },
+              "cells": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "required": ["tileId", "x", "y"],
+                  "additionalProperties": false,
+                  "properties": {
+                    "tileId": { "type": "string", "minLength": 1 },
+                    "x": { "type": "integer", "minimum": 0 },
+                    "y": { "type": "integer", "minimum": 0 },
+                    "requireAllNeighbors": {
+                      "type": "boolean",
+                      "description": "Interior tile: must be fully surrounded by connected grid neighbors at authoring time; mirrored to autotile.requireAllNeighbors."
+                    },
+                    "requireNoNeighbors": {
+                      "type": "boolean",
+                      "description": "Isolated tile: must have no connecting neighbors; mirrored to autotile.requireNoNeighbors."
+                    },
+                    "quadrantComposite": {
+                      "type": "boolean",
+                      "description": "Inner-corner overlay source tile (one per object); mirrored to autotile.quadrantComposite."
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "groups": { "type": "array" },
+    "physicsProfiles": { "type": "array" },
+    "autotileProfiles": {
+      "type": "array",
+      "deprecated": true,
+      "description": "DEPRECATED: legacy bitmask/verticalStack autotile profiles. Retired in favor of the canonical member-graph model (objects[].memberGraphLayout + per-tile autotile.connectsWithTileIds). Empty arrays are dropped by Tile Editor v4's 'Migrate legacy autotile' pass."
+    },
+    "autotileConnectGroups": {
+      "type": "array",
+      "deprecated": true,
+      "description": "DEPRECATED: legacy shared autotile connect sets referenced by tile autotile.connectGroupId. Retired in favor of per-tile autotile.connectsWithTileIds derived from the member-graph layout."
+    },
+    "hvstAutotileGroups": {
+      "type": "array",
+      "deprecated": true,
+      "description": "DEPRECATED: legacy TileEditorV3 HVST autotile groups. Retired in favor of the canonical member-graph model; stripped by Tile Editor v4's 'Migrate legacy autotile' pass."
+    },
+    "decoTilePool": {
+      "type": "array",
+      "description": "Library tile ids randomly chosen for procedural DecoTile overlays.",
+      "items": { "type": "string" }
+    },
+    "dungeonShaftLadderTileId": {
+      "type": "string",
+      "description": "Optional v3 tile id drawn only on dungeon shaft / room-transition ladder tiles (map column matches GeneratedRoom.ladderColumnTx). Other ladder columns still use terrain bridge."
+    },
+    "dungeonShaftLadderObjectId": {
+      "type": "string",
+      "description": "Alternative to dungeonShaftLadderTileId: objects[].id; uses that object's tileIds[0] as the shaft ladder visual."
+    },
+    "decoTilePlacementRules": {
+      "type": "object",
+      "description": "Per-deco-tile placement constraints applied as a post-pass on the generator's DecoTile list.",
+      "additionalProperties": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "groundOnly": { "type": "boolean", "description": "Cell directly below must be solid (e.g. SOLID/BREAKABLE/PLATFORM)." },
+          "airOnly": { "type": "boolean", "description": "Cell must be empty air AND the cell below must NOT be standable ground." },
+          "spawnWeight": { "type": "number", "minimum": 0, "maximum": 1, "description": "Global keep probability for this deco id (0..1)." },
+          "preferAboveObjects": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "object ids whose tileIds count as preferred ground neighbors below this deco."
+          },
+          "preferAboveWeight": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1,
+            "description": "Probability of keeping a deco that is above ground but NOT above a preferred object (0 = log-only, 1 = no preference)."
+          },
+          "preferAdjacentToObjects": {
+            "type": "array",
+            "items": { "type": "string" },
+            "description": "Object ids (expanded to tile ids): keep procedural deco only when a neighbor cell displays one of those tiles; orthogonal vs diagonal is controlled by the adjacent weight fields (default orthogonal-only)."
+          },
+          "preferAdjacentOrthogonalWeight": {
+            "type": "number",
+            "description": "When > 0 with preferAdjacentToObjects, orthogonal neighbors count toward the adjacent gate (default 1). If both this and preferAdjacentDiagonalWeight are <= 0, runtime treats orthogonal as 1."
+          },
+          "preferAdjacentDiagonalWeight": {
+            "type": "number",
+            "description": "When > 0 with preferAdjacentToObjects, diagonal neighbors count toward the adjacent gate (default 0 for legacy orthogonal-only behavior)."
+          }
+        }
+      }
+    },
+    "terrainBridge": {
+      "type": "object",
+      "description": "Maps TileMap terrain codes to v3 display/connect tile ids (replaces legacy terrain_bridge.json sidecar).",
+      "additionalProperties": true,
+      "properties": {
+        "formatVersion": { "type": "integer", "minimum": 1 },
+        "byTerrain": {
+          "type": "object",
+          "minProperties": 1,
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "object",
+                "required": ["displayTileId", "connectAsTileId"],
+                "additionalProperties": false,
+                "properties": {
+                  "displayTileId": { "type": "string", "minLength": 1 },
+                  "connectAsTileId": { "type": "string", "minLength": 1 }
+                }
+              },
+              {
+                "type": "object",
+                "required": ["displayChoices", "connectAsTileId"],
+                "additionalProperties": false,
+                "properties": {
+                  "connectAsTileId": { "type": "string", "minLength": 1 },
+                  "displayChoices": {
+                    "type": "array",
+                    "minItems": 1,
+                    "items": {
+                      "type": "object",
+                      "required": ["tileId", "weight"],
+                      "additionalProperties": false,
+                      "properties": {
+                        "tileId": { "type": "string", "minLength": 1 },
+                        "weight": { "type": "integer", "minimum": 1 }
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      }
+    },
+    "proceduralRoomGen": {
+      "type": "object",
+      "description": "Object-keyed procedural deco pools and optional RoomGenerator tunables per room kind.",
+      "additionalProperties": true,
+      "properties": {
+        "formatVersion": { "type": "integer", "minimum": 1 },
+        "decoPoolsByRoomKind": {
+          "type": "object",
+          "description": "Keys: START, NORMAL, ITEM, SHOP, BOSS, SECRET, SUPER_SECRET. Values: arrays of { objectId, weight?, tileIds?, memberIndices? }.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["objectId"],
+              "additionalProperties": false,
+              "properties": {
+                "objectId": { "type": "string", "minLength": 1 },
+                "weight": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Relative weight; may be fractional (e.g. 0.5). Integer weights repeat that many times in the expanded pick multiset."
+                },
+                "tileIds": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Subset of that object's tileIds; if omitted, all members are used."
+                },
+                "memberIndices": {
+                  "type": "array",
+                  "items": { "type": "integer", "minimum": 0 },
+                  "description": "0-based indices into objects[].tileIds; ignored if tileIds is set."
+                },
+                "editorAutoEmptyDeco": {
+                  "type": "boolean",
+                  "description": "When true, row is managed by TileEditorV4 Save (EMPTY member auto-pool); stripped before rewrite."
+                }
+              }
+            }
+          }
+        },
+        "terrainBridgePoolByRoomKind": {
+          "type": "object",
+          "description": "Keys: START, NORMAL, ITEM, SHOP, BOSS, SECRET, SUPER_SECRET. Objects-tab Weight column for non-EMPTY mapTerrain: relative weights merged into terrainBridge.displayChoicesByRoomKind on Save.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["objectId", "weight"],
+              "additionalProperties": false,
+              "properties": {
+                "objectId": { "type": "string", "minLength": 1 },
+                "weight": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Relative weight vs other terrain-bridge entries in this room kind (integer-rounded when building displayChoices)."
+                }
+              }
+            }
+          }
+        },
+        "placedPropsByRoomKind": {
+          "type": "object",
+          "description": "Keys: START, NORMAL, ITEM, SHOP, BOSS, SECRET, SUPER_SECRET. Pixel-placed logical objects on the floor (PlacedRoomObject); not deco blobs. Each room runs round(sum(weights)) placement attempts; each attempt picks one entry at random in proportion to weight (legacy count field is read as weight).",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["objectId"],
+              "additionalProperties": false,
+              "properties": {
+                "objectId": { "type": "string", "minLength": 1 },
+                "weight": {
+                  "type": "number",
+                  "minimum": 0,
+                  "exclusiveMinimum": 0,
+                  "description": "Relative spawn weight vs other placed props in this room kind."
+                },
+                "count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "description": "Legacy: treated as weight when weight is omitted."
+                },
+                "z": { "type": "integer", "description": "Draw order (zOrder)." },
+                "solidsOnly": {
+                  "type": "boolean",
+                  "description": "Legacy opt-in. When true, the object must have at least one member with mapTerrain SOLID (and RoomScope). Omitted or false: any member allowed by RoomScope suffices (PLATFORM, BREAKABLE, etc.). Default at runtime is false."
+                }
+              }
+            }
+          }
+        },
+        "tunablesByRoomKind": {
+          "type": "object",
+          "description": "Optional overrides for procedural placement; omitted fields use engine defaults.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "decoClusterCountMin": { "type": "integer", "minimum": 1 },
+              "decoClusterCountMax": { "type": "integer", "minimum": 1 },
+              "ladderPlacementModulo": { "type": "integer", "minimum": 1 },
+              "platformPlacementModulo": { "type": "integer", "minimum": 1 }
+            }
+          }
+        },
+        "decoClusterFallbackTileIdsByRoomKind": {
+          "type": "object",
+          "description": "Per DungeonLayout.RoomKind.name(): when the procedural deco pick multiset is empty, map legacy cluster ARGB channels to real v3 tile ids (red/blue ambient clusters, ITEM/SHOP overlay tints). Blank fields are auto-filled from the merged deco pool when possible.",
+          "additionalProperties": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "red": { "type": "string", "minLength": 1 },
+              "blue": { "type": "string", "minLength": 1 },
+              "itemBlob": { "type": "string", "minLength": 1 },
+              "itemRoomBlob": { "type": "string", "minLength": 1 },
+              "shopBlob": { "type": "string", "minLength": 1 },
+              "shopRoomBlob": { "type": "string", "minLength": 1 }
+            }
+          }
+        },
+        "normalBiomes": {
+          "type": "array",
+          "description": "Legacy flat biome list (migrated into normalBiomesBySheet on load). Prefer normalBiomesBySheet.",
+          "items": {
+            "$ref": "#/properties/proceduralRoomGen/properties/normalBiomesBySheet/additionalProperties/items"
+          }
+        },
+        "normalBiomesBySheet": {
+          "type": "object",
+          "description": "Sheet id → weighted NORMAL-room biome list. On first migration, legacy normalBiomes copy to the \"main\" sheet only; other sheets start with a default row.",
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "required": ["id", "weight"],
+              "additionalProperties": true,
+              "properties": {
+                "id": { "type": "string", "minLength": 1 },
+                "label": { "type": "string" },
+                "weight": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "description": "Relative rarity vs other biomes on this sheet when rolling per NORMAL room."
+                },
+                "decoPool": {
+                  "type": "array",
+                  "description": "Replaces proceduralRoomGen.decoPoolsByRoomKind.NORMAL when this biome is active.",
+                  "items": { "$ref": "#/properties/proceduralRoomGen/properties/decoPoolsByRoomKind/additionalProperties/items" }
+                },
+                "terrainBridgePool": {
+                  "type": "array",
+                  "description": "Replaces terrainBridgePoolByRoomKind.NORMAL display weights.",
+                  "items": { "$ref": "#/properties/proceduralRoomGen/properties/terrainBridgePoolByRoomKind/additionalProperties/items" }
+                },
+                "placedProps": {
+                  "type": "array",
+                  "description": "Replaces placedPropsByRoomKind.NORMAL.",
+                  "items": { "$ref": "#/properties/proceduralRoomGen/properties/placedPropsByRoomKind/additionalProperties/items" }
+                },
+                "tunables": {
+                  "type": "object",
+                  "description": "Replaces tunablesByRoomKind.NORMAL.",
+                  "additionalProperties": false,
+                  "properties": {
+                    "decoClusterCountMin": { "type": "integer", "minimum": 1 },
+                    "decoClusterCountMax": { "type": "integer", "minimum": 1 },
+                    "ladderPlacementModulo": { "type": "integer", "minimum": 1 },
+                    "platformPlacementModulo": { "type": "integer", "minimum": 1 }
+                  }
+                },
+                "decoClusterFallback": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "red": { "type": "string", "minLength": 1 },
+                    "blue": { "type": "string", "minLength": 1 }
+                  }
+                },
+                "contextThemeRules": {
+                  "type": "array",
+                  "description": "Replaces top-level contextThemeRules for this biome's NORMAL rooms.",
+                  "items": { "type": "object", "additionalProperties": true }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "floorRange": {
+      "type": "object",
+      "description": "Restricts procedural placement to in-game dungeon floors (gridY). { min, max } is inclusive; omit max for an open-ended floor >= min (deep-floor fallback). Absent floorRange = every floor.",
+      "additionalProperties": false,
+      "properties": {
+        "min": { "type": "integer" },
+        "max": { "type": "integer" }
+      }
+    },
+    "roomKind": {
+      "type": "string",
+      "enum": [
+        "START",
+        "NORMAL",
+        "ITEM",
+        "SHOP",
+        "BOSS",
+        "SECRET",
+        "SUPER_SECRET",
+        "SECRET_ROOM"
+      ]
+    },
+    "mapTerrain": {
+      "type": "string",
+      "enum": ["EMPTY", "SOLID", "DOOR", "PLATFORM", "LADDER", "BREAKABLE"]
+    },
+    "roomScope": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "allowRoomKinds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/roomKind" }
+        },
+        "denyRoomKinds": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/roomKind" }
+        }
+      }
+    },
+    "spriteCell": {
+      "type": "object",
+      "required": ["row", "col"],
+      "additionalProperties": false,
+      "properties": {
+        "row": { "type": "integer", "minimum": 0 },
+        "col": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "renderLayer": {
+      "type": "object",
+      "required": ["layerId", "z", "sprite"],
+      "additionalProperties": true,
+      "properties": {
+        "layerId": { "type": "string" },
+        "z": { "type": "integer" },
+        "sprite": {
+          "type": "object",
+          "required": ["sheetId", "cell"],
+          "additionalProperties": true,
+          "properties": {
+            "sheetId": { "type": "string" },
+            "cell": { "$ref": "#/$defs/spriteCell" }
+          }
+        },
+        "offsetXPx": { "type": "integer" },
+        "offsetYPx": { "type": "integer" },
+        "flipH": { "type": "boolean" },
+        "flipV": { "type": "boolean" },
+        "rotationMilliDeg": { "type": "integer" }
+      }
+    },
+    "tileDef": {
+      "type": "object",
+      "required": ["id", "renderLayers", "autotile", "hitbox", "sceneRoles", "parallax"],
+      "additionalProperties": true,
+      "properties": {
+        "id": { "type": "string", "minLength": 1 },
+        "label": { "type": "string" },
+        "mapTerrain": { "$ref": "#/$defs/mapTerrain" },
+        "terrainBridgeWeight": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Relative weight in procedural terrainBridge displayChoices pool for this tile's mapTerrain."
+        },
+        "terrainBridgeConnectAnchor": {
+          "type": "boolean",
+          "description": "When true, this tile id becomes connectAsTileId for its terrain bucket (else first tile id lexicographically)."
+        },
+        "canBreakAsDeco": {
+          "type": "boolean",
+          "description": "When true and this tile appears as procedural deco, each placement may roll sword-breakable (see breakableDecoChance)."
+        },
+        "breakableDecoChance": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Probability [0–1] that a spawned deco instance is breakable (e.g. 0.15 = 15%). Requires canBreakAsDeco."
+        },
+        "breakableDeco": {
+          "type": "boolean",
+          "description": "Legacy: treated as canBreakAsDeco with chance 1.0 if breakableDecoChance is absent."
+        },
+        "roomScope": { "$ref": "#/$defs/roomScope" },
+        "editorUi": { "type": "object", "additionalProperties": true },
+        "renderLayers": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "$ref": "#/$defs/renderLayer" }
+        },
+        "autotile": {
+          "type": "object",
+          "additionalProperties": true,
+          "properties": {
+            "enabled": { "type": "boolean" },
+            "profileId": { "type": "string", "deprecated": true, "description": "DEPRECATED: legacy bitmask/verticalStack profile id. Retired in favor of member-graph connectsWithTileIds." },
+            "connectGroupId": { "type": "string", "deprecated": true, "description": "DEPRECATED: legacy shared connect-group reference. Use connectsWithTileIds (derived from the member-graph layout)." },
+            "hvstGroupId": { "type": "string", "deprecated": true, "description": "DEPRECATED: legacy HVST group reference. Stripped by Tile Editor v4's 'Migrate legacy autotile' pass; horizontal-strip footprint is now derived from the object's member-graph island orientation." },
+            "connectsWithTileIds": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "requireAllNeighbors": {
+              "type": "boolean",
+              "description": "Member-graph autotile: this tile is only picked when all four orthogonal sides have connecting terrain."
+            },
+            "requireNoNeighbors": {
+              "type": "boolean",
+              "description": "Member-graph autotile: this tile is only picked when no orthogonal side has connecting terrain (isolated)."
+            },
+            "quadrantComposite": {
+              "type": "boolean",
+              "description": "Inner-corner overlay source: one 16×16 tile whose four 8×8 quadrants stamp concave corners when two ortho neighbors connect and the shared diagonal does not."
+            }
+          }
+        },
+        "hitbox": { "type": "object", "additionalProperties": true },
+        "sceneRoles": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "parallax": { "type": "object", "additionalProperties": true }
+      }
+    }
+  }
+}

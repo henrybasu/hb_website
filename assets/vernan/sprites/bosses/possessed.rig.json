@@ -1,0 +1,672 @@
+{
+  "_doc": "Possessed boss rig: part layout, poses, and per-part hitboxes. Authored by tools.EnemyEditor. Pose offsets are world px relative to the assembly anchor (body center), in art-faces-LEFT space (+x right, +y down), mirrored when facing Vernan. 'angle' is degrees, positive = clockwise. Hull polygons are per-part TEXTURE-LOCAL coords within the part's frame (origin top-left of the frame, +x right, +y down), points as [x,y]. Roles: hurt = receives damage, hit = deals contact damage to Vernan, collision = bounces off walls while knocked loose.",
+  "version": 1,
+  "enemy": "possessed",
+  "sheet": "possessed.png",
+  "frameSize": [
+    16,
+    16
+  ],
+  "parts": [
+    {
+      "name": "head",
+      "frame": 0,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 1.0,
+      "scanlineScale": 0.5,
+      "hulls": {
+        "hurt": [
+          [
+            3,
+            3
+          ],
+          [
+            5,
+            2
+          ],
+          [
+            11,
+            2
+          ],
+          [
+            13,
+            3
+          ],
+          [
+            16,
+            6
+          ],
+          [
+            16,
+            11
+          ],
+          [
+            14,
+            13
+          ],
+          [
+            12,
+            14
+          ],
+          [
+            4,
+            14
+          ],
+          [
+            2,
+            13
+          ],
+          [
+            1,
+            12
+          ],
+          [
+            1,
+            6
+          ],
+          [
+            2,
+            4
+          ]
+        ],
+        "collision": [
+          [
+            3,
+            2
+          ],
+          [
+            13,
+            2
+          ],
+          [
+            13,
+            13
+          ],
+          [
+            3,
+            13
+          ]
+        ]
+      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "body",
+      "frame": 1,
+      "pivot": [
+        8,
+        8
+      ],
+      "hulls": {
+        "hurt": [
+          [
+            3,
+            1
+          ],
+          [
+            13,
+            1
+          ],
+          [
+            14,
+            15
+          ],
+          [
+            2,
+            15
+          ]
+        ],
+        "hit": [
+          [
+            4,
+            2
+          ],
+          [
+            12,
+            2
+          ],
+          [
+            12,
+            13
+          ],
+          [
+            4,
+            13
+          ]
+        ],
+        "collision": [
+          [
+            3,
+            2
+          ],
+          [
+            13,
+            2
+          ],
+          [
+            13,
+            13
+          ],
+          [
+            3,
+            13
+          ]
+        ]
+      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "handL",
+      "frame": 2,
+      "pivot": [
+        8,
+        8
+      ],
+      "hulls": {
+        "hurt": [
+          [
+            5,
+            4
+          ],
+          [
+            7,
+            4
+          ],
+          [
+            11,
+            3
+          ],
+          [
+            13,
+            4
+          ],
+          [
+            13,
+            8
+          ],
+          [
+            11,
+            9
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            10,
+            13
+          ],
+          [
+            9,
+            13
+          ],
+          [
+            8,
+            12
+          ],
+          [
+            5,
+            12
+          ],
+          [
+            4,
+            11
+          ],
+          [
+            4,
+            5
+          ]
+        ],
+        "collision": [
+          [
+            4,
+            4
+          ],
+          [
+            12,
+            4
+          ],
+          [
+            12,
+            12
+          ],
+          [
+            4,
+            12
+          ]
+        ]
+      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "handR",
+      "frame": 3,
+      "pivot": [
+        8,
+        8
+      ],
+      "hulls": {
+        "hurt": [
+          [
+            6,
+            6
+          ],
+          [
+            9,
+            5
+          ],
+          [
+            11,
+            4
+          ],
+          [
+            13,
+            4
+          ],
+          [
+            14,
+            5
+          ],
+          [
+            14,
+            7
+          ],
+          [
+            13,
+            8
+          ],
+          [
+            11,
+            8
+          ],
+          [
+            11,
+            12
+          ],
+          [
+            10,
+            13
+          ],
+          [
+            5,
+            13
+          ],
+          [
+            4,
+            12
+          ],
+          [
+            4,
+            8
+          ]
+        ],
+        "collision": [
+          [
+            4,
+            4
+          ],
+          [
+            12,
+            4
+          ],
+          [
+            12,
+            12
+          ],
+          [
+            4,
+            12
+          ]
+        ]
+      },
+      "chainAttach": {      }
+    }
+  ],
+  "drawOrder": [
+    "handL",
+    "body",
+    "head",
+    "handR"
+  ],
+  "bob": {
+    "ampPx": 1.5,
+    "speedRadPerSec": 2.4,
+    "scanlineAmpPx": 1.0,
+    "perPartPhase": true
+  },
+  "poses": {
+    "idle": {
+      "head": {
+        "dx": -1,
+        "dy": -14,
+        "angle": 0
+      },
+      "body": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 0
+      },
+      "handL": {
+        "dx": -12,
+        "dy": 1,
+        "angle": 0
+      },
+      "handR": {
+        "dx": 11,
+        "dy": 0,
+        "angle": 0
+      }
+    },
+    "windup": {
+      "head": {
+        "dx": -4,
+        "dy": -13,
+        "angle": -36
+      },
+      "body": {
+        "dx": 0,
+        "dy": 1,
+        "angle": -7
+      },
+      "handL": {
+        "dx": -7,
+        "dy": 3,
+        "angle": -162
+      },
+      "handR": {
+        "dx": 7,
+        "dy": 3,
+        "angle": -117
+      }
+    },
+    "nova": {
+      "head": {
+        "dx": -2,
+        "dy": -13,
+        "angle": -25
+      },
+      "body": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 0
+      },
+      "handL": {
+        "dx": -7,
+        "dy": -8,
+        "angle": 34
+      },
+      "handR": {
+        "dx": 7,
+        "dy": -8,
+        "angle": -34
+      }
+    },
+    "telegraph": {
+      "head": {
+        "dx": -1,
+        "dy": -14,
+        "angle": -4
+      },
+      "body": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 0
+      },
+      "handL": {
+        "dx": -7,
+        "dy": 8,
+        "angle": -16
+      },
+      "handR": {
+        "dx": 7,
+        "dy": 7,
+        "angle": 40
+      }
+    },
+    "hurt": {
+      "head": {
+        "dx": 0,
+        "dy": -14,
+        "angle": -21
+      },
+      "body": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 32
+      },
+      "handL": {
+        "dx": -11,
+        "dy": -4,
+        "angle": 12
+      },
+      "handR": {
+        "dx": 12,
+        "dy": 0,
+        "angle": -12
+      }
+    },
+    "dash_windup": {
+      "head": {
+        "dx": 2,
+        "dy": -13,
+        "angle": 14
+      },
+      "body": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 12
+      },
+      "handL": {
+        "dx": -8,
+        "dy": -3,
+        "angle": -40
+      },
+      "handR": {
+        "dx": 8,
+        "dy": -3,
+        "angle": 40
+      }
+    },
+    "dash": {
+      "head": {
+        "dx": -7,
+        "dy": -7,
+        "angle": 11
+      },
+      "body": {
+        "dx": -2,
+        "dy": 5,
+        "angle": -58
+      },
+      "handL": {
+        "dx": 4,
+        "dy": 6,
+        "angle": 24
+      },
+      "handR": {
+        "dx": 13,
+        "dy": 3,
+        "angle": -30
+      }
+    },
+    "dash_0": {
+      "head": {
+        "dx": -5,
+        "dy": -7,
+        "angle": 25
+      },
+      "body": {
+        "dx": 0,
+        "dy": 5,
+        "angle": -46
+      },
+      "handL": {
+        "dx": 1,
+        "dy": 5,
+        "angle": 0
+      },
+      "handR": {
+        "dx": 11,
+        "dy": 0,
+        "angle": 0
+      }
+    },
+    "dash_windup_0": {
+      "head": {
+        "dx": 2,
+        "dy": -10,
+        "angle": 14
+      },
+      "body": {
+        "dx": -1,
+        "dy": 6,
+        "angle": 12
+      },
+      "handL": {
+        "dx": -9,
+        "dy": -9,
+        "angle": -406
+      },
+      "handR": {
+        "dx": 12,
+        "dy": -7,
+        "angle": 382
+      }
+    },
+    "dash_windup_1": {
+      "head": {
+        "dx": 3,
+        "dy": -7,
+        "angle": 14
+      },
+      "body": {
+        "dx": 1,
+        "dy": 7,
+        "angle": 12
+      },
+      "handL": {
+        "dx": -10,
+        "dy": -9,
+        "angle": -770
+      },
+      "handR": {
+        "dx": 14,
+        "dy": -7,
+        "angle": 750
+      }
+    },
+    "dash_windup_2": {
+      "head": {
+        "dx": 3,
+        "dy": -6,
+        "angle": 14
+      },
+      "body": {
+        "dx": 1,
+        "dy": 7,
+        "angle": 12
+      },
+      "handL": {
+        "dx": -7,
+        "dy": -12,
+        "angle": -937
+      },
+      "handR": {
+        "dx": 16,
+        "dy": -9,
+        "angle": 995
+      }
+    },
+    "dash_windup_3": {
+      "head": {
+        "dx": 1,
+        "dy": -9,
+        "angle": -13
+      },
+      "body": {
+        "dx": 1,
+        "dy": 7,
+        "angle": 12
+      },
+      "handL": {
+        "dx": -5,
+        "dy": -14,
+        "angle": -987
+      },
+      "handR": {
+        "dx": 16,
+        "dy": -13,
+        "angle": 1021
+      }
+    }
+  },
+  "idleSequence": [
+    "idle"
+  ],
+  "bullet": {
+    "sheet": "possessed bullet.png",
+    "dieSheet": "possessed bullet die.png",
+    "frameSize": [
+      8,
+      8
+    ],
+    "frames": 2,
+    "hulls": {
+      "collision": [
+        [
+          2,
+          2
+        ],
+        [
+          6,
+          2
+        ],
+        [
+          6,
+          6
+        ],
+        [
+          2,
+          6
+        ]
+      ],
+      "hit": [
+        [
+          1,
+          1
+        ],
+        [
+          7,
+          1
+        ],
+        [
+          7,
+          7
+        ],
+        [
+          1,
+          7
+        ]
+      ]
+    }
+  },
+  "sequences": {
+    "idle": [
+      "idle"
+    ],
+    "dash_windup": [
+      "dash_windup",
+      "dash_windup_0",
+      "dash_windup_1",
+      "dash_windup_2",
+      "dash_windup_3"
+    ],
+    "dash": [
+      "dash",
+      "dash_0"
+    ]
+  }
+}

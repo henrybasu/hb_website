@@ -1,0 +1,2522 @@
+{
+  "_doc": "Nephilim boss rig: puppet assembly from nephilim.png. Pose offsets are world px from the body anchor (body center), art-faces-LEFT (+x right, +y down). Skeleton: texture-local rest nodes per part, links between parts, bind rules u2192 dx/dy/angle, clips with world-space keyframes (Bake in Enemy Editor). The bind pose is editor-only (T-pose for chainAttach sockets); it is not referenced in sequences.",
+  "version": 1,
+  "enemy": "nephilim",
+  "sheet": "nephilim.png",
+  "frameSize": [
+    16,
+    16
+  ],
+  "parts": [
+    {
+      "name": "head",
+      "frame": 0,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.35,
+      "scanlineScale": 0.0,
+      "chainAttach": {
+        "parent": [
+          1.8000000000000043,
+          2.950000000000001
+        ]
+      },
+      "hulls": {
+        "hurt": [
+          [
+            1,
+            4
+          ],
+          [
+            0,
+            10
+          ],
+          [
+            0,
+            15
+          ],
+          [
+            3,
+            16
+          ],
+          [
+            5,
+            16
+          ],
+          [
+            9,
+            13
+          ],
+          [
+            13,
+            11
+          ],
+          [
+            16,
+            8
+          ],
+          [
+            16,
+            2
+          ],
+          [
+            14,
+            0
+          ],
+          [
+            5,
+            0
+          ]
+        ]
+      }
+    },
+    {
+      "name": "body",
+      "frame": 1,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.2,
+      "scanlineScale": 0.0,
+      "chainAttach": {
+        "socketNeck": [
+          -0.29999999999999716,
+          -3.8499999999999996
+        ],
+        "socketHandL": [
+          -5.0000000000000036,
+          -1.5000000000000009
+        ],
+        "socketHandR": [
+          3.9999999999999964,
+          -2.500000000000001
+        ],
+        "socketFootL": [
+          -3.132963073676681,
+          2.98342527859651
+        ],
+        "socketFootR": [
+          3.1735234406403485,
+          2.224014213554625
+        ]
+      },
+      "hulls": {
+        "hurt": [
+          [
+            3,
+            5
+          ],
+          [
+            2,
+            6
+          ],
+          [
+            2,
+            9
+          ],
+          [
+            4,
+            9
+          ],
+          [
+            4,
+            12
+          ],
+          [
+            5,
+            13
+          ],
+          [
+            11,
+            13
+          ],
+          [
+            12,
+            10
+          ],
+          [
+            12,
+            8
+          ],
+          [
+            14,
+            8
+          ],
+          [
+            15,
+            6
+          ],
+          [
+            13,
+            4
+          ],
+          [
+            8,
+            4
+          ]
+        ],
+        "hit": [
+          [
+            5,
+            5
+          ],
+          [
+            11,
+            5
+          ],
+          [
+            11,
+            11
+          ],
+          [
+            5,
+            11
+          ]
+        ]
+      }
+    },
+    {
+      "name": "neck",
+      "frame": 2,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.15,
+      "scanlineScale": 0.0,
+      "chainAttach": {
+        "parent": [
+          -0.29999999999999716,
+          2.1500000000000004
+        ],
+        "child": [
+          -1.1999999999999957,
+          -3.9499999999999993
+        ]
+      },
+      "hulls": {
+        "hit": [
+          [
+            6,
+            3
+          ],
+          [
+            9,
+            3
+          ],
+          [
+            9,
+            11
+          ],
+          [
+            6,
+            11
+          ]
+        ],
+        "hurt": [
+          [
+            6,
+            1
+          ],
+          [
+            6,
+            8
+          ],
+          [
+            4,
+            10
+          ],
+          [
+            4,
+            13
+          ],
+          [
+            5,
+            14
+          ],
+          [
+            10,
+            14
+          ],
+          [
+            11,
+            13
+          ],
+          [
+            11,
+            9
+          ],
+          [
+            9,
+            8
+          ],
+          [
+            9,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "name": "handL",
+      "frame": 3,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.5,
+      "scanlineScale": 0.0,
+      "chainAttach": {
+        "parent": [
+          0.5,
+          -5.9999999999999964
+        ],
+        "child": [
+          0.25,
+          6.857142857142858
+        ]
+      },
+      "hulls": {
+        "hurt": [
+          [
+            6,
+            1
+          ],
+          [
+            6,
+            7
+          ],
+          [
+            4,
+            9
+          ],
+          [
+            4,
+            12
+          ],
+          [
+            6,
+            13
+          ],
+          [
+            6,
+            16
+          ],
+          [
+            8,
+            16
+          ],
+          [
+            11,
+            14
+          ],
+          [
+            11,
+            7
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            1
+          ]
+        ],
+        "hit": [
+          [
+            6,
+            7
+          ],
+          [
+            6,
+            13
+          ],
+          [
+            10,
+            13
+          ],
+          [
+            10,
+            7
+          ]
+        ],
+        "grab": [
+          [
+            5,
+            6
+          ],
+          [
+            5,
+            14
+          ],
+          [
+            11,
+            14
+          ],
+          [
+            11,
+            6
+          ]
+        ]
+      }
+    },
+    {
+      "name": "handR",
+      "frame": 4,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.5,
+      "scanlineScale": 0.0,
+      "chainAttach": {
+        "parent": [
+          -0.5,
+          -5
+        ],
+        "child": [
+          -0.10714285714285765,
+          7.142857142857139
+        ]
+      },
+      "hulls": {
+        "hurt": [
+          [
+            5,
+            7
+          ],
+          [
+            5,
+            14
+          ],
+          [
+            7,
+            16
+          ],
+          [
+            10,
+            16
+          ],
+          [
+            10,
+            13
+          ],
+          [
+            12,
+            12
+          ],
+          [
+            10,
+            7
+          ],
+          [
+            10,
+            1
+          ],
+          [
+            7,
+            1
+          ],
+          [
+            6,
+            2
+          ],
+          [
+            6,
+            7
+          ]
+        ],
+        "hit": [
+          [
+            6,
+            7
+          ],
+          [
+            6,
+            13
+          ],
+          [
+            10,
+            13
+          ],
+          [
+            10,
+            7
+          ]
+        ],
+        "grab": [
+          [
+            5,
+            6
+          ],
+          [
+            5,
+            14
+          ],
+          [
+            11,
+            14
+          ],
+          [
+            11,
+            6
+          ]
+        ]
+      }
+    },
+    {
+      "name": "footL",
+      "frame": 5,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.45,
+      "scanlineScale": 0.0,
+      "chainAttach": {
+        "parent": [
+          2.1866694951650487,
+          -3.034390769594033
+        ],
+        "child": [
+          -0.09090909090908994,
+          7.22727272727273
+        ]
+      },
+      "hulls": {
+        "hit": [
+          [
+            4,
+            11
+          ],
+          [
+            4,
+            15
+          ],
+          [
+            11,
+            15
+          ],
+          [
+            11,
+            11
+          ]
+        ],
+        "hurt": [
+          [
+            14,
+            16
+          ],
+          [
+            3,
+            16
+          ],
+          [
+            2,
+            15
+          ],
+          [
+            2,
+            12
+          ],
+          [
+            8,
+            9
+          ],
+          [
+            8,
+            3
+          ],
+          [
+            12,
+            3
+          ],
+          [
+            12,
+            9
+          ],
+          [
+            14,
+            12
+          ]
+        ]
+      }
+    },
+    {
+      "name": "footR",
+      "frame": 6,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.45,
+      "scanlineScale": 0.0,
+      "chainAttach": {
+        "parent": [
+          -1.3459596194645655,
+          -4.014832401625743
+        ],
+        "child": [
+          0,
+          7
+        ]
+      },
+      "hulls": {
+        "hit": [
+          [
+            4,
+            11
+          ],
+          [
+            4,
+            15
+          ],
+          [
+            11,
+            15
+          ],
+          [
+            11,
+            11
+          ]
+        ],
+        "hurt": [
+          [
+            2,
+            16
+          ],
+          [
+            13,
+            16
+          ],
+          [
+            14,
+            15
+          ],
+          [
+            13,
+            11
+          ],
+          [
+            8,
+            9
+          ],
+          [
+            8,
+            3
+          ],
+          [
+            4,
+            3
+          ],
+          [
+            4,
+            9
+          ],
+          [
+            2,
+            12
+          ]
+        ]
+      }
+    },
+    {
+      "name": "armL",
+      "frame": 2,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.2,
+      "scanlineScale": 0.0,
+      "chainAttach": {
+        "parent": [
+          -0.5,
+          -7
+        ],
+        "child": [
+          -0.5,
+          6
+        ]
+      },
+      "hulls": {
+        "hit": [
+          [
+            6,
+            3
+          ],
+          [
+            9,
+            3
+          ],
+          [
+            9,
+            11
+          ],
+          [
+            6,
+            11
+          ]
+        ],
+        "hurt": [
+          [
+            6,
+            1
+          ],
+          [
+            6,
+            8
+          ],
+          [
+            4,
+            10
+          ],
+          [
+            4,
+            13
+          ],
+          [
+            5,
+            14
+          ],
+          [
+            10,
+            14
+          ],
+          [
+            11,
+            13
+          ],
+          [
+            11,
+            9
+          ],
+          [
+            9,
+            8
+          ],
+          [
+            9,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "name": "armR",
+      "frame": 2,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.2,
+      "scanlineScale": 0.0,
+      "chainAttach": {
+        "parent": [
+          -0.5,
+          -7
+        ],
+        "child": [
+          -0.5,
+          6
+        ]
+      },
+      "hulls": {
+        "hit": [
+          [
+            6,
+            3
+          ],
+          [
+            9,
+            3
+          ],
+          [
+            9,
+            11
+          ],
+          [
+            6,
+            11
+          ]
+        ],
+        "hurt": [
+          [
+            6,
+            1
+          ],
+          [
+            6,
+            8
+          ],
+          [
+            4,
+            10
+          ],
+          [
+            4,
+            13
+          ],
+          [
+            5,
+            14
+          ],
+          [
+            10,
+            14
+          ],
+          [
+            11,
+            13
+          ],
+          [
+            11,
+            9
+          ],
+          [
+            9,
+            8
+          ],
+          [
+            9,
+            1
+          ]
+        ]
+      }
+    },
+    {
+      "name": "connFootL",
+      "frame": 2,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.2,
+      "scanlineScale": 0.0,
+      "hulls": {
+        "hit": [
+          [
+            6,
+            3
+          ],
+          [
+            9,
+            3
+          ],
+          [
+            9,
+            11
+          ],
+          [
+            6,
+            11
+          ]
+        ],
+        "hurt": [
+          [
+            6,
+            1
+          ],
+          [
+            6,
+            8
+          ],
+          [
+            4,
+            10
+          ],
+          [
+            4,
+            13
+          ],
+          [
+            5,
+            14
+          ],
+          [
+            10,
+            14
+          ],
+          [
+            11,
+            13
+          ],
+          [
+            11,
+            9
+          ],
+          [
+            9,
+            8
+          ],
+          [
+            9,
+            1
+          ]
+        ]
+      },
+      "chainAttach": {
+        "parent": [
+          -0.5,
+          -7
+        ],
+        "child": [
+          -0.5,
+          6
+        ]
+      }
+    },
+    {
+      "name": "connFootR",
+      "frame": 2,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.2,
+      "scanlineScale": 0.0,
+      "hulls": {
+        "hit": [
+          [
+            6,
+            3
+          ],
+          [
+            9,
+            3
+          ],
+          [
+            9,
+            11
+          ],
+          [
+            6,
+            11
+          ]
+        ],
+        "hurt": [
+          [
+            6,
+            1
+          ],
+          [
+            6,
+            8
+          ],
+          [
+            4,
+            10
+          ],
+          [
+            4,
+            13
+          ],
+          [
+            5,
+            14
+          ],
+          [
+            10,
+            14
+          ],
+          [
+            11,
+            13
+          ],
+          [
+            11,
+            9
+          ],
+          [
+            9,
+            8
+          ],
+          [
+            9,
+            1
+          ]
+        ]
+      },
+      "chainAttach": {
+        "parent": [
+          -0.5,
+          -7
+        ],
+        "child": [
+          -0.5,
+          6
+        ]
+      }
+    }
+  ],
+  "drawOrder": [
+    "armL",
+    "neck",
+    "handL",
+    "connFootL",
+    "body",
+    "connFootR",
+    "footL",
+    "footR",
+    "armR",
+    "head",
+    "handR"
+  ],
+  "bob": {
+    "ampPx": 0.8,
+    "speedRadPerSec": 2.2,
+    "scanlineAmpPx": 0.0,
+    "perPartPhase": true
+  },
+  "poses": {
+    "idle": {
+      "head": {
+        "dx": -1,
+        "dy": -18,
+        "angle": -3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -5,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -11,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -9,
+        "dy": 10,
+        "angle": 25
+      },
+      "handR": {
+        "dx": 14,
+        "dy": 10,
+        "angle": -13
+      },
+      "armL": {
+        "dx": -4,
+        "dy": 0,
+        "angle": 10
+      },
+      "armR": {
+        "dx": 11,
+        "dy": -1,
+        "angle": -25
+      },
+      "footL": {
+        "dx": -4,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 9,
+        "dy": 14,
+        "angle": 0
+      },
+      "connFootL": {
+        "dx": -1,
+        "dy": 5,
+        "angle": 3
+      },
+      "connFootR": {
+        "dx": 7,
+        "dy": 4,
+        "angle": -11
+      }
+    },
+    "bind": {
+      "head": {
+        "dx": -1,
+        "dy": -18,
+        "angle": 0
+      },
+      "body": {
+        "dx": 2,
+        "dy": -5,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -11,
+        "angle": 0
+      },
+      "handL": {
+        "dx": -22,
+        "dy": -7,
+        "angle": 90
+      },
+      "handR": {
+        "dx": 24,
+        "dy": -8,
+        "angle": -90
+      },
+      "armL": {
+        "dx": -10,
+        "dy": -6,
+        "angle": 90
+      },
+      "armR": {
+        "dx": 13,
+        "dy": -8,
+        "angle": -90
+      },
+      "footL": {
+        "dx": -4,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 9,
+        "dy": 14,
+        "angle": 0
+      },
+      "connFootL": {
+        "dx": -1,
+        "dy": 5,
+        "angle": 3
+      },
+      "connFootR": {
+        "dx": 7,
+        "dy": 4,
+        "angle": -11
+      }
+    },
+    "death": {
+      "head": {
+        "dx": -1,
+        "dy": -17,
+        "angle": 6
+      },
+      "body": {
+        "dx": 2,
+        "dy": -4,
+        "angle": 8
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -10,
+        "angle": 4
+      },
+      "handL": {
+        "dx": -12,
+        "dy": 11,
+        "angle": 38
+      },
+      "handR": {
+        "dx": 17,
+        "dy": 10,
+        "angle": -28
+      },
+      "armL": {
+        "dx": -5,
+        "dy": 1,
+        "angle": 18
+      },
+      "armR": {
+        "dx": 12,
+        "dy": 0,
+        "angle": -32
+      },
+      "footL": {
+        "dx": -5,
+        "dy": 15,
+        "angle": 4
+      },
+      "footR": {
+        "dx": 10,
+        "dy": 15,
+        "angle": -4
+      },
+      "connFootL": {
+        "dx": -2,
+        "dy": 6,
+        "angle": 8
+      },
+      "connFootR": {
+        "dx": 8,
+        "dy": 5,
+        "angle": -14
+      }
+    },
+    "walk": {
+      "head": {
+        "dx": 2,
+        "dy": -20,
+        "angle": 3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -5,
+        "angle": 12
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -11,
+        "angle": 2
+      },
+      "handL": {
+        "dx": -19,
+        "dy": -1,
+        "angle": 63
+      },
+      "handR": {
+        "dx": 17,
+        "dy": 9,
+        "angle": -21
+      },
+      "armL": {
+        "dx": -8,
+        "dy": -5,
+        "angle": 74
+      },
+      "armR": {
+        "dx": 12,
+        "dy": -2,
+        "angle": -40
+      },
+      "footL": {
+        "dx": -8,
+        "dy": 11,
+        "angle": -18
+      },
+      "footR": {
+        "dx": 7,
+        "dy": 14,
+        "angle": 0
+      },
+      "connFootL": {
+        "dx": -4,
+        "dy": 3,
+        "angle": 32
+      },
+      "connFootR": {
+        "dx": 5,
+        "dy": 5,
+        "angle": 0
+      }
+    },
+    "idle_0": {
+      "head": {
+        "dx": -1,
+        "dy": -14,
+        "angle": -3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -3,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -8,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -14,
+        "dy": 10,
+        "angle": 24
+      },
+      "handR": {
+        "dx": 18,
+        "dy": 10,
+        "angle": -22
+      },
+      "footL": {
+        "dx": -8,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 11,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -7,
+        "dy": 1,
+        "angle": 41
+      },
+      "armR": {
+        "dx": 12,
+        "dy": 0,
+        "angle": -40
+      },
+      "connFootL": {
+        "dx": -3,
+        "dy": 6,
+        "angle": 26
+      },
+      "connFootR": {
+        "dx": 8,
+        "dy": 5,
+        "angle": -27
+      }
+    },
+    "idle_1": {
+      "head": {
+        "dx": -1,
+        "dy": -17,
+        "angle": -3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -5,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -11,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -10,
+        "dy": 9,
+        "angle": 17
+      },
+      "handR": {
+        "dx": 14,
+        "dy": 10,
+        "angle": -13
+      },
+      "footL": {
+        "dx": -4,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 9,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -6,
+        "dy": -1,
+        "angle": 25
+      },
+      "armR": {
+        "dx": 11,
+        "dy": -1,
+        "angle": -25
+      },
+      "connFootL": {
+        "dx": -1,
+        "dy": 5,
+        "angle": 3
+      },
+      "connFootR": {
+        "dx": 7,
+        "dy": 4,
+        "angle": -11
+      }
+    },
+    "idle_2": {
+      "head": {
+        "dx": -1,
+        "dy": -17,
+        "angle": -3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -5,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -11,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -10,
+        "dy": 9,
+        "angle": 17
+      },
+      "handR": {
+        "dx": 14,
+        "dy": 10,
+        "angle": -13
+      },
+      "footL": {
+        "dx": -4,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 9,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -6,
+        "dy": -1,
+        "angle": 25
+      },
+      "armR": {
+        "dx": 11,
+        "dy": -1,
+        "angle": -25
+      },
+      "connFootL": {
+        "dx": -1,
+        "dy": 5,
+        "angle": 3
+      },
+      "connFootR": {
+        "dx": 7,
+        "dy": 4,
+        "angle": -11
+      }
+    },
+    "idle_3": {
+      "head": {
+        "dx": -1,
+        "dy": -14,
+        "angle": -3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -3,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -8,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -14,
+        "dy": 10,
+        "angle": 24
+      },
+      "handR": {
+        "dx": 18,
+        "dy": 10,
+        "angle": -22
+      },
+      "footL": {
+        "dx": -8,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 11,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -7,
+        "dy": 1,
+        "angle": 41
+      },
+      "armR": {
+        "dx": 12,
+        "dy": 0,
+        "angle": -40
+      },
+      "connFootL": {
+        "dx": -3,
+        "dy": 6,
+        "angle": 26
+      },
+      "connFootR": {
+        "dx": 8,
+        "dy": 5,
+        "angle": -27
+      }
+    },
+    "walk_0": {
+      "head": {
+        "dx": -3,
+        "dy": -18,
+        "angle": 3
+      },
+      "body": {
+        "dx": -1,
+        "dy": -4,
+        "angle": -12
+      },
+      "neck": {
+        "dx": -1,
+        "dy": -10,
+        "angle": -2
+      },
+      "handL": {
+        "dx": -20,
+        "dy": 7,
+        "angle": 65
+      },
+      "handR": {
+        "dx": 15,
+        "dy": 7,
+        "angle": -21
+      },
+      "footL": {
+        "dx": -14,
+        "dy": 12,
+        "angle": 19
+      },
+      "footR": {
+        "dx": 7,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -10,
+        "dy": 1,
+        "angle": 44
+      },
+      "armR": {
+        "dx": 9,
+        "dy": -3,
+        "angle": -44
+      },
+      "connFootL": {
+        "dx": -7,
+        "dy": 5,
+        "angle": 45
+      },
+      "connFootR": {
+        "dx": 4,
+        "dy": 5,
+        "angle": -18
+      }
+    },
+    "walk_1": {
+      "head": {
+        "dx": -10,
+        "dy": -15,
+        "angle": -6
+      },
+      "body": {
+        "dx": -4,
+        "dy": -3,
+        "angle": -12
+      },
+      "neck": {
+        "dx": -5,
+        "dy": -9,
+        "angle": -13
+      },
+      "handL": {
+        "dx": -20,
+        "dy": 10,
+        "angle": 65
+      },
+      "handR": {
+        "dx": 14,
+        "dy": 5,
+        "angle": -21
+      },
+      "footL": {
+        "dx": -12,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 9,
+        "dy": 13,
+        "angle": -11
+      },
+      "armL": {
+        "dx": -11,
+        "dy": 3,
+        "angle": 25
+      },
+      "armR": {
+        "dx": 7,
+        "dy": -4,
+        "angle": -61
+      },
+      "connFootL": {
+        "dx": -7,
+        "dy": 6,
+        "angle": 30
+      },
+      "connFootR": {
+        "dx": 3,
+        "dy": 5,
+        "angle": -36
+      }
+    },
+    "walk_2": {
+      "head": {
+        "dx": -4,
+        "dy": -17,
+        "angle": -6
+      },
+      "body": {
+        "dx": 0,
+        "dy": -4,
+        "angle": -3
+      },
+      "neck": {
+        "dx": -1,
+        "dy": -10,
+        "angle": -13
+      },
+      "handL": {
+        "dx": -18,
+        "dy": 7,
+        "angle": 81
+      },
+      "handR": {
+        "dx": 19,
+        "dy": 4,
+        "angle": -43
+      },
+      "footL": {
+        "dx": -6,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 5,
+        "dy": 12,
+        "angle": -18
+      },
+      "armL": {
+        "dx": -8,
+        "dy": 1,
+        "angle": 25
+      },
+      "armR": {
+        "dx": 10,
+        "dy": -4,
+        "angle": -65
+      },
+      "connFootL": {
+        "dx": -3,
+        "dy": 6,
+        "angle": 18
+      },
+      "connFootR": {
+        "dx": 3,
+        "dy": 5,
+        "angle": 7
+      }
+    },
+    "walk_3": {
+      "head": {
+        "dx": -2,
+        "dy": -18,
+        "angle": 4
+      },
+      "body": {
+        "dx": 0,
+        "dy": -4,
+        "angle": 5
+      },
+      "neck": {
+        "dx": 1,
+        "dy": -10,
+        "angle": -2
+      },
+      "handL": {
+        "dx": -16,
+        "dy": 7,
+        "angle": 65
+      },
+      "handR": {
+        "dx": 19,
+        "dy": 5,
+        "angle": -59
+      },
+      "footL": {
+        "dx": 0,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": -4,
+        "dy": 11,
+        "angle": -20
+      },
+      "armL": {
+        "dx": -7,
+        "dy": 0,
+        "angle": 31
+      },
+      "armR": {
+        "dx": 10,
+        "dy": -2,
+        "angle": -48
+      },
+      "connFootL": {
+        "dx": 2,
+        "dy": 5,
+        "angle": 12
+      },
+      "connFootR": {
+        "dx": -5,
+        "dy": 5,
+        "angle": 36
+      }
+    },
+    "idle_4": {
+      "head": {
+        "dx": -1,
+        "dy": -17,
+        "angle": -3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -4,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -10,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -12,
+        "dy": 9,
+        "angle": 41
+      },
+      "handR": {
+        "dx": 15,
+        "dy": 9,
+        "angle": -16
+      },
+      "footL": {
+        "dx": -5,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 10,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -5,
+        "dy": 1,
+        "angle": 21
+      },
+      "armR": {
+        "dx": 11,
+        "dy": -1,
+        "angle": -33
+      },
+      "connFootL": {
+        "dx": -1,
+        "dy": 5,
+        "angle": 14
+      },
+      "connFootR": {
+        "dx": 7,
+        "dy": 5,
+        "angle": -21
+      }
+    },
+    "rest": {
+      "head": {
+        "dx": -1,
+        "dy": -14,
+        "angle": -3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -3,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -8,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -14,
+        "dy": 10,
+        "angle": 24
+      },
+      "handR": {
+        "dx": 18,
+        "dy": 10,
+        "angle": -22
+      },
+      "footL": {
+        "dx": -8,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 11,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -7,
+        "dy": 1,
+        "angle": 41
+      },
+      "armR": {
+        "dx": 12,
+        "dy": 0,
+        "angle": -40
+      },
+      "connFootL": {
+        "dx": -3,
+        "dy": 6,
+        "angle": 26
+      },
+      "connFootR": {
+        "dx": 8,
+        "dy": 5,
+        "angle": -27
+      }
+    },
+    "rest_0": {
+      "head": {
+        "dx": -2,
+        "dy": -14,
+        "angle": -24
+      },
+      "body": {
+        "dx": 2,
+        "dy": -3,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -8,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -4,
+        "dy": 12,
+        "angle": 10
+      },
+      "handR": {
+        "dx": 7,
+        "dy": 13,
+        "angle": -1
+      },
+      "footL": {
+        "dx": -6,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 11,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -3,
+        "dy": 1,
+        "angle": -4
+      },
+      "armR": {
+        "dx": 8,
+        "dy": 1,
+        "angle": -2
+      },
+      "connFootL": {
+        "dx": -3,
+        "dy": 6,
+        "angle": 26
+      },
+      "connFootR": {
+        "dx": 8,
+        "dy": 5,
+        "angle": -27
+      }
+    },
+    "awaken_0": {
+      "head": {
+        "dx": -2,
+        "dy": -14,
+        "angle": -24
+      },
+      "body": {
+        "dx": 2,
+        "dy": -3,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -8,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -4,
+        "dy": 12,
+        "angle": 10
+      },
+      "handR": {
+        "dx": 7,
+        "dy": 13,
+        "angle": -1
+      },
+      "footL": {
+        "dx": -6,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 11,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -3,
+        "dy": 1,
+        "angle": -4
+      },
+      "armR": {
+        "dx": 8,
+        "dy": 1,
+        "angle": -2
+      },
+      "connFootL": {
+        "dx": -3,
+        "dy": 6,
+        "angle": 26
+      },
+      "connFootR": {
+        "dx": 8,
+        "dy": 5,
+        "angle": -27
+      }
+    },
+    "awaken": {
+      "head": {
+        "dx": -1,
+        "dy": -14,
+        "angle": -3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -3,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -8,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -14,
+        "dy": 10,
+        "angle": 24
+      },
+      "handR": {
+        "dx": 18,
+        "dy": 10,
+        "angle": -22
+      },
+      "footL": {
+        "dx": -8,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 11,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -7,
+        "dy": 1,
+        "angle": 41
+      },
+      "armR": {
+        "dx": 12,
+        "dy": 0,
+        "angle": -40
+      },
+      "connFootL": {
+        "dx": -3,
+        "dy": 6,
+        "angle": 26
+      },
+      "connFootR": {
+        "dx": 8,
+        "dy": 5,
+        "angle": -27
+      }
+    },
+    "awaken_1": {
+      "head": {
+        "dx": -1,
+        "dy": -14,
+        "angle": -3
+      },
+      "body": {
+        "dx": 2,
+        "dy": -4,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -8,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -9,
+        "dy": 11,
+        "angle": 13
+      },
+      "handR": {
+        "dx": 13,
+        "dy": 11,
+        "angle": -15
+      },
+      "footL": {
+        "dx": -5,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 10,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -5,
+        "dy": 1,
+        "angle": 22
+      },
+      "armR": {
+        "dx": 10,
+        "dy": 0,
+        "angle": -21
+      },
+      "connFootL": {
+        "dx": -2,
+        "dy": 6,
+        "angle": 19
+      },
+      "connFootR": {
+        "dx": 7,
+        "dy": 5,
+        "angle": -19
+      }
+    },
+    "grab_windup": {
+      "head": {
+        "dx": 5,
+        "dy": -19,
+        "angle": 9
+      },
+      "body": {
+        "dx": 5,
+        "dy": -6,
+        "angle": 16
+      },
+      "neck": {
+        "dx": 7,
+        "dy": -12,
+        "angle": 13
+      },
+      "handL": {
+        "dx": -4,
+        "dy": -20,
+        "angle": -141
+      },
+      "handR": {
+        "dx": 18,
+        "dy": -20,
+        "angle": 170
+      },
+      "armL": {
+        "dx": -4,
+        "dy": -11,
+        "angle": 121
+      },
+      "armR": {
+        "dx": 15,
+        "dy": -11,
+        "angle": -133
+      },
+      "footL": {
+        "dx": -6,
+        "dy": 7,
+        "angle": -37
+      },
+      "footR": {
+        "dx": 9,
+        "dy": 14,
+        "angle": 8
+      },
+      "connFootL": {
+        "dx": -3,
+        "dy": 1,
+        "angle": 58
+      },
+      "connFootR": {
+        "dx": 8,
+        "dy": 4,
+        "angle": -11
+      }
+    },
+    "arm_guard": {
+      "head": {
+        "dx": -3,
+        "dy": -17,
+        "angle": -31
+      },
+      "body": {
+        "dx": 2,
+        "dy": -5,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -11,
+        "angle": -4
+      },
+      "handL": {
+        "dx": -11,
+        "dy": -9,
+        "angle": -173
+      },
+      "handR": {
+        "dx": 0,
+        "dy": -4,
+        "angle": 151
+      },
+      "armL": {
+        "dx": -7,
+        "dy": -4,
+        "angle": 64
+      },
+      "armR": {
+        "dx": 6,
+        "dy": -3,
+        "angle": 23
+      },
+      "footL": {
+        "dx": -10,
+        "dy": 11,
+        "angle": 22
+      },
+      "footR": {
+        "dx": 9,
+        "dy": 14,
+        "angle": 0
+      },
+      "connFootL": {
+        "dx": -3,
+        "dy": 4,
+        "angle": 35
+      },
+      "connFootR": {
+        "dx": 7,
+        "dy": 4,
+        "angle": -11
+      }
+    },
+    "grab_reach": {
+      "head": {
+        "dx": -10,
+        "dy": -14,
+        "angle": -21
+      },
+      "body": {
+        "dx": -4,
+        "dy": -3,
+        "angle": -8
+      },
+      "neck": {
+        "dx": -5,
+        "dy": -9,
+        "angle": -26
+      },
+      "handL": {
+        "dx": -27,
+        "dy": -2,
+        "angle": 83
+      },
+      "handR": {
+        "dx": -14,
+        "dy": 3,
+        "angle": 64
+      },
+      "armL": {
+        "dx": -14,
+        "dy": -3,
+        "angle": 84
+      },
+      "armR": {
+        "dx": -4,
+        "dy": -3,
+        "angle": 60
+      },
+      "footL": {
+        "dx": -11,
+        "dy": 12,
+        "angle": -62
+      },
+      "footR": {
+        "dx": 7,
+        "dy": 14,
+        "angle": 0
+      },
+      "connFootL": {
+        "dx": -10,
+        "dy": 6,
+        "angle": 51
+      },
+      "connFootR": {
+        "dx": 3,
+        "dy": 5,
+        "angle": -39
+      }
+    },
+    "grab_recover": {
+      "head": {
+        "dx": -1,
+        "dy": -17,
+        "angle": -2
+      },
+      "body": {
+        "dx": 2.0,
+        "dy": -5.142857142857143,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -11,
+        "angle": -9
+      },
+      "handL": {
+        "dx": -11,
+        "dy": 12,
+        "angle": 18
+      },
+      "handR": {
+        "dx": 17,
+        "dy": 6,
+        "angle": -10
+      },
+      "armL": {
+        "dx": -5,
+        "dy": 1,
+        "angle": 14
+      },
+      "armR": {
+        "dx": 12,
+        "dy": -4,
+        "angle": -60
+      },
+      "footL": {
+        "dx": -7,
+        "dy": 13,
+        "angle": 13
+      },
+      "footR": {
+        "dx": 9,
+        "dy": 14,
+        "angle": 0
+      },
+      "connFootL": {
+        "dx": -2,
+        "dy": 5,
+        "angle": 18
+      },
+      "connFootR": {
+        "dx": 7,
+        "dy": 4,
+        "angle": -11
+      }
+    },
+    "death_0": {
+      "head": {
+        "dx": 3,
+        "dy": -18,
+        "angle": 31
+      },
+      "body": {
+        "dx": 2,
+        "dy": -4,
+        "angle": 8
+      },
+      "neck": {
+        "dx": 2,
+        "dy": -10,
+        "angle": 4
+      },
+      "handL": {
+        "dx": -6,
+        "dy": 11,
+        "angle": 17
+      },
+      "handR": {
+        "dx": 11,
+        "dy": 12,
+        "angle": -4
+      },
+      "footL": {
+        "dx": -5,
+        "dy": 15,
+        "angle": 4
+      },
+      "footR": {
+        "dx": 10,
+        "dy": 15,
+        "angle": -4
+      },
+      "armL": {
+        "dx": -3,
+        "dy": 0,
+        "angle": 5
+      },
+      "armR": {
+        "dx": 10,
+        "dy": 1,
+        "angle": -14
+      },
+      "connFootL": {
+        "dx": -2,
+        "dy": 6,
+        "angle": 8
+      },
+      "connFootR": {
+        "dx": 8,
+        "dy": 5,
+        "angle": -14
+      }
+    },
+    "grab_0": {
+      "head": {
+        "dx": -12,
+        "dy": -13,
+        "angle": -36
+      },
+      "body": {
+        "dx": -4,
+        "dy": -2,
+        "angle": -8
+      },
+      "neck": {
+        "dx": -6,
+        "dy": -8,
+        "angle": -26
+      },
+      "handL": {
+        "dx": -14,
+        "dy": 1,
+        "angle": -61
+      },
+      "handR": {
+        "dx": -11,
+        "dy": -3,
+        "angle": 148
+      },
+      "footL": {
+        "dx": -16,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 7,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -14,
+        "dy": -3,
+        "angle": 84
+      },
+      "armR": {
+        "dx": -3,
+        "dy": -1,
+        "angle": 44
+      },
+      "connFootL": {
+        "dx": -10,
+        "dy": 6,
+        "angle": 51
+      },
+      "connFootR": {
+        "dx": 3,
+        "dy": 5,
+        "angle": -46
+      }
+    },
+    "grab_1": {
+      "head": {
+        "dx": -7,
+        "dy": -14,
+        "angle": -46
+      },
+      "body": {
+        "dx": -2,
+        "dy": -3,
+        "angle": -8
+      },
+      "neck": {
+        "dx": -2,
+        "dy": -9,
+        "angle": -7
+      },
+      "handL": {
+        "dx": -13,
+        "dy": 1,
+        "angle": -61
+      },
+      "handR": {
+        "dx": -11,
+        "dy": -2,
+        "angle": 148
+      },
+      "footL": {
+        "dx": -14,
+        "dy": 13,
+        "angle": 14
+      },
+      "footR": {
+        "dx": 8,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -13,
+        "dy": -3,
+        "angle": 84
+      },
+      "armR": {
+        "dx": -3,
+        "dy": -1,
+        "angle": 52
+      },
+      "connFootL": {
+        "dx": -7,
+        "dy": 6,
+        "angle": 36
+      },
+      "connFootR": {
+        "dx": 4,
+        "dy": 5,
+        "angle": -33
+      }
+    },
+    "lift_0": {
+      "head": {
+        "dx": -6,
+        "dy": -13,
+        "angle": -57
+      },
+      "body": {
+        "dx": 2,
+        "dy": -5,
+        "angle": 0
+      },
+      "neck": {
+        "dx": 1,
+        "dy": -11,
+        "angle": -36
+      },
+      "handL": {
+        "dx": -6,
+        "dy": 12,
+        "angle": 3
+      },
+      "handR": {
+        "dx": 11,
+        "dy": 10,
+        "angle": -4
+      },
+      "footL": {
+        "dx": -4,
+        "dy": 14,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 9,
+        "dy": 14,
+        "angle": 0
+      },
+      "armL": {
+        "dx": -4,
+        "dy": 0,
+        "angle": 10
+      },
+      "armR": {
+        "dx": 9,
+        "dy": -1,
+        "angle": -14
+      },
+      "connFootL": {
+        "dx": -1,
+        "dy": 5,
+        "angle": 3
+      },
+      "connFootR": {
+        "dx": 7,
+        "dy": 4,
+        "angle": -11
+      }
+    }
+  },
+  "idleSequence": [
+    "idle",
+    "idle_3",
+    "idle_4"
+  ],
+  "anchorCollision": [
+    [
+      -10,
+      -5
+    ],
+    [
+      15,
+      -5
+    ],
+    [
+      15,
+      22
+    ],
+    [
+      -10,
+      22
+    ]
+  ],
+  "sequences": {
+    "idle": [
+      "idle",
+      "idle_3",
+      "idle_4"
+    ],
+    "walk": [
+      "walk",
+      "walk_0",
+      "walk_1",
+      "walk_2",
+      "walk_3"
+    ],
+    "rest": [
+      "rest_0"
+    ],
+    "awaken": [
+      "awaken_0",
+      "awaken_1",
+      "idle_1",
+      "idle"
+    ],
+    "grab": [
+      "grab_windup",
+      "grab_reach",
+      "grab_0",
+      "grab_1",
+      "grab_recover"
+    ],
+    "arm_guard": [
+      "arm_guard"
+    ],
+    "death": [
+      "death",
+      "death_0"
+    ],
+    "lift": [
+      "lift_0"
+    ]
+  }
+}

@@ -1,0 +1,95 @@
+{
+  "id": "boss0",
+  "layers": [
+    {
+      "sprite": "boss0",
+      "frameMode": "single",
+      "frameIndex": 0,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 2,
+      "opacity": 127,
+      "blend": "add",
+      "zIndex": 2,
+      "transforms": [
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": 32,
+          "vySubpxPerTick": 12
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 8,
+          "mulY": 88
+        },
+        {
+          "kind": "scanlineWarp",
+          "enabled": true,
+          "ampPx": 32.0,
+          "phasePerRowRad": 0.4,
+          "timeRadPerTick": 0.05,
+          "pinnedRow": 8,
+          "strength": 1.0,
+          "phaseOffsetRad": 0.0
+        },
+        {
+          "kind": "fisheye",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 314.8383712319704,
+          "strength": -0.25,
+          "rippleAmp": 0.6,
+          "rippleFreq": 5.0,
+          "timeRadPerTick": 0.03,
+          "phaseOffsetRad": 0.0
+        }
+      ]
+    },
+    {
+      "sprite": "boss0",
+      "frameMode": "single",
+      "frameIndex": 1,
+      "frameW": 16,
+      "frameH": 16,
+      "frameCount": 2,
+      "opacity": 255,
+      "blend": "normal",
+      "zIndex": 1,
+      "transforms": [
+        {
+          "kind": "fisheye",
+          "enabled": true,
+          "centerXPx": 256.0,
+          "centerYPx": 128.0,
+          "radiusPx": 314.8383712319704,
+          "strength": 0.35,
+          "rippleAmp": 1.0,
+          "rippleFreq": 12.0,
+          "timeRadPerTick": 0.03,
+          "phaseOffsetRad": 2.399963229728653
+        },
+        {
+          "kind": "scroll",
+          "vxSubpxPerTick": -24,
+          "vySubpxPerTick": 8
+        },
+        {
+          "kind": "cameraParallax",
+          "mulX": 160,
+          "mulY": 160
+        },
+        {
+          "kind": "scanlineWarp",
+          "enabled": true,
+          "ampPx": 4.0,
+          "phasePerRowRad": 0.55,
+          "timeRadPerTick": 0.04,
+          "pinnedRow": 4,
+          "strength": 1.0,
+          "phaseOffsetRad": 2.399963229728653
+        }
+      ]
+    }
+  ]
+}

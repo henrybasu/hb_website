@@ -1,0 +1,407 @@
+{
+  "_doc": "lil miner familiar rig: six-part puppet (head, handL, handR, footL, footR, body) that trails Vernan and mines rooms. Every 7 room clears he throws a coin toward her (BreakableLootRoll coin odds). Pose offsets are world px relative to the anchor (body center), art-faces-LEFT (+x right, +y down), mirrored when facing right. Author in ./familiar-editor.sh or ./lil-miner-editor.sh.",
+  "version": 1,
+  "enemy": "lil miner friend",
+  "sheet": "lil miner friend.png",
+  "frameSize": [
+    16,
+    16
+  ],
+  "parts": [
+    {
+      "name": "head",
+      "frame": 0,
+      "pivot": [
+        8,
+        8
+      ],
+      "bobScale": 0.5,
+      "scanlineScale": 0.0,
+      "hulls": {      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "handL",
+      "frame": 1,
+      "pivot": [
+        9,
+        7
+      ],
+      "bobScale": 0.7,
+      "scanlineScale": 0.0,
+      "hulls": {      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "handR",
+      "frame": 2,
+      "pivot": [
+        7,
+        7
+      ],
+      "bobScale": 0.7,
+      "scanlineScale": 0.0,
+      "hulls": {      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "footL",
+      "frame": 3,
+      "pivot": [
+        8,
+        12
+      ],
+      "bobScale": 0.4,
+      "scanlineScale": 0.0,
+      "hulls": {      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "footR",
+      "frame": 4,
+      "pivot": [
+        8,
+        12
+      ],
+      "bobScale": 0.4,
+      "scanlineScale": 0.0,
+      "hulls": {      },
+      "chainAttach": {      }
+    },
+    {
+      "name": "body",
+      "frame": 5,
+      "pivot": [
+        8,
+        8
+      ],
+      "hulls": {      },
+      "chainAttach": {      }
+    }
+  ],
+  "drawOrder": [
+    "footL",
+    "footR",
+    "handL",
+    "head",
+    "handR",
+    "body"
+  ],
+  "bob": {
+    "ampPx": 0.8,
+    "speedRadPerSec": 2.4,
+    "scanlineAmpPx": 0.0,
+    "perPartPhase": true
+  },
+  "poses": {
+    "idle": {
+      "head": {
+        "dx": 0,
+        "dy": -1,
+        "angle": 0
+      },
+      "body": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 0
+      },
+      "handL": {
+        "dx": 0,
+        "dy": -3,
+        "angle": -8
+      },
+      "handR": {
+        "dx": -1,
+        "dy": -2,
+        "angle": 8
+      },
+      "footL": {
+        "dx": 0,
+        "dy": 4,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 1,
+        "dy": 4,
+        "angle": 0
+      }
+    },
+    "idle_bob": {
+      "head": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 2
+      },
+      "body": {
+        "dx": 0,
+        "dy": 0,
+        "angle": 0
+      },
+      "handL": {
+        "dx": 1,
+        "dy": -2,
+        "angle": -4
+      },
+      "handR": {
+        "dx": -1,
+        "dy": -1,
+        "angle": 4
+      },
+      "footL": {
+        "dx": -1,
+        "dy": 4,
+        "angle": -12
+      },
+      "footR": {
+        "dx": -1,
+        "dy": 5,
+        "angle": 0
+      }
+    },
+    "mining": {
+      "head": {
+        "dx": 1,
+        "dy": 1,
+        "angle": -20
+      },
+      "body": {
+        "dx": 1,
+        "dy": 2,
+        "angle": 8
+      },
+      "handL": {
+        "dx": -2,
+        "dy": 3,
+        "angle": -35
+      },
+      "handR": {
+        "dx": 1,
+        "dy": 3,
+        "angle": 45
+      },
+      "footL": {
+        "dx": -1,
+        "dy": 6,
+        "angle": -4
+      },
+      "footR": {
+        "dx": 1,
+        "dy": 6,
+        "angle": 4
+      }
+    },
+    "mining_peak": {
+      "head": {
+        "dx": 0,
+        "dy": 2,
+        "angle": -22
+      },
+      "body": {
+        "dx": 1,
+        "dy": 2,
+        "angle": 12
+      },
+      "handL": {
+        "dx": -3,
+        "dy": 3,
+        "angle": -50
+      },
+      "handR": {
+        "dx": 3,
+        "dy": 3,
+        "angle": 62
+      },
+      "footL": {
+        "dx": -4,
+        "dy": 6,
+        "angle": -6
+      },
+      "footR": {
+        "dx": 2,
+        "dy": 6,
+        "angle": 6
+      }
+    },
+    "throw": {
+      "head": {
+        "dx": -1,
+        "dy": -2,
+        "angle": -20
+      },
+      "body": {
+        "dx": -1,
+        "dy": 0,
+        "angle": -4
+      },
+      "handL": {
+        "dx": -9,
+        "dy": -9,
+        "angle": -28
+      },
+      "handR": {
+        "dx": -13,
+        "dy": 1,
+        "angle": -55
+      },
+      "footL": {
+        "dx": -1,
+        "dy": 4,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 0,
+        "dy": 4,
+        "angle": 0
+      }
+    },
+    "throw_release": {
+      "head": {
+        "dx": 1,
+        "dy": -2,
+        "angle": 18
+      },
+      "body": {
+        "dx": 1,
+        "dy": 0,
+        "angle": 2
+      },
+      "handL": {
+        "dx": -1,
+        "dy": -4,
+        "angle": -27
+      },
+      "handR": {
+        "dx": -2,
+        "dy": -9,
+        "angle": 35
+      },
+      "footL": {
+        "dx": -1,
+        "dy": 4,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 2,
+        "dy": 5,
+        "angle": 0
+      }
+    },
+    "mining_0": {
+      "head": {
+        "dx": 0,
+        "dy": 2,
+        "angle": -22
+      },
+      "handL": {
+        "dx": -2,
+        "dy": 4,
+        "angle": -50
+      },
+      "handR": {
+        "dx": 1,
+        "dy": 3,
+        "angle": 62
+      },
+      "footL": {
+        "dx": -2,
+        "dy": 6,
+        "angle": -6
+      },
+      "footR": {
+        "dx": 1,
+        "dy": 7,
+        "angle": 6
+      },
+      "body": {
+        "dx": 1,
+        "dy": 2,
+        "angle": 12
+      }
+    },
+    "mining_1": {
+      "head": {
+        "dx": 2,
+        "dy": -1,
+        "angle": 24
+      },
+      "handL": {
+        "dx": -7,
+        "dy": -7,
+        "angle": -50
+      },
+      "handR": {
+        "dx": 2,
+        "dy": -7,
+        "angle": 62
+      },
+      "footL": {
+        "dx": -3,
+        "dy": 5,
+        "angle": -22
+      },
+      "footR": {
+        "dx": 1,
+        "dy": 6,
+        "angle": 6
+      },
+      "body": {
+        "dx": 1,
+        "dy": 1,
+        "angle": 12
+      }
+    },
+    "throw_0": {
+      "head": {
+        "dx": 2,
+        "dy": -1,
+        "angle": 18
+      },
+      "handL": {
+        "dx": -5,
+        "dy": 0,
+        "angle": -12
+      },
+      "handR": {
+        "dx": 7,
+        "dy": -6,
+        "angle": 35
+      },
+      "footL": {
+        "dx": 0,
+        "dy": 4,
+        "angle": 0
+      },
+      "footR": {
+        "dx": 1,
+        "dy": 5,
+        "angle": 0
+      },
+      "body": {
+        "dx": 1,
+        "dy": 0,
+        "angle": 2
+      }
+    }
+  },
+  "idleSequence": [
+    "idle",
+    "idle_bob"
+  ],
+  "sequences": {
+    "idle": [
+      "idle",
+      "idle_bob"
+    ],
+    "mining": [
+      "mining",
+      "mining_peak",
+      "mining_0",
+      "mining_1"
+    ],
+    "throw": [
+      "throw",
+      "throw_release",
+      "throw_0"
+    ]
+  }
+}

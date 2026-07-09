@@ -1,0 +1,40 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/room.schema.json",
+  "title": "Authored room JSON (tiles grid + optional props)",
+  "type": "object",
+  "required": ["tiles"],
+  "additionalProperties": true,
+  "properties": {
+    "tiles": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "string",
+          "description": "v3 tile id or empty for EMPTY terrain"
+        }
+      }
+    },
+    "placedObjects": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "ref": { "type": "string" },
+          "tileId": { "type": "string" },
+          "xPx": { "type": "integer" },
+          "yPx": { "type": "integer" },
+          "z": { "type": "integer" }
+        },
+        "anyOf": [
+          { "required": ["tileId"] },
+          { "required": ["ref"] }
+        ]
+      }
+    }
+  }
+}

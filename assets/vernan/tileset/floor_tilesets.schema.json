@@ -1,0 +1,35 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://example.local/floor_tilesets.schema.json",
+  "title": "Per-floor weighted tileset registry",
+  "type": "object",
+  "required": ["formatVersion", "defaultTilesetPath", "floors"],
+  "additionalProperties": false,
+  "properties": {
+    "formatVersion": { "type": "integer", "minimum": 1 },
+    "defaultTilesetPath": {
+      "type": "string",
+      "description": "Relative to the tileset directory (e.g. tileset.json)."
+    },
+    "floors": {
+      "type": "object",
+      "description": "Keys are floor ids (dungeon gridY as string, e.g. \"0\", \"-1\").",
+      "additionalProperties": {
+        "type": "array",
+        "minItems": 1,
+        "items": {
+          "type": "object",
+          "required": ["tilesetPath", "weight"],
+          "additionalProperties": false,
+          "properties": {
+            "tilesetPath": {
+              "type": "string",
+              "description": "Relative to the tileset directory."
+            },
+            "weight": { "type": "integer", "minimum": 1 }
+          }
+        }
+      }
+    }
+  }
+}

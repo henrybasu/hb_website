@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme");
+      document.documentElement.setAttribute(
+        "data-theme",
+        t === "light" || t === "dark" || t === "system" ? t : "system"
+      );
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "system");
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Play Vernan — the 2D action platformer — in your browser on Page D of the Test Website demo site.">
+  <title>Vernan | Page D | Test Website</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/vernan-web.css?v=0.1.0">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">Test Website</a>
+      <div class="header-end">
+        <div class="theme-switcher" role="group" aria-label="Color theme">
+          <button type="button" class="theme-btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="theme-btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" class="theme-btn" data-theme-choice="system" aria-pressed="false">System</button>
+        </div>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="page-a.html">Page A</a></li>
+          <li><a href="page-b.html">Page B</a></li>
+          <li><a href="page-c.html">Page C</a></li>
+          <li><a href="page-d.html" aria-current="page">Page D</a></li>
+          <li><a href="strame-how-to-play.html">Strame Guide</a></li>
+          <li><a href="vernan-how-to-play.html">Vernan Guide</a></li>
+          <li><a href="sitemap.html">Site Map</a></li>
+        </ul>
+      </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container container--wide">
+    <section class="content-block">
+      <details class="strame-web-help strame-web-help--compact">
+        <summary>Quick controls</summary>
+        <ul class="strame-web-help-tips">
+          <li><strong>Move:</strong> Arrow keys or WASD</li>
+          <li><strong>Jump:</strong> Z or Space</li>
+          <li><strong>Attack:</strong> X</li>
+          <li><strong>Subweapon:</strong> C (when equipped)</li>
+          <li><strong>Debug overlay:</strong> F3</li>
+          <li>Walk through doors at the left/right edges to change rooms. Use <code>?seed=12345</code> for a fixed dungeon.</li>
+        </ul>
+        <p class="strame-web-help-note"><a href="vernan-how-to-play.html">Full Vernan guide</a> · desktop Java app has more items, bosses, and modes.</p>
+      </details>
+      <div id="vernan-web-root"></div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; 2026 Test Website. All rights reserved (placeholder).</p>
+      <p><a href="vernan-how-to-play.html">Vernan Guide</a> &middot; <a href="sitemap.html">Site Map</a> &middot; <a href="about.html">About</a></p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+  <script src="js/vernan-web.js?v=0.1.3"></script>
+  <script>
+    try {
+      if (typeof VernanWeb === "undefined") {
+        throw new Error(
+          "vernan-web.js did not load. Hard-refresh (Cmd+Shift+R). " +
+          "On GitHub Pages, commit and push js/vernan-web.js and page-d.html."
+        );
+      }
+      var seedParam = new URLSearchParams(location.search).get("seed");
+      VernanWeb.mount("#vernan-web-root", {
+        assetBase: "assets/vernan/",
+        seed: seedParam ? parseInt(seedParam, 10) : undefined,
+      });
+    } catch (err) {
+      var root = document.getElementById("vernan-web-root");
+      if (root) {
+        root.innerHTML =
+          '<div class="vernan-web-banner error" style="display:block;margin:1rem 0">' +
+          "Vernan failed to load: " + (err && err.message ? err.message : String(err)) +
+          "</div>";
+      }
+      console.error("VernanWeb.mount failed:", err);
+    }
+  </script>
+</body>
+</html>

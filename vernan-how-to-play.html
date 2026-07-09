@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <script>
+  (function () {
+    try {
+      var t = localStorage.getItem("theme");
+      document.documentElement.setAttribute(
+        "data-theme",
+        t === "light" || t === "dark" || t === "system" ? t : "system"
+      );
+    } catch (e) {
+      document.documentElement.setAttribute("data-theme", "system");
+    }
+  })();
+  </script>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="How to play Vernan in the browser — controls, dungeon navigation, combat, and tips.">
+  <title>How to Play Vernan | Test Website</title>
+  <link rel="stylesheet" href="css/styles.css">
+  <link rel="stylesheet" href="css/vernan-web.css">
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="logo" href="index.html">Test Website</a>
+      <div class="header-end">
+        <div class="theme-switcher" role="group" aria-label="Color theme">
+          <button type="button" class="theme-btn" data-theme-choice="light" aria-pressed="false">Light</button>
+          <button type="button" class="theme-btn" data-theme-choice="dark" aria-pressed="false">Dark</button>
+          <button type="button" class="theme-btn" data-theme-choice="system" aria-pressed="false">System</button>
+        </div>
+        <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" aria-label="Toggle navigation">
+        <span></span>
+        <span></span>
+        <span></span>
+      </button>
+      <nav id="site-nav" class="site-nav" aria-label="Main navigation">
+        <ul>
+          <li><a href="index.html">Home</a></li>
+          <li><a href="about.html">About</a></li>
+          <li><a href="page-a.html">Page A</a></li>
+          <li><a href="page-b.html">Page B</a></li>
+          <li><a href="page-c.html">Page C</a></li>
+          <li><a href="page-d.html">Page D</a></li>
+          <li><a href="strame-how-to-play.html">Strame Guide</a></li>
+          <li><a href="vernan-how-to-play.html" aria-current="page">Vernan Guide</a></li>
+          <li><a href="sitemap.html">Site Map</a></li>
+        </ul>
+      </nav>
+      </div>
+    </div>
+  </header>
+
+  <main class="container container--wide">
+    <section class="page-header">
+      <p class="eyebrow">Vernan — browser client</p>
+      <h1>How to play</h1>
+      <p class="lead">
+        Controls and tips for the browser version of Vernan (single-player platformer dungeon crawl).
+        Link to this page from anywhere on the site — e.g. <code>vernan-how-to-play.html</code>.
+      </p>
+      <p class="strame-guide-cta-row">
+        <a class="btn btn-primary" href="page-d.html">Play now on Page D</a>
+        <a class="btn btn-secondary" href="page-d.html?seed=12345">Play with fixed seed</a>
+      </p>
+    </section>
+
+    <article class="strame-web-help strame-guide" aria-labelledby="vernan-guide-controls">
+      <h2 id="vernan-guide-controls">1. Controls</h2>
+      <ul class="strame-web-help-tips">
+        <li><strong>Move:</strong> Arrow keys or WASD. Hold <kbd>Down</kbd> / <kbd>S</kbd> to crouch on the ground.</li>
+        <li><strong>Jump:</strong> <kbd>Z</kbd> or <kbd>Space</kbd>. Jump has a short wind-up squat on the ground.</li>
+        <li><strong>Attack:</strong> <kbd>X</kbd> — sword swing with wind-up, active, and recovery frames.</li>
+        <li><strong>Subweapon:</strong> <kbd>C</kbd> when you have a subweapon equipped (desktop app has more subweapons).</li>
+        <li><strong>Climb:</strong> Stand on a ladder tile and press <kbd>Up</kbd>/<kbd>Down</kbd> or <kbd>W</kbd>/<kbd>S</kbd>.</li>
+        <li><strong>Debug:</strong> <kbd>F3</kbd> toggles the collision grid overlay.</li>
+        <li>On touch devices, on-screen buttons appear below the game canvas.</li>
+      </ul>
+
+      <h2 id="vernan-guide-dungeon">2. The dungeon</h2>
+      <ol class="strame-web-help-steps">
+        <li>Each run is a procedurally generated graph of rooms connected by <strong>doors</strong> (left/right) and <strong>ladders</strong> (up/down).</li>
+        <li>Walk into a door at the edge of a room to transition to the neighboring room (brief fade).</li>
+        <li>Room types include start, normal combat, item, shop, boss, and secret rooms.</li>
+        <li>Add <code>?seed=NUMBER</code> to the URL for a reproducible dungeon layout (e.g. <code>page-d.html?seed=12345</code>).</li>
+      </ol>
+
+      <h2 id="vernan-guide-combat">3. Combat</h2>
+      <ul class="strame-web-help-tips">
+        <li><strong>Crawlers</strong> hop toward you and deal contact damage. Slash with <kbd>X</kbd> during the active attack frame.</li>
+        <li>You have red heart containers shown in the bottom HUD. Invulnerability frames apply after taking damage.</li>
+        <li>Pick up keys and coins as you explore (full item system in the desktop app).</li>
+      </ul>
+
+      <h2 id="vernan-guide-hud">4. HUD</h2>
+      <ul class="strame-web-help-tips">
+        <li>The bottom bar shows hearts (HP), keys, money, current room type, and run seed.</li>
+        <li>FPS/UPS counters appear under the canvas during play.</li>
+      </ul>
+
+      <h2 id="vernan-guide-tips">5. Tips &amp; troubleshooting</h2>
+      <ul class="strame-web-help-tips">
+        <li>Click the game canvas once if keyboard input does not respond (focus).</li>
+        <li>Hard refresh (<kbd>Cmd</kbd>+<kbd>Shift</kbd>+<kbd>R</kbd> on Mac) after updates.</li>
+        <li>If sprites fail to load, ensure <code>assets/vernan/</code> was synced from <code>new-vernan-2/</code> (see repo <code>scripts/sync-vernan-assets.sh</code>).</li>
+        <li>The desktop Java game has costumes, layered Vernan body art, full boss AI, and 40+ items — the browser client is being expanded toward full parity.</li>
+      </ul>
+
+      <p class="strame-web-help-note">
+        Embed or link this guide: <code>&lt;a href="vernan-how-to-play.html"&gt;How to play Vernan&lt;/a&gt;</code>
+      </p>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container footer-inner">
+      <p>&copy; 2026 Test Website. All rights reserved (placeholder).</p>
+      <p><a href="page-d.html">Play Vernan</a> &middot; <a href="sitemap.html">Site Map</a> &middot; <a href="about.html">About</a></p>
+    </div>
+  </footer>
+
+  <script src="js/main.js"></script>
+</body>
+</html>

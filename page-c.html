@@ -19,7 +19,7 @@
   <meta name="description" content="Play Strame Standard Online in the browser on Page C of the Test Website demo site.">
   <title>Strame Online | Page C | Test Website</title>
   <link rel="stylesheet" href="css/styles.css">
-  <link rel="stylesheet" href="css/strame-web.css?v=20260702-recruit2">
+  <link rel="stylesheet" href="css/strame-web.css?v=20260707-lobby-ui">
 </head>
 <body>
   <header class="site-header">
@@ -43,7 +43,9 @@
           <li><a href="page-a.html">Page A</a></li>
           <li><a href="page-b.html">Page B</a></li>
           <li><a href="page-c.html" aria-current="page">Page C</a></li>
+          <li><a href="page-d.html">Page D</a></li>
           <li><a href="strame-how-to-play.html">Strame Guide</a></li>
+          <li><a href="vernan-how-to-play.html">Vernan Guide</a></li>
           <li><a href="sitemap.html">Site Map</a></li>
         </ul>
       </nav>
@@ -53,8 +55,8 @@
 
   <main class="container container--wide">
     <section class="content-block">
-      <section class="strame-web-help" aria-labelledby="strame-how-to-play">
-        <h2 id="strame-how-to-play">How to play (two players)</h2>
+      <details class="strame-web-help strame-web-help--compact">
+        <summary>How to play (two players)</summary>
         <ol class="strame-web-help-steps">
           <li><strong>Two players, two browsers.</strong> Each player opens this page on their own computer or phone (or use two different browsers). You cannot play both sides in one tab.</li>
           <li><strong>Same relay URL.</strong> Both players must enter your Render relay (e.g. <code>wss://your-relay.onrender.com/ws</code>). The GitHub Pages site does not host a relay — leave the field empty only if you use a <code>?relay=…</code> link.</li>
@@ -69,7 +71,7 @@
           <li>Win by reducing the opponent to <strong>0 gold and 0 HP</strong> on the board.</li>
         </ul>
         <p class="strame-web-help-note">Short rules above — <a href="strame-how-to-play.html">full instructions</a> · desktop app has more units and modes.</p>
-      </section>
+      </details>
       <div id="strame-web-root"></div>
     </section>
   </main>
@@ -82,12 +84,23 @@
   </footer>
 
   <script src="js/main.js"></script>
-  <script src="js/strame-web.js?v=20260702-recruit2"></script>
+  <script src="js/strame-web.js?v=20260707-lobby-ui"></script>
   <script>
-    StrameWeb.mount("#strame-web-root", {
-      relayUrl: new URLSearchParams(location.search).get("relay") || undefined,
-      assetBase: "assets/strame/",
-    });
+    try {
+      StrameWeb.mount("#strame-web-root", {
+        relayUrl: new URLSearchParams(location.search).get("relay") || undefined,
+        assetBase: "assets/strame/",
+      });
+    } catch (err) {
+      var root = document.getElementById("strame-web-root");
+      if (root) {
+        root.innerHTML =
+          '<div class="strame-web-banner error" style="display:block;margin:1rem 0">' +
+          "Strame failed to load: " + (err && err.message ? err.message : String(err)) +
+          "</div>";
+      }
+      console.error("StrameWeb.mount failed:", err);
+    }
   </script>
 </body>
 </html>

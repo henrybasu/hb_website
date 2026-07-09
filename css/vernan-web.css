@@ -1,0 +1,111 @@
+.vernan-web-root {
+  --vernan-display-w: 1024px;
+  --vernan-display-h: 640px;
+  font-family: system-ui, sans-serif;
+  color: var(--text, #e8e8ec);
+}
+
+.vernan-web-shell {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  width: 100%;
+}
+
+.vernan-web-canvas-wrap {
+  position: relative;
+  width: min(100%, var(--vernan-display-w));
+  aspect-ratio: 512 / 320;
+  background: #000;
+  border: 2px solid var(--border, #333);
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.vernan-web-canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+  touch-action: none;
+}
+
+.vernan-web-loading {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.85);
+  gap: 0.5rem;
+}
+
+.vernan-web-loading-bar {
+  width: 60%;
+  height: 8px;
+  background: #222;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+.vernan-web-loading-bar-fill {
+  height: 100%;
+  background: #6b8f5e;
+  width: 0%;
+  transition: width 0.15s;
+}
+
+.vernan-web-hud-bar {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem 1rem;
+  align-items: center;
+  justify-content: space-between;
+  width: min(100%, var(--vernan-display-w));
+  font-size: 0.85rem;
+  color: var(--muted, #999);
+}
+
+.vernan-web-touch {
+  display: none;
+  width: min(100%, var(--vernan-display-w));
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 0.5rem;
+  user-select: none;
+}
+
+@media (pointer: coarse) {
+  .vernan-web-touch {
+    display: grid;
+  }
+}
+
+.vernan-touch-btn {
+  padding: 0.75rem;
+  background: var(--surface, #1a1a22);
+  border: 1px solid var(--border, #444);
+  border-radius: 6px;
+  text-align: center;
+  font-size: 0.8rem;
+  touch-action: manipulation;
+}
+
+.vernan-touch-btn:active {
+  background: #2a2a38;
+}
+
+.vernan-web-help {
+  font-size: 0.85rem;
+  color: var(--muted, #999);
+  max-width: var(--vernan-display-w);
+}
+
+.vernan-web-banner.error {
+  background: #3a1515;
+  color: #ffb0b0;
+  padding: 1rem;
+  border-radius: 4px;
+}
