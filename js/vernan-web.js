@@ -30,7 +30,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.10";
+const WEB_CLIENT_VERSION_STR = "0.1.11";
 
   // --- math/util.ts ---
 
@@ -509,6 +509,14 @@ class Health {
 
   getMax(){
     return Math.floor(this.redMax + this.soul + 1e-9);
+  }
+
+  getRedMax(){
+    return Math.floor(this.redMax + 1e-9);
+  }
+
+  getRedCurrent(){
+    return Math.floor(this.redCurrent + 1e-9);
   }
 
   isAlive(){
@@ -1633,6 +1641,8 @@ class GameSim {
       playerHurtTint: this.player.hurtTint,
       hp: this.player.health.getCurrent(),
       hpMax: this.player.health.getMax(),
+      hpRed: this.player.health.getRedCurrent(),
+      hpRedMax: this.player.health.getRedMax(),
       keys: this.player.stats.keys,
       money: this.player.stats.money,
       roomKind: this.layout.room(this.currentRoomId).kind,
@@ -1737,9 +1747,19 @@ class GameLoop {
 
   // --- render/RenderPipeline.ts ---
 
+function hudHeartSlotCount(redMax){
+  return Math.max(1, Math.floor((redMax + 1) / 2));
+}
 
-
-
+/** UI health strip: 0 = full, 1 = half, 2 = empty. */
+function uiHeartFrameIndexForSlot(slotIndex, currentHp, maxHp){
+  const capacity = Math.min(2, maxHp - 2 * slotIndex);
+  if (capacity <= 0) return 2;
+  const filled = Math.min(capacity, Math.max(0, currentHp - 2 * slotIndex));
+  if (filled >= 2) return 0;
+  if (filled >= 1) return 1;
+  return 2;
+}
 
 class RenderPipeline {
   constructor(displayCanvas) {
@@ -1898,14 +1918,31 @@ class RenderPipeline {
     ctx.fillRect(0, hudY, INTERNAL_WIDTH, HUD_HEIGHT);
 
     const heart = assets.get("sprites/UI health.png");
-    for (let i = 0; i < snap.hpMax; i++) {
-      const filled = i < snap.hp;
+    const heartSlots = hudHeartSlotCount(snap.hpRedMax);
+    const frameW = heart ? Math.max(1, heart.width / 3) : 8;
+    const PAD_L = 6;
+    const HEART_SLOT = 16;
+    const HEART_GAP = 2;
+    let hx = PAD_L;
+    for (let slot = 0; slot < heartSlots; slot++) {
+      const fi = uiHeartFrameIndexForSlot(slot, snap.hpRed, snap.hpRedMax);
       if (heart) {
-        ctx.drawImage(heart, filled ? 0 : 8, 0, 8, 8, 8 + i * 10, hudY + 8, 8, 8);
+        ctx.drawImage(
+          heart,
+          fi * frameW,
+          0,
+          frameW,
+          heart.height,
+          hx,
+          hudY + 4,
+          HEART_SLOT,
+          HEART_SLOT
+        );
       } else {
-        ctx.fillStyle = filled ? "#e74c3c" : "#333";
-        ctx.fillRect(8 + i * 10, hudY + 8, 8, 8);
+        ctx.fillStyle = fi === 0 ? "#e74c3c" : fi === 1 ? "#c0392b" : "#333";
+        ctx.fillRect(hx, hudY + 4, HEART_SLOT, HEART_SLOT);
       }
+      hx += HEART_SLOT + HEART_GAP;
     }
 
     ctx.fillStyle = "#aaa";
