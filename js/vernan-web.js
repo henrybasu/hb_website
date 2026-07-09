@@ -41,7 +41,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.62";
+const WEB_CLIENT_VERSION_STR = "0.1.63";
 
   // --- math/util.ts ---
 
@@ -1050,9 +1050,11 @@ function minimapRoomAdjacentToCurrent(layout, currentRoomId, roomId){
 }
 
 function drawMinimap(ctx, snap, hudY){
-  if (!snap.hasMap) return;
   const layout = snap.layout;
   if (!layout || layout.roomCount() === 0) return;
+  const mapRevealed = snap.hasMap;
+  const secretMapRevealed = snap.hasEyeOfHorus;
+  const compassRevealed = snap.hasCompass;
   const grid = minimapGridMetrics(layout);
   const x0 = Math.max(6, INTERNAL_WIDTH - grid.totalW - 8);
   const y0 = hudY + Math.floor((HUD_HEIGHT - grid.totalH) / 2);
@@ -1070,15 +1072,27 @@ function drawMinimap(ctx, snap, hudY){
     const adjacentNow =
       !current && minimapRoomAdjacentToCurrent(layout, snap.currentRoomId, n.id);
     const secretKind = n.kind === RoomKind.SECRET || n.kind === RoomKind.SUPER_SECRET;
+    const specialKind =
+      n.kind === RoomKind.ITEM || n.kind === RoomKind.SHOP || n.kind === RoomKind.BOSS;
     const adjacentRemembered =
       !current &&
       !secretKind &&
       n.id < snap.minimapAdjacentSeen.length &&
       snap.minimapAdjacentSeen[n.id];
     const showRoom = secretKind
-      ? current || visited
-      : visited || current || adjacentNow || adjacentRemembered;
-    if (!showRoom) continue;
+      ? current || visited || secretMapRevealed
+      : visited ||
+        current ||
+        adjacentNow ||
+        adjacentRemembered ||
+        (mapRevealed && specialKind);
+    if (!showRoom) {
+      if (compassRevealed && !secretKind) {
+        ctx.fillStyle = "rgba(22,24,30,0.78)";
+        ctx.fillRect(x, y, MINIMAP_CELL_W, MINIMAP_CELL_H);
+      }
+      continue;
+    }
 
     const [r, g, b] = minimapKindRgb(n.kind);
     if (current) {
@@ -7458,6 +7472,8 @@ class GameSim {
         facing: p.facing,
       })),
       hasMap: this.inventory.count("MAP") > 0,
+      hasCompass: this.inventory.count("COMPASS") > 0,
+      hasEyeOfHorus: this.inventory.count("EYE_OF_HORUS") > 0,
       attackStat: this.player.stats.attackDamage,
       luckStat: this.player.stats.luck ?? 0,
       swordProfileId: this.player.swordProfile?.id ?? null,
