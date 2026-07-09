@@ -30,7 +30,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.9";
+const WEB_CLIENT_VERSION_STR = "0.1.10";
 
   // --- math/util.ts ---
 
@@ -1524,17 +1524,38 @@ class GameSim {
   }
 
   tryDoorTransition(input){
-    const feetY = this.player.feetY();
-    const tx = Math.floor((this.player.x + this.player.w() / 2) / TILE_SIZE);
-    const ty = Math.floor(feetY / TILE_SIZE);
+    if (!anyPressed(input, Keys.up)) return;
+    if (!this.player.onGround) return;
+
+    const pr = {
+      x: this.player.x,
+      y: this.player.y,
+      w: this.player.w(),
+      h: this.player.h(),
+    };
+    const x0 = Math.floor(pr.x / TILE_SIZE);
+    const x1 = Math.floor((pr.x + pr.w - 1e-6) / TILE_SIZE);
+    const y0 = Math.floor(pr.y / TILE_SIZE);
+    const y1 = Math.floor((pr.y + pr.h - 1e-6) / TILE_SIZE);
+
+    let touchedLeft = false;
+    let touchedRight = false;
+    for (let ty = y0; ty <= y1; ty++) {
+      for (let tx = x0; tx <= x1; tx++) {
+        if (!this.map.isDoorTile(tx, ty)) continue;
+        if (tx <= 1) touchedLeft = true;
+        if (tx >= this.map.getWidth() - 2) touchedRight = true;
+      }
+    }
+
     const node = this.layout.room(this.currentRoomId);
 
-    if (node.doorWest && tx <= 1 && this.player.x < TILE_SIZE * 2) {
-      const west = this.layout.neighborWest(this.currentRoomId);
-      if (west >= 0) this.beginTransition(west, "west");
-    } else if (node.doorEast && tx >= this.map.getWidth() - 2) {
+    if (touchedRight && node.doorEast) {
       const east = this.layout.neighborEast(this.currentRoomId);
       if (east >= 0) this.beginTransition(east, "east");
+    } else if (touchedLeft && node.doorWest) {
+      const west = this.layout.neighborWest(this.currentRoomId);
+      if (west >= 0) this.beginTransition(west, "west");
     }
   }
 
