@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.53";
+const WEB_CLIENT_VERSION_STR = "0.1.54";
 
   // --- math/util.ts ---
 
@@ -5113,7 +5113,7 @@ function itemPedestalPickupRect(sp, itemH = 16, pedestalH = 16){
 }
 
 function shopPickupHitbox(p){
-  const size = 14;
+  const size = p.kind === "HEART" || p.kind === "KEY" ? 16 : 8;
   return { x: p.x - size * 0.5, y: p.groundTop - size, w: size, h: size };
 }
 
@@ -6300,6 +6300,8 @@ class GameSim {
         kind: p.kind,
         x: p.x,
         y: p.y,
+        w: p.w,
+        h: p.h,
         angleRad: p.angleRad,
         animTime: p.animTime,
       })),
@@ -6892,8 +6894,10 @@ class RenderPipeline {
 
   drawWorldPickups(ctx, snap, assets){
     for (const p of snap.worldPickups ?? []) {
-      const cx = p.x + 4;
-      const cy = p.y + 4;
+      const pw = p.w ?? (p.kind === VernanPickups.PickupKind.HEART || p.kind === VernanPickups.PickupKind.KEY ? 16 : 8);
+      const ph = p.h ?? pw;
+      const cx = p.x + pw * 0.5;
+      const cy = p.y + ph * 0.5;
       ctx.save();
       ctx.translate(cx, cy);
       ctx.rotate(p.angleRad ?? 0);
@@ -6904,20 +6908,21 @@ class RenderPipeline {
           assets.get("sprites/heart.png") ??
           assets.get("sprites/UI health.png");
         if (imageDrawable(heart)) {
-          const fw = Math.max(1, Math.floor(heart.width / 8));
-          const frame = Math.floor((p.animTime ?? 0) * 12) & 7;
-          ctx.drawImage(heart, frame * fw, 0, fw, heart.height, p.x, p.y, 8, 8);
+          const frames = heart.width >= ph * 8 ? 8 : Math.max(1, Math.floor(heart.width / ph));
+          const fw = Math.max(1, Math.floor(heart.width / frames));
+          const frame = Math.floor((p.animTime ?? 0) * 12) % frames;
+          ctx.drawImage(heart, frame * fw, 0, fw, heart.height, p.x, p.y, pw, ph);
         } else {
           ctx.fillStyle = "#e74c3c";
-          ctx.fillRect(p.x, p.y, 8, 8);
+          ctx.fillRect(p.x, p.y, pw, ph);
         }
       } else if (p.kind === VernanPickups.PickupKind.KEY) {
         const key = assets.get("sprites/key.png") ?? assets.get("sprites/UI key.png");
         if (imageDrawable(key)) {
-          ctx.drawImage(key, p.x, p.y, 8, 8);
+          ctx.drawImage(key, p.x, p.y, pw, ph);
         } else {
           ctx.fillStyle = "#f1c40f";
-          ctx.fillRect(p.x, p.y, 8, 8);
+          ctx.fillRect(p.x, p.y, pw, ph);
         }
       } else {
         const coinPath =
@@ -6928,10 +6933,10 @@ class RenderPipeline {
               : "sprites/coin 1.png";
         const coin = assets.get(coinPath) ?? assets.get("sprites/UI coin.png");
         if (imageDrawable(coin)) {
-          ctx.drawImage(coin, p.x, p.y, 8, 8);
+          ctx.drawImage(coin, p.x, p.y, pw, ph);
         } else {
           ctx.fillStyle = "#ffd678";
-          ctx.fillRect(p.x, p.y, 8, 8);
+          ctx.fillRect(p.x, p.y, pw, ph);
         }
       }
       ctx.restore();
@@ -6944,14 +6949,15 @@ class RenderPipeline {
       if (p.kind === "HEART") {
         const heart = assets.get("sprites/heart.png") ?? assets.get("sprites/UI health.png");
         if (imageDrawable(heart)) {
-          const fw = Math.max(1, Math.floor(heart.width / 3));
+          const frames = heart.width >= hb.h * 8 ? 8 : Math.max(1, Math.floor(heart.width / hb.h));
+          const fw = Math.max(1, Math.floor(heart.width / frames));
           ctx.drawImage(heart, 0, 0, fw, heart.height, hb.x, hb.y, hb.w, hb.h);
         } else {
           ctx.fillStyle = "#e74c3c";
           ctx.fillRect(hb.x, hb.y, hb.w, hb.h);
         }
       } else {
-        const key = assets.get("sprites/UI key.png");
+        const key = assets.get("sprites/key.png") ?? assets.get("sprites/UI key.png");
         if (imageDrawable(key)) {
           ctx.drawImage(key, hb.x, hb.y, hb.w, hb.h);
         } else {

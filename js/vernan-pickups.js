@@ -6,7 +6,13 @@
 
   const TILE_SIZE = 16;
   const GRAVITY = 300;
-  const PICKUP_SIZE = 8;
+  const PICKUP_SIZE_COIN = 8;
+  const PICKUP_SIZE_HEART_KEY = 16;
+
+  function pickupSize(kind) {
+    if (kind === PickupKind.HEART || kind === PickupKind.KEY) return PICKUP_SIZE_HEART_KEY;
+    return PICKUP_SIZE_COIN;
+  }
   const LOOT_SALT = 0x1007ab1e10adn;
 
   const PickupKind = {
@@ -162,8 +168,9 @@
       this.omega = omega;
       this.angleRad = 0;
       this.animTime = 0;
-      this.w = PICKUP_SIZE;
-      this.h = PICKUP_SIZE;
+      const sz = pickupSize(kind);
+      this.w = sz;
+      this.h = sz;
     }
 
     static finishCreate(kind, x, y, style, rnd) {
@@ -180,20 +187,22 @@
     }
 
     static createFromCenter(kind, centerX, centerY, style, rnd) {
+      const sz = pickupSize(kind);
       return WorldPickup.finishCreate(
         kind,
-        centerX - PICKUP_SIZE * 0.5,
-        centerY - PICKUP_SIZE * 0.5,
+        centerX - sz * 0.5,
+        centerY - sz * 0.5,
         style,
         rnd
       );
     }
 
     static createAtFeet(kind, feetCenterX, feetY, style, rnd) {
+      const sz = pickupSize(kind);
       return WorldPickup.finishCreate(
         kind,
-        feetCenterX - PICKUP_SIZE * 0.5,
-        feetY - PICKUP_SIZE,
+        feetCenterX - sz * 0.5,
+        feetY - sz,
         style,
         rnd
       );
@@ -225,6 +234,8 @@
         kind: this.kind,
         x: this.x,
         y: this.y,
+        w: this.w,
+        h: this.h,
         vx: this.vx,
         vy: this.vy,
         omega: this.omega,
@@ -235,6 +246,8 @@
 
     static fromSnapshot(data) {
       const p = new WorldPickup(data.kind, data.x, data.y, data.vx, data.vy, data.omega ?? 0);
+      if (data.w != null) p.w = data.w;
+      if (data.h != null) p.h = data.h;
       p.angleRad = data.angleRad ?? 0;
       p.animTime = data.animTime ?? 0;
       return p;
