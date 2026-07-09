@@ -39,7 +39,7 @@ const TILE_BREAKABLE = 5;
 const TILE_KEYBLOCK = 6;
 const TILE_KEYBLOCK_CONNECTOR = 7;
 
-const WEB_CLIENT_VERSION_STR = "0.1.54";
+const WEB_CLIENT_VERSION_STR = "0.1.60";
 
   // --- math/util.ts ---
 
@@ -294,6 +294,25 @@ function charToTile(c){
 function isFloorTerrainTile(map, tx, ty) {
   const t = map.tileAt(tx, ty);
   return t === TILE_SOLID || t === TILE_BREAKABLE;
+}
+
+function inwardSolidSampleCell(map, tx, ty, isHiddenShell) {
+  const w = map.getWidth();
+  const h = map.getHeight();
+  const dirs = [
+    [1, 0],
+    [-1, 0],
+    [0, 1],
+    [0, -1],
+  ];
+  for (const [dx, dy] of dirs) {
+    const ix = tx + dx;
+    const iy = ty + dy;
+    if (ix < 1 || ix >= w - 1 || iy < 1 || iy >= h - 1) continue;
+    if (isHiddenShell?.(ix, iy)) continue;
+    if (map.tileAt(ix, iy) === TILE_SOLID) return [ix, iy];
+  }
+  return null;
 }
 
 function solidAutotileCell(map, tx, ty) {
@@ -1029,6 +1048,7 @@ function minimapRoomAdjacentToCurrent(layout, currentRoomId, roomId){
 }
 
 function drawMinimap(ctx, snap, hudY){
+  if (!snap.hasMap) return;
   const layout = snap.layout;
   if (!layout || layout.roomCount() === 0) return;
   const grid = minimapGridMetrics(layout);
@@ -1904,6 +1924,8 @@ function makeGeneratedRoom(map, meta){
     decoTiles: meta.decoTiles ?? [],
     roomBridge: meta.roomBridge ?? null,
     biomeId: meta.biomeId ?? null,
+    itemPedestal: meta.itemPedestal ?? null,
+    deferredFloorPickups: meta.deferredFloorPickups ?? [],
   };
 }
 
@@ -2252,6 +2274,7 @@ function buildDungeonContent(layout, dungeonFloorOrdinal = 1, tilesetRuntime = n
   }
   const seams = placeSecretEntranceSeams(layout, rooms);
   applyFinalShaftPass(layout, rooms, seams);
+  applySecretPostGenerationContent(layout, rooms);
   applyPostGenerationEnemies(layout, rooms, dungeonFloorOrdinal);
   return { rooms, seams };
 }
@@ -2587,6 +2610,16 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null, dung
     );
   }
 
+  let itemPedestal = null;
+  const deferredFloorPickups = [];
+  const doorTxs = [];
+  if (conn.doorWest && gen.leftDoorTileX >= 0) doorTxs.push(gen.leftDoorTileX);
+  if (conn.doorEast && gen.rightDoorTileX >= 0) doorTxs.push(gen.rightDoorTileX);
+  if (kind === RoomKind.ITEM) {
+    itemPedestal = buildItemPedestalSlot(gen.map, Math.floor(w / 2), dungeonLadderTx, doorTxs);
+  }
+  gen = { ...gen, itemPedestal, deferredFloorPickups };
+
   if (
     (kind === RoomKind.NORMAL || kind === RoomKind.BOSS || kind === RoomKind.ITEM) &&
     typeof VernanTerrainRules !== "undefined"
@@ -2636,6 +2669,19 @@ function generateRoomContent(node, plannedW, plannedH, secretFinish = null, dung
 }
 
 function rollPostGenerationEnemies(gen, contentSeed, kind, dungeonFloorOrdinal) {
+  if (kind === RoomKind.BOSS) {
+    const map = gen.map;
+    const tx = clamp(Math.floor(map.getWidth() / 2), 4, map.getWidth() - 5);
+    return [
+      {
+        x: tx * TILE_SIZE,
+        y: enemySpawnAnchorYPx(map, tx),
+        hp: enemyBaseMaxHealth(EnemyKind.JACK_BLUE),
+        kind: EnemyKind.JACK_BLUE,
+        aggro: true,
+      },
+    ];
+  }
   if (kind === RoomKind.NORMAL) {
     return rollEnemySpawns(gen, contentSeed, kind, dungeonFloorOrdinal);
   }
@@ -2832,6 +2878,11 @@ class Health {
   addSoul(amount){
     this.soul += amount;
   }
+
+  setRedMaxWithoutHealing(cap){
+    this.redMax = Math.max(0.001, cap);
+    this.redCurrent = Math.min(this.redCurrent, this.redMax);
+  }
 }
 
   // --- config/Physics.ts ---
@@ -2841,6 +2892,12 @@ class Health {
 
 
 const GRAVITY = 300;
+const HURT_KNOCKBACK_X = 74;
+const HURT_KNOCKBACK_Y = -98;
+const HURT_TINT_SECONDS = 0.35;
+const HURT_AIR_ANIM_FPS = 12;
+const HURT_AIR_SHEET_FRAMES = 6;
+const SCARF_FLOAT_GRAVITY_SCALE = 1 / 3;
 
 function moveAndCollide(
   map,
@@ -3038,6 +3095,109 @@ function canStepOffLadderTop(map, player, columnTx){
   return true;
 }
 
+/** Hitbox intersects ladder tiles, or feet on a mouth deck with shaft below (Java overlapsLadderOrPlatformShaftBelow). */
+function overlapsLadderOrPlatformShaftBelow(map, player, shaftCol){
+  if (playerOverlapsLadder(map, player)) return true;
+  if (shaftCol >= 0 && ladderShaftBelowFeetPlatform(map, player, shaftCol)) return true;
+  return false;
+}
+
+function topIntersectedLadderRowInColumn(map, columnTx, player){
+  const topTile = Math.floor((player.y + 0.001) / TILE_SIZE);
+  const bottomTile = Math.floor((player.feetY() - 0.001) / TILE_SIZE);
+  let best = -1;
+  for (let ty = topTile; ty <= bottomTile; ty++) {
+    if (map.isLadderTile(columnTx, ty)) best = Math.max(best, ty);
+  }
+  return best;
+}
+
+function hullIntersectsPlatformInColumn(map, columnTx, player){
+  const topTile = Math.floor((player.y + 0.001) / TILE_SIZE);
+  const bottomTile = Math.floor((player.feetY() - 0.001) / TILE_SIZE);
+  for (let ty = topTile; ty <= bottomTile; ty++) {
+    if (!map.isPlatformTile(columnTx, ty)) continue;
+    const tileTop = ty * TILE_SIZE;
+    const tileBot = (ty + 1) * TILE_SIZE;
+    if (player.feetY() > tileTop && player.y < tileBot) return true;
+  }
+  return false;
+}
+
+/** Keep climb latched while rising through the mouth one-way above the top rung (Java preserveClimbAscentToDeck). */
+function preserveClimbAscentToDeck(map, player, shaftCol, upHeld){
+  if (!player.climbing || !upHeld || shaftCol < 0) return false;
+  if (feetOnPlatformDeckInColumn(map, player, shaftCol)) return false;
+  let topRungTy = topIntersectedLadderRowInColumn(map, shaftCol, player);
+  if (topRungTy < 0) {
+    const topTile = Math.floor((player.y + 0.001) / TILE_SIZE);
+    const bottomTile = Math.floor((player.feetY() - 0.001) / TILE_SIZE);
+    for (let ty = topTile; ty <= bottomTile; ty++) {
+      if (map.isPlatformTile(shaftCol, ty)) {
+        topRungTy = ty + 1;
+        break;
+      }
+    }
+  }
+  if (topRungTy < 0) return false;
+  const deckTy = topRungTy - 1;
+  if (deckTy < 1 || !map.isPlatformTile(shaftCol, deckTy)) return false;
+  if (ladderContinuesAboveDeck(map, shaftCol, deckTy)) return false;
+  if (playerOverlapsLadder(map, player)) return false;
+  const deckTop = deckTy * TILE_SIZE;
+  const topRungTop = topRungTy * TILE_SIZE;
+  if (player.feetY() <= deckTop + 2) return false;
+  if (player.feetY() > topRungTop + 1e-3) return false;
+  const centerTx = Math.floor((player.x + player.w() * 0.5) / TILE_SIZE);
+  if (centerTx < shaftCol - 1 || centerTx > shaftCol + 1) return false;
+  return hullIntersectsPlatformInColumn(map, shaftCol, player);
+}
+
+/** Snap out of solid floor penetration while climbing down (Java correctClimbingFloorPenetration). */
+function correctClimbingFloorPenetration(map, player){
+  if (!player.climbing || player.vy < 0) return;
+  const body = rect(player.x, player.y, player.w(), player.h());
+  const leftTile = Math.floor((body.x + 0.001) / TILE_SIZE);
+  const rightTile = Math.floor((rectRight(body) - 0.001) / TILE_SIZE);
+  const feetTy = Math.floor((rectBottom(body) - 1e-3) / TILE_SIZE);
+  let bestFloorY = Infinity;
+  for (let ty = feetTy; ty <= feetTy + 1; ty++) {
+    if (ty < 0 || ty >= map.getHeight()) continue;
+    const floorY = ty * TILE_SIZE;
+    if (rectBottom(body) <= floorY + 1e-3) continue;
+    for (let tx = leftTile; tx <= rightTile; tx++) {
+      if (!map.isSolidTile(tx, ty)) continue;
+      const tile = rect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+      if (rectsOverlap(body, tile)) bestFloorY = Math.min(bestFloorY, floorY);
+    }
+  }
+  if (bestFloorY < Infinity) {
+    player.y = bestFloorY - player.h();
+    player.vy = 0;
+    player.climbing = false;
+    player.onGround = true;
+    player.activeClimbShaftTx = -1;
+  }
+}
+
+/** End climb when resting on solid floor or a mouth deck without rung overlap. */
+function maybeExitClimbAtFloor(map, player, shaftCol){
+  if (!player.climbing || !player.onGround) return;
+  const onDeck = shaftCol >= 0 && feetOnPlatformDeckInColumn(map, player, shaftCol);
+  const onLadderTiles = playerOverlapsLadder(map, player);
+  if (onDeck) {
+    if (!onLadderTiles && !canStepOffLadderTop(map, player, shaftCol)) {
+      player.climbing = false;
+      player.activeClimbShaftTx = -1;
+    }
+    return;
+  }
+  if (player.vy >= 0) {
+    player.climbing = false;
+    player.activeClimbShaftTx = -1;
+  }
+}
+
 const ENEMY_CRAWLER_HITBOX_H = 12;
 const ENEMY_CRAWLER_SPRITE_W = 16;
 const ENEMY_CRAWLER_SPRITE_H = 16;
@@ -3140,6 +3300,7 @@ const Keys = {
   jump: ["KeyZ", "Space"],
   attack: ["KeyX"],
   subweapon: ["KeyC"],
+  pause: ["Enter"],
   debug: ["F3", "Backquote"],
 };
 
@@ -3260,6 +3421,9 @@ class Player {
   animFrame = 0;
   animAccum = 0;
   hurtTint = 0;
+  hurtLocked = false;
+  hurtAirFrame = 0;
+  hurtAirAnimAccum = 0;
   health = new Health(6);
   stats = {
     maxGroundSpeed: 85,
@@ -3277,9 +3441,16 @@ class Player {
     attackRecoverEarlyFrames: 12,
     attackRecoverLateFrames: 8,
     attackDamage: 1,
+    swordHitWidthPx: 14,
+    damageMultiplierBonus: 0,
+    luck: 0,
+    pinkScarfStacks: 0,
+    shieldStacks: 0,
+    disc01SlideStacks: 0,
     keys: 0,
     money: 0,
   };
+  swordProfile = { id: null, damageMult: 1, timingScale: 1, attackSheet: null };
 
   prevX = 0;
   prevY = 0;
@@ -3308,6 +3479,9 @@ class Player {
     this.attackPhase = 0;
     this.attackTimer = 0;
     this.hurtTint = 0;
+    this.hurtLocked = false;
+    this.hurtAirFrame = 0;
+    this.hurtAirAnimAccum = 0;
   }
 
   w(){
@@ -3330,10 +3504,44 @@ class Player {
     return this.y + this.h();
   }
 
-  applyContactKnockback(horizontalSign){
-    this.vx = horizontalSign * 74;
-    this.vy = -98;
+  startHurtReaction(horizontalSign, halved = false){
+    this.hurtTint = Math.max(this.hurtTint, HURT_TINT_SECONDS);
+    this.hurtLocked = true;
+    this.hurtAirFrame = 0;
+    this.hurtAirAnimAccum = 0;
+    this.attackPhase = 0;
+    this.attackTimer = 0;
+    this.jumpSquatFrames = 0;
+    this.climbing = false;
+    this.activeClimbShaftTx = -1;
+    this.crouching = false;
+    this.landingLockFrames = 0;
+    this.walkOffLedgeActive = false;
+    const kbScale = halved ? 0.5 : 1;
+    this.vx = horizontalSign * HURT_KNOCKBACK_X * kbScale;
+    this.vy = HURT_KNOCKBACK_Y * kbScale;
     this.onGround = false;
+  }
+
+  applyContactKnockback(horizontalSign){
+    this.startHurtReaction(horizontalSign);
+  }
+
+  tickHurtAirAnim(dt){
+    if (this.hurtLocked && !this.onGround) {
+      this.hurtAirAnimAccum += dt;
+      const frameSec = 1 / HURT_AIR_ANIM_FPS;
+      while (
+        this.hurtAirAnimAccum >= frameSec &&
+        this.hurtAirFrame < HURT_AIR_SHEET_FRAMES - 1
+      ) {
+        this.hurtAirAnimAccum -= frameSec;
+        this.hurtAirFrame++;
+      }
+    } else {
+      this.hurtAirAnimAccum = 0;
+      this.hurtAirFrame = 0;
+    }
   }
 
   update(dt, input, map){
@@ -3352,6 +3560,43 @@ class Player {
     const jumpEdge = anyPressed(input, Keys.jump);
     const jumpHeld = anyDown(input, Keys.jump);
     const attackPressed = anyPressed(input, Keys.attack);
+
+    if (this.hurtLocked) {
+      const wasOnGround = this.onGround;
+      const scarfFloat =
+        (this.stats.pinkScarfStacks ?? 0) > 0 && this.vy > 0 && jumpHeld;
+      if (!this.onGround) {
+        const g = GRAVITY * (scarfFloat ? SCARF_FLOAT_GRAVITY_SCALE : 1);
+        const fallCap = 3000 * (scarfFloat ? SCARF_FLOAT_GRAVITY_SCALE : 1);
+        this.vy = Math.min(this.vy + g * dt, fallCap);
+      }
+      const result = moveAndCollide(
+        map,
+        this.x,
+        this.y,
+        this.w(),
+        this.h(),
+        this.vx,
+        this.vy,
+        dt
+      );
+      this.x = result.x;
+      this.y = result.y;
+      this.vx = result.vx;
+      this.vy = result.vy;
+      if (this.vy < -1) {
+        this.onGround = false;
+      } else {
+        this.onGround = result.onGround;
+      }
+      if (!wasOnGround && this.onGround) {
+        applyLandSquash(this.renderSquashStretch, 5);
+        this.hurtLocked = false;
+      }
+      this.tickHurtAirAnim(dt);
+      this.renderSquashStretch.tick(dt);
+      return;
+    }
 
     // Attack state machine (phase 1 windup, 2 active, 3 early recover, 4 late recover)
     if (this.attackPhase > 0) {
@@ -3380,8 +3625,7 @@ class Player {
     const resolvedShaft = resolveClimbShaftColumn(map, this);
     if (resolvedShaft >= 0) this.activeClimbShaftTx = resolvedShaft;
     shaftCol = this.activeClimbShaftTx >= 0 ? this.activeClimbShaftTx : resolvedShaft;
-    const onShaft = shaftCol >= 0 && playerOverlapsLadderColumn(map, this, shaftCol);
-    const onLadder = onShaft || playerOverlapsLadder(map, this);
+    const onLadderNow = overlapsLadderOrPlatformShaftBelow(map, this, shaftCol);
 
     if (
       !this.climbing &&
@@ -3394,16 +3638,23 @@ class Player {
       this.activeClimbShaftTx = shaftCol;
     }
 
-    if (this.climbing && !onLadder && !(this.climbing && down && shaftCol >= 0)) {
+    const preserveAscent =
+      this.climbing && up && preserveClimbAscentToDeck(map, this, shaftCol, up);
+    if (
+      this.climbing &&
+      !onLadderNow &&
+      !(this.climbing && down && shaftCol >= 0) &&
+      !preserveAscent
+    ) {
       this.climbing = false;
       this.activeClimbShaftTx = -1;
     }
-    if (!this.climbing && onLadder && (up || down)) {
+    if (!this.climbing && onLadderNow && (up || down)) {
       this.climbing = true;
       if (shaftCol >= 0) this.activeClimbShaftTx = shaftCol;
     }
 
-    if (this.climbing && onLadder) {
+    if (this.climbing && (onLadderNow || preserveAscent)) {
       if (shaftCol >= 0) constrainClimbingShaftColumn(this, shaftCol);
       if (jumpEdge && this.attackPhase === 0) {
         this.climbing = false;
@@ -3415,13 +3666,14 @@ class Player {
         else this.vx = this.facing * this.stats.maxAirSpeed * 0.45;
         this.coyoteTimer = 0;
       } else {
-        this.onGround = false;
         this.vx = 0;
         this.vy = 0;
         let climbVy = 0;
         if (up) climbVy -= this.stats.climbSpeed;
         if (down) climbVy += this.stats.climbSpeed;
         if (climbVy !== 0) {
+          this.onGround = false;
+          this.vy = climbVy;
           const cr = moveAndCollide(
             map,
             this.x,
@@ -3434,7 +3686,9 @@ class Player {
             false,
             true
           );
+          this.x = cr.x;
           this.y = cr.y;
+          this.vy = cr.vy;
           if (climbVy > 0 && cr.onGround) {
             if (shaftCol >= 0 && feetOnPlatformDeckInColumn(map, this, shaftCol)) {
               if (canStepOffLadderTop(map, this, shaftCol)) {
@@ -3443,25 +3697,36 @@ class Player {
               } else if (!playerOverlapsLadderColumn(map, this, shaftCol)) {
                 this.climbing = false;
                 this.onGround = false;
+              } else {
+                this.onGround = true;
               }
             } else {
               this.onGround = cr.onGround;
             }
           }
-        }
-        if (left) this.facing = -1;
-        if (right) this.facing = 1;
-        if (up || down) {
-          this.animAccum += dt;
-          if (this.animAccum > 0.2) {
-            this.animAccum = 0;
-            this.animFrame = (this.animFrame + 1) % 2;
-          }
         } else {
-          this.animAccum = 0;
-          this.animFrame = 0;
+          this.onGround =
+            probeGrounded(map, this.x, this.y, this.w(), this.h()) ||
+            (shaftCol >= 0 && feetOnPlatformDeckInColumn(map, this, shaftCol));
+          maybeExitClimbAtFloor(map, this, shaftCol);
         }
-        return;
+        correctClimbingFloorPenetration(map, this);
+        maybeExitClimbAtFloor(map, this, shaftCol);
+        if (this.climbing) {
+          if (left) this.facing = -1;
+          if (right) this.facing = 1;
+          if (up || down) {
+            this.animAccum += dt;
+            if (this.animAccum > 0.2) {
+              this.animAccum = 0;
+              this.animFrame = (this.animFrame + 1) % 2;
+            }
+          } else {
+            this.animAccum = 0;
+            this.animFrame = 0;
+          }
+          return;
+        }
       }
     }
 
@@ -3545,6 +3810,9 @@ class Player {
     // Gravity
     if (!this.onGround) {
       this.vy = Math.min(this.vy + GRAVITY * dt, 3000);
+      if ((this.stats.pinkScarfStacks ?? 0) > 0 && jumpHeld && this.vy > 0) {
+        this.vy *= 0.92;
+      }
     }
 
     const result = moveAndCollide(map, this.x, this.y, this.w(), this.h(), this.vx, this.vy, dt);
@@ -3624,7 +3892,7 @@ class Player {
 
   attackHitbox(){
     if (!this.isAttackActive()) return null;
-    const reach = 18;
+    const reach = this.stats.swordHitWidthPx ?? 14;
     if (this.facing > 0) {
       return { x: this.x + this.w(), y: this.y + 2, w: reach, h: this.h() - 4 };
     }
@@ -3636,7 +3904,12 @@ class Player {
   }
 
   spriteName(){
+    if (this.hurtLocked && !this.onGround) return "vernan hurt air.png";
     if (this.attackPhase > 0) {
+      const sheet = this.swordProfile?.attackSheet;
+      if (sheet) {
+        return this.isGroundedForSprite() ? sheet : "vernan air attack.png";
+      }
       return this.isGroundedForSprite() ? "vernan attack.png" : "vernan air attack.png";
     }
     if (this.climbing) return "vernan climb.png";
@@ -3654,6 +3927,9 @@ class Player {
 
   spriteFrameIndex(){
     const name = this.spriteName();
+    if (name.includes("hurt air")) {
+      return Math.max(0, Math.min(HURT_AIR_SHEET_FRAMES - 1, this.hurtAirFrame));
+    }
     if (name.includes("attack")) {
       if (this.attackPhase <= 1) return 0;
       if (this.attackPhase === 2) return 1;
@@ -3987,11 +4263,11 @@ function enemyContactDamage(player, enemy){
   const er = { x: enemy.x - 1, y: enemy.y, w: enemy.w + 2, h: enemy.h };
   if (!rectsOverlapSlack(pr, er)) return;
   if (player.health.tryDamage(1, 1.125)) {
-    player.hurtTint = 0.35;
     const pcx = player.x + player.w() * 0.5;
     const knockFromX = enemy.x + enemy.w * 0.5;
     const sign = pcx < knockFromX ? -1 : 1;
-    player.applyContactKnockback(sign);
+    const halved = player.crouching && player.onGround;
+    player.startHurtReaction(sign, halved);
   }
 }
 
@@ -4764,13 +5040,8 @@ class ItemCatalog {
     return [...this.items.values()];
   }
 
-  applyToPlayer(item, player){
-    player.stats.attackDamage += item.damageBonusPerStack;
-    player.stats.maxGroundSpeed += item.groundSpeedBonusPerStack;
-    player.stats.maxAirSpeed += item.airSpeedBonusPerStack;
-    player.stats.jumpSquatFrames = Math.max(1, player.stats.jumpSquatFrames + item.jumpSquatFramesBonusPerStack);
-    if (item.redHeartsHealOnPickup > 0) player.health.heal(item.redHeartsHealOnPickup);
-    if (item.soulHeartsOnPickup > 0) player.health.addSoul(item.soulHeartsOnPickup);
+  applyToPlayer(_item, _player){
+    // Stats are recomputed from full inventory via applyPlayerItemPassives().
   }
 
   poolFallbackItem(){
@@ -4808,11 +5079,15 @@ class PlayerItemInventory {
   stacks = new Map();
   acquired = new Set();
   equippedSubweapon = null;
+  preferredPrimaryWeapon = null;
+  acquireOrder = [];
 
   reset(){
     this.stacks.clear();
     this.acquired.clear();
     this.equippedSubweapon = null;
+    this.preferredPrimaryWeapon = null;
+    this.acquireOrder = [];
   }
 
   count(id){
@@ -4822,6 +5097,7 @@ class PlayerItemInventory {
   add(id, n = 1){
     this.stacks.set(id, (this.stacks.get(id) ?? 0) + n);
     this.acquired.add(id);
+    for (let i = 0; i < n; i++) this.acquireOrder.push(id);
   }
 
   markAcquired(id){
@@ -4834,6 +5110,21 @@ class PlayerItemInventory {
 
   setEquippedSubweapon(id){
     this.equippedSubweapon = id;
+  }
+
+  ownedPassiveIds(catalog){
+    const seen = new Set();
+    const out = [];
+    for (let i = this.acquireOrder.length - 1; i >= 0; i--) {
+      const id = this.acquireOrder[i];
+      if (seen.has(id)) continue;
+      if (this.count(id) <= 0) continue;
+      const def = catalog?.get(id);
+      if (def?.subweapon) continue;
+      seen.add(id);
+      out.push(id);
+    }
+    return out;
   }
 }
 
@@ -4917,6 +5208,278 @@ class PedestalItemDecks {
     }
     return out;
   }
+}
+
+const PLAYER_BASE_MAX_HEALTH = 6;
+const SECRET_CONTENT_SEED_SALT = 0x517cc1b727220a95n;
+
+function isAllowedPedestalTileX(tx, widthTiles, ladderTx, doorTxs) {
+  if (tx < 2 || tx >= widthTiles - 2) return false;
+  if (ladderTx >= 0 && Math.abs(tx - ladderTx) <= 1) return false;
+  for (const d of doorTxs ?? []) {
+    if (Math.abs(tx - d) <= 1) return false;
+  }
+  return true;
+}
+
+function resolvePedestalTileX(widthTiles, desiredTx, ladderTx, doorTxs) {
+  let t = clamp(desiredTx, 2, widthTiles - 3);
+  if (isAllowedPedestalTileX(t, widthTiles, ladderTx, doorTxs)) return t;
+  let best = t;
+  let bestDist = Infinity;
+  const cands = [
+    ladderTx + 2,
+    ladderTx - 2,
+    ladderTx + 3,
+    ladderTx - 3,
+    t + 2,
+    t - 2,
+    t + 3,
+    t - 3,
+    2,
+    widthTiles - 3,
+  ];
+  for (const c0 of cands) {
+    const c = clamp(c0, 2, widthTiles - 3);
+    if (!isAllowedPedestalTileX(c, widthTiles, ladderTx, doorTxs)) continue;
+    const d = Math.abs(c - desiredTx);
+    if (d < bestDist) {
+      bestDist = d;
+      best = c;
+    }
+  }
+  return best;
+}
+
+function buildItemPedestalSlot(map, desiredTx, ladderTx, doorTxs) {
+  const w = map.getWidth();
+  const cx = resolvePedestalTileX(w, desiredTx, ladderTx, doorTxs);
+  return {
+    itemId: null,
+    x: cx * TILE_SIZE + TILE_SIZE * 0.5,
+    groundTop: map.groundTopWorldYAtColumn(cx),
+  };
+}
+
+function addDeferredPickupCluster(rng, w, groundY, kind, count) {
+  const out = [];
+  const mid = clamp(Math.floor(w / 2), 4, w - 5);
+  for (let i = 0; i < count; i++) {
+    const x = clamp(mid + (i - Math.floor(count / 2)) * 2 + rng.nextInt(3) - 1, 2, w - 3);
+    const gy = groundY[x];
+    out.push({
+      kind,
+      feetCenterX: x * TILE_SIZE + TILE_SIZE * 0.5,
+      feetY: gy * TILE_SIZE,
+    });
+  }
+  return out;
+}
+
+function rollSuperSecretDeferredLoot(rng, w, groundY) {
+  const v = rng.nextInt(8);
+  const mid = clamp(Math.floor(w / 2), 4, w - 5);
+  const baseX = mid * TILE_SIZE + TILE_SIZE * 0.5;
+  const baseY = groundY[mid] * TILE_SIZE;
+  switch (v) {
+    case 0:
+      return addDeferredPickupCluster(rng, w, groundY, "HEART", 6);
+    case 1:
+      return addDeferredPickupCluster(rng, w, groundY, "HEART", 3);
+    case 2:
+      return [{ kind: "HEART", feetCenterX: baseX, feetY: baseY }];
+    case 3:
+      return addDeferredPickupCluster(rng, w, groundY, "COIN_10", 3);
+    case 4:
+      return addDeferredPickupCluster(rng, w, groundY, "COIN_1", 6);
+    case 5:
+      return [{ kind: "KEY", feetCenterX: baseX, feetY: baseY }];
+    case 6:
+      return [
+        ...addDeferredPickupCluster(rng, w, groundY, "HEART", 3),
+        { kind: "KEY", feetCenterX: baseX + 24, feetY: baseY },
+      ];
+    default:
+      return [
+        { kind: "HEART", feetCenterX: baseX - 16, feetY: baseY },
+        { kind: "KEY", feetCenterX: baseX, feetY: baseY },
+        ...addDeferredPickupCluster(rng, w, groundY, "COIN_1", 5),
+      ];
+  }
+}
+
+function doorTileXsFromGen(gen){
+  const doorTxs = [];
+  if (gen.leftDoorTileX >= 0) doorTxs.push(gen.leftDoorTileX);
+  if (gen.rightDoorTileX >= 0) doorTxs.push(gen.rightDoorTileX);
+  return doorTxs;
+}
+
+/** Re-seat pedestal + floor pickups on finalized terrain (Java regroundItemPedestal). */
+function regroundSecretRoomContent(gen){
+  const map = gen.map;
+  if (!map) return gen;
+  const w = map.getWidth();
+  const groundY = groundYFromMap(map);
+  let itemPedestal = gen.itemPedestal ?? null;
+  if (itemPedestal) {
+    const tx = clamp(Math.floor(itemPedestal.x / TILE_SIZE), 1, w - 2);
+    const gy = groundY[tx];
+    itemPedestal = { ...itemPedestal, groundTop: gy * TILE_SIZE };
+  }
+  const deferredFloorPickups = (gen.deferredFloorPickups ?? []).map((d) => {
+    const tx = clamp(Math.floor(d.feetCenterX / TILE_SIZE), 2, w - 3);
+    return { ...d, feetY: groundY[tx] * TILE_SIZE };
+  });
+  return { ...gen, itemPedestal, deferredFloorPickups };
+}
+
+function applySecretRoomDeferredContent(gen, kind, contentSeed) {
+  const map = gen.map;
+  const w = map.getWidth();
+  const groundY = groundYFromMap(map);
+  const ladderTx = gen.ladderColumnTx ?? -1;
+  const doorTxs = doorTileXsFromGen(gen);
+  const rng = javaRandom(Number(BigInt(contentSeed) ^ SECRET_CONTENT_SEED_SALT));
+  let itemPedestal = null;
+  let deferredFloorPickups = [];
+  if (kind === RoomKind.SECRET) {
+    const roll = rng.nextInt(4);
+    if (roll === 0) {
+      itemPedestal = buildItemPedestalSlot(map, Math.floor(w / 2), ladderTx, doorTxs);
+    } else if (roll === 1) {
+      deferredFloorPickups = addDeferredPickupCluster(rng, w, groundY, "KEY", 3);
+    } else if (roll === 2) {
+      deferredFloorPickups = addDeferredPickupCluster(rng, w, groundY, "HEART", 3);
+    } else {
+      deferredFloorPickups = addDeferredPickupCluster(rng, w, groundY, "COIN_1", 10);
+    }
+  } else if (kind === RoomKind.SUPER_SECRET) {
+    deferredFloorPickups = rollSuperSecretDeferredLoot(rng, w, groundY);
+  }
+  return { ...gen, itemPedestal, deferredFloorPickups };
+}
+
+/** Secret / super-secret loot after final shaft pass (Java RoomGenerator.applySecretPostGenerationContent). */
+function applySecretPostGenerationContent(layout, rooms){
+  const n = layout.roomCount();
+  for (let id = 0; id < n; id++) {
+    const kind = layout.room(id).kind;
+    if (kind !== RoomKind.SECRET && kind !== RoomKind.SUPER_SECRET) continue;
+    const gen = rooms[id];
+    if (!gen?.map) continue;
+    rooms[id] = regroundSecretRoomContent(
+      applySecretRoomDeferredContent(gen, kind, layout.room(id).contentSeed)
+    );
+  }
+}
+
+const K_CANDY_REFILL_SEED_SALT = 0x4b5f434e44595341n;
+const K_CANDY_REFILL_PRICE = 15;
+
+const PRIMARY_WEAPON_IDS = ["STICK", "LEMON", "HEADBAND", "FLINT", "GEM_SWORD"];
+
+function resolveSwordProfile(catalog, inventory) {
+  const preferred = inventory.preferredPrimaryWeapon;
+  const order = preferred
+    ? [preferred, ...PRIMARY_WEAPON_IDS.filter((id) => id !== preferred)]
+    : PRIMARY_WEAPON_IDS.slice();
+  for (const id of order) {
+    if (inventory.count(id) <= 0) continue;
+    if (id === "FLINT" || id === "GEM_SWORD") {
+      const flint = inventory.count("FLINT") > 0;
+      const gem = inventory.count("GEM_SWORD") > 0;
+      const flintDef = catalog?.get("FLINT");
+      const flintMult = flintDef?.damageMultiplierPerStack ?? 1.25;
+      if (flint && !gem) {
+        return { id: "FLINT", damageMult: flintMult, timingScale: 0.5, attackSheet: "vernan attack.png" };
+      }
+      if (gem && !flint) {
+        return { id: "GEM_SWORD", damageMult: 1, timingScale: 1, attackSheet: "vernan attack.png" };
+      }
+      const visual = preferred === "FLINT" ? "FLINT" : "GEM_SWORD";
+      return {
+        id: visual,
+        damageMult: (1 + flintMult) * 0.5,
+        timingScale: 0.75,
+        attackSheet: "vernan attack.png",
+      };
+    }
+    if (id === "HEADBAND") {
+      return { id, damageMult: 1, timingScale: 1, attackSheet: "vernan attack.png" };
+    }
+    return { id, damageMult: 1, timingScale: 1, attackSheet: "sword attack.png" };
+  }
+  return { id: null, damageMult: 1, timingScale: 1, attackSheet: null };
+}
+
+function applyPlayerItemPassives(catalog, inventory, player) {
+  const s = player.stats;
+  s.maxGroundSpeed = 85;
+  s.maxAirSpeed = 70;
+  s.climbSpeed = 80;
+  s.groundAccel = 300;
+  s.groundBrake = 500;
+  s.groundFriction = 1800;
+  s.attackDamage = 1;
+  s.luck = 0;
+  s.attackWindupFrames = 10;
+  s.attackActiveFrames = 4;
+  s.attackRecoverEarlyFrames = 12;
+  s.attackRecoverLateFrames = 8;
+  s.jumpSquatFrames = 5;
+  s.swordHitWidthPx = 14;
+  s.damageMultiplierBonus = 0;
+  s.pinkScarfStacks = 0;
+  s.shieldStacks = 0;
+  s.disc01SlideStacks = 0;
+
+  const flintOwned = inventory.count("FLINT") > 0;
+  const gemOwned = inventory.count("GEM_SWORD") > 0;
+  let swBonus = 0;
+
+  for (const [id, stacks] of inventory.stacks) {
+    const def = catalog?.get(id);
+    if (!def || def.subweapon) continue;
+    swBonus += stacks * (def.swordWidthBonusPerStack ?? 0);
+    s.attackDamage += stacks * (def.damageBonusPerStack ?? 0);
+    s.luck += stacks * (def.luckPerStack ?? 0);
+    if (!(flintOwned && gemOwned && (id === "FLINT" || id === "GEM_SWORD"))) {
+      s.attackWindupFrames += stacks * (def.attackWindupFramesBonusPerStack ?? 0);
+      s.attackActiveFrames += stacks * (def.attackActiveFramesBonusPerStack ?? 0);
+      s.jumpSquatFrames += stacks * (def.jumpSquatFramesBonusPerStack ?? 0);
+      s.attackRecoverEarlyFrames += stacks * (def.attackRecoverEarlyFramesBonusPerStack ?? 0);
+      s.attackRecoverLateFrames += stacks * (def.attackRecoverLateFramesBonusPerStack ?? 0);
+      s.maxGroundSpeed += stacks * (def.groundSpeedBonusPerStack ?? 0);
+      s.maxAirSpeed += stacks * (def.airSpeedBonusPerStack ?? 0);
+      s.climbSpeed += stacks * (def.climbSpeedBonusPerStack ?? 0);
+      const itemMult = def.damageMultiplierPerStack ?? 1;
+      if (id !== "FLINT" && itemMult !== 1) {
+        s.damageMultiplierBonus += stacks * (itemMult - 1);
+      }
+    }
+  }
+  if (flintOwned && gemOwned) {
+    const gemBonus = catalog?.get("GEM_SWORD")?.attackWindupFramesBonusPerStack ?? 0;
+    s.attackWindupFrames += Math.round(gemBonus * 0.5);
+  }
+  s.swordHitWidthPx = 14 + swBonus;
+  s.attackActiveFrames = Math.max(1, s.attackActiveFrames);
+  s.attackRecoverEarlyFrames = Math.max(1, s.attackRecoverEarlyFrames);
+  s.attackRecoverLateFrames = Math.max(1, s.attackRecoverLateFrames);
+  s.jumpSquatFrames = Math.max(1, s.jumpSquatFrames);
+  s.pinkScarfStacks = inventory.count("PINK_SCARF");
+  s.shieldStacks = inventory.count("SHIELD");
+  s.disc01SlideStacks = inventory.count("DISC01_SLIDE");
+}
+
+function syncHealthCapFromItems(catalog, inventory, player) {
+  let cap = PLAYER_BASE_MAX_HEALTH;
+  for (const [id, stacks] of inventory.stacks) {
+    const bonusHearts = catalog?.get(id)?.redMaxBonusPerStack ?? 0;
+    if (bonusHearts > 0) cap += stacks * bonusHearts * 2;
+  }
+  player.health.setRedMaxWithoutHealing(cap);
 }
 
 function shuffleInPlace(arr, rng){
@@ -5087,6 +5650,48 @@ function spawnShopKeeperForRoom(gen, pedestals, pickups, pedestalHalfW = TILE_SI
   };
 }
 
+const PAUSE_MENU_X = 12;
+const PAUSE_MENU_Y = 28;
+const PAUSE_MENU_W = 220;
+const PAUSE_MENU_PADDING = 8;
+const PAUSE_ITEM_CELL = 32;
+
+function pauseMenuShowsItem(inventory, itemCatalog, id){
+  const def = itemCatalog?.get(id);
+  if (!def) return false;
+  if (def.subweapon) {
+    return inventory.hasAcquired(id) || inventory.equippedSubweapon === id;
+  }
+  return inventory.count(id) > 0;
+}
+
+function collectPauseMenuIcons(inventory, itemCatalog, assets){
+  const icons = [];
+  const sword = assets.get("sprites/sword attack.png");
+  if (imageDrawable(sword)) icons.push({ img: sword, label: "sword" });
+  const seen = new Set();
+  for (const id of inventory.acquireOrder) {
+    if (seen.has(id) || !pauseMenuShowsItem(inventory, itemCatalog, id)) continue;
+    seen.add(id);
+    const def = itemCatalog?.get(id);
+    const img = def ? assets.get(itemSpritePath(def.spriteFileName)) : null;
+    if (imageDrawable(img)) icons.push({ img, label: id });
+  }
+  if (inventory.equippedSubweapon && !seen.has(inventory.equippedSubweapon)) {
+    const def = itemCatalog?.get(inventory.equippedSubweapon);
+    const img = def ? assets.get(itemSpritePath(def.spriteFileName)) : null;
+    if (imageDrawable(img)) icons.push({ img, label: inventory.equippedSubweapon });
+  }
+  if (itemCatalog) {
+    for (const def of itemCatalog.all()) {
+      if (seen.has(def.id) || !pauseMenuShowsItem(inventory, itemCatalog, def.id)) continue;
+      const img = assets.get(itemSpritePath(def.spriteFileName));
+      if (imageDrawable(img)) icons.push({ img, label: def.id });
+    }
+  }
+  return icons;
+}
+
 function itemSpritePath(spriteFileName){
   return `sprites/items/${spriteFileName}`;
 }
@@ -5160,6 +5765,7 @@ class AssetLoader {
       "sprites/items/item pedestal.png",
       "sprites/heart.png",
       "sprites/heart collect.png",
+      "sprites/vernan hurt air.png",
       "tiles/underground tileset.png",
       "tiles/la sheet.png",
     ];
@@ -5251,6 +5857,49 @@ class AssetLoader {
 
 
 
+function deferredPickupKind(kindStr){
+  const K = VernanPickups?.PickupKind;
+  if (!K) return kindStr;
+  return K[kindStr] ?? kindStr;
+}
+
+class FrisbeeProjectile {
+  constructor(x, y, vx, facing){
+    this.x = x;
+    this.y = y;
+    this.vx = vx;
+    this.vy = -40;
+    this.w = 12;
+    this.h = 12;
+    this.facing = facing;
+    this.dead = false;
+    this.life = 2.5;
+    this.spin = 0;
+  }
+
+  hitbox(){
+    return { x: this.x, y: this.y, w: this.w, h: this.h };
+  }
+
+  update(dt, map){
+    this.life -= dt;
+    if (this.life <= 0) this.dead = true;
+    this.vy += GRAVITY * 0.35 * dt;
+    this.x += this.vx * dt;
+    this.y += this.vy * dt;
+    this.spin += dt * 18;
+    const cx = this.x + this.w * 0.5;
+    const footY = this.y + this.h;
+    const tx = Math.floor(cx / TILE_SIZE);
+    const ty = Math.floor((footY + 1) / TILE_SIZE);
+    if (map.isSolidTile(tx, ty) && this.vy > 0) {
+      this.y = ty * TILE_SIZE - this.h;
+      this.vy *= -0.45;
+      this.vx *= 0.82;
+    }
+  }
+}
+
 class GameSim {
   player = new Player();
   camera = new SideScrollCamera();
@@ -5260,6 +5909,7 @@ class GameSim {
   transitionFade = 0;
   transitionDir = null;
   debugOverlay = false;
+  paused = false;
   fps = 0;
   ups = 0;
   gameOver = false;
@@ -5267,6 +5917,9 @@ class GameSim {
   inventory = new PlayerItemInventory();
   pedestalDecks = null;
   resolvedShopPedestals = [];
+  resolvedItemPedestal = [];
+  itemPedestalItemCollected = [];
+  roomClearRewardPedestals = [];
   resolvedShopPickups = [];
   shopPedestalCollected = [];
   shopPickupCollected = [];
@@ -5275,6 +5928,8 @@ class GameSim {
   shopKeeper = null;
   pedestalBobPhase = 0;
   itemPickupOverlay = null;
+  subweaponCooldown = 0;
+  subweaponProjectiles = [];
   decorationTime = 0;
   worldPickups = [];
   roomPersistedPickups = [];
@@ -5313,6 +5968,8 @@ class GameSim {
     this.pedestalBobPhase = 0;
     this.decorationTime = 0;
     this.itemPickupOverlay = null;
+    this.paused = false;
+    this.debugOverlay = false;
     this.layout = DungeonLayout.generate(this.seed, 12, 24);
     const built = buildDungeonContent(this.layout, this.dungeonLevel, this.tilesetRuntime);
     this.cachedRooms = built.rooms;
@@ -5321,6 +5978,12 @@ class GameSim {
     this.roomVisited = new Array(n).fill(false);
     this.minimapAdjacentSeen = new Array(n).fill(false);
     this.resolvedShopPedestals = new Array(n).fill(null);
+    this.resolvedItemPedestal = new Array(n).fill(null);
+    this.itemPedestalItemCollected = new Array(n).fill(false);
+    this.resolvedSuperSecretKCandyRefill = new Array(n).fill(null);
+    this.superSecretKCandyRefillCollected = new Array(n).fill(false);
+    this.superSecretKCandyRefillResolved = new Array(n).fill(false);
+    this.roomClearRewardPedestals = new Array(n).fill(null);
     this.resolvedShopPickups = new Array(n).fill(null);
     this.shopPedestalCollected = new Array(n).fill(null);
     this.shopPickupCollected = new Array(n).fill(null);
@@ -5333,10 +5996,15 @@ class GameSim {
     this.lastEnemyDeathFeetCenterY = 0;
     this.activeSeamOpenAnim = null;
     this.brickChunks = [];
+    this.subweaponProjectiles = [];
+    this.subweaponCooldown = 0;
+    this.seedDeferredFloorPickupsFromGenerator();
     this.assignRoomMathBackgroundPresets();
     this.roomVisited[0] = true;
     this.revealMinimapAdjacentNeighbors(0);
     this.player = new Player();
+    this.applyPlayerItemPassives();
+    this.syncHealthCapFromItems();
     this.loadRoom(0);
     const spawn = spawnAtFloor(this.map, roomSpawnTx(this.layout.room(0), this.map, false, false));
     this.player.resetAt(spawn.x, spawn.y);
@@ -5370,6 +6038,226 @@ class GameSim {
       if (def?.luckPerStack) luck += def.luckPerStack * count;
     }
     return luck;
+  }
+
+  seedDeferredFloorPickupsFromGenerator(){
+    if (typeof VernanPickups === "undefined") return;
+    const rng = javaRandom(Number(BigInt(this.seed) ^ 0xfeedface5eedn));
+    for (let i = 0; i < this.cachedRooms.length; i++) {
+      const deferred = this.cachedRooms[i]?.deferredFloorPickups ?? [];
+      if (!deferred.length) continue;
+      if (!this.roomPersistedPickups[i]) this.roomPersistedPickups[i] = [];
+      for (const d of deferred) {
+        this.roomPersistedPickups[i].push(
+          VernanPickups.WorldPickup.createAtFeet(
+            deferredPickupKind(d.kind),
+            d.feetCenterX,
+            d.feetY,
+            VernanPickups.SpawnStyle.BREAKABLE,
+            rng
+          ).snapshot()
+        );
+      }
+    }
+  }
+
+  resolveDeferredPedestalsForRoom(roomId){
+    if (roomId < 0 || roomId >= this.cachedRooms.length) return;
+    const kind = this.layout.room(roomId).kind;
+    const gen = this.cachedRooms[roomId];
+    if (kind === RoomKind.ITEM) {
+      const base = gen.itemPedestal;
+      if (base && !base.itemId && !this.resolvedItemPedestal[roomId]) {
+        const itemId =
+          this.pedestalDecks?.draw(PedestalSpawnKind.ITEM_ROOM) ??
+          this.itemCatalog?.poolFallbackItem();
+        this.resolvedItemPedestal[roomId] = { ...base, itemId };
+      }
+    } else if (kind === RoomKind.SECRET) {
+      const base = gen.itemPedestal;
+      if (base && !base.itemId && !this.resolvedItemPedestal[roomId]) {
+        const itemId =
+          this.pedestalDecks?.draw(PedestalSpawnKind.SECRET) ??
+          this.itemCatalog?.poolFallbackItem();
+        this.resolvedItemPedestal[roomId] = { ...base, itemId };
+      }
+    } else if (kind === RoomKind.SUPER_SECRET) {
+      this.resolveSuperSecretKCandyRefillForRoom(roomId);
+    } else if (kind === RoomKind.SHOP) {
+      this.resolveShopLayout(roomId);
+    }
+  }
+
+  resolveSuperSecretKCandyRefillForRoom(roomId){
+    if (roomId < 0 || this.superSecretKCandyRefillResolved[roomId]) return;
+    this.superSecretKCandyRefillResolved[roomId] = true;
+    if (this.inventory.equippedSubweapon !== "K_CANDY") return;
+    const node = this.layout.room(roomId);
+    const gen = this.cachedRooms[roomId];
+    if (!gen?.map) return;
+    const rng = javaRandom(Number(BigInt(node.contentSeed) ^ K_CANDY_REFILL_SEED_SALT));
+    if (rng.nextInt(5) !== 0) return;
+    const map = gen.map;
+    const w = map.getWidth();
+    const groundY = groundYFromMap(map);
+    const doorTxs = doorTileXsFromGen(gen);
+    const ladderTx = gen.ladderColumnTx ?? -1;
+    const desired = rng.nextBoolean() ? Math.floor(w / 4) : Math.floor((3 * w) / 4);
+    const cx = resolvePedestalTileX(w, desired, ladderTx, doorTxs);
+    const gy = groundY[clamp(cx, 1, w - 2)];
+    this.resolvedSuperSecretKCandyRefill[roomId] = {
+      itemId: "K_CANDY",
+      x: cx * TILE_SIZE + TILE_SIZE * 0.5,
+      groundTop: gy * TILE_SIZE,
+      price: K_CANDY_REFILL_PRICE,
+    };
+    this.superSecretKCandyRefillCollected[roomId] = false;
+  }
+
+  currentFreePedestal(){
+    const rid = this.currentRoomId;
+    if (rid < 0 || this.itemPedestalItemCollected[rid]) return null;
+    const ssRefill = this.resolvedSuperSecretKCandyRefill[rid];
+    if (
+      ssRefill?.itemId &&
+      !this.superSecretKCandyRefillCollected[rid] &&
+      this.layout.room(rid).kind === RoomKind.SUPER_SECRET
+    ) {
+      return ssRefill;
+    }
+    const boss = this.roomClearRewardPedestals[rid];
+    if (boss?.itemId) return boss;
+    const resolved = this.resolvedItemPedestal[rid];
+    if (resolved?.itemId) return resolved;
+    const base = this.cachedRooms[rid]?.itemPedestal;
+    if (base?.itemId) return base;
+    return null;
+  }
+
+  registerItemAcquired(id){
+    if (!id) return;
+    this.inventory.markAcquired(id);
+    this.pedestalDecks?.purgeAcquired(id);
+  }
+
+  applyImmediateItemPickupEffects(def){
+    if (!def) return;
+    if (def.redHeartsHealOnPickup > 0) this.player.health.heal(def.redHeartsHealOnPickup);
+    if (def.soulHeartsOnPickup > 0) this.player.health.addSoul(def.soulHeartsOnPickup);
+  }
+
+  applyPlayerItemPassives(){
+    if (!this.itemCatalog) return;
+    applyPlayerItemPassives(this.itemCatalog, this.inventory, this.player);
+    this.player.swordProfile = resolveSwordProfile(this.itemCatalog, this.inventory);
+  }
+
+  syncHealthCapFromItems(){
+    if (!this.itemCatalog) return;
+    syncHealthCapFromItems(this.itemCatalog, this.inventory, this.player);
+  }
+
+  acquireItem(itemId, showOverlay = true){
+    const def = this.itemCatalog?.get(itemId);
+    if (!def) return;
+    if (def.subweapon) {
+      this.inventory.setEquippedSubweapon(itemId);
+    } else {
+      this.inventory.add(itemId, 1);
+      if (PRIMARY_WEAPON_IDS.includes(itemId)) {
+        this.inventory.preferredPrimaryWeapon = itemId;
+      }
+    }
+    this.registerItemAcquired(itemId);
+    this.applyImmediateItemPickupEffects(def);
+    this.applyPlayerItemPassives();
+    this.syncHealthCapFromItems();
+    if (showOverlay) this.beginItemPickupOverlay(itemId, def);
+  }
+
+  tryCollectFreePrimaryPedestal(){
+    const sp = this.currentFreePedestal();
+    if (!sp?.itemId) return;
+    const pick = itemPedestalPickupRect(sp);
+    if (!pick || !rectsOverlap(playerPickupRect(this.player), pick)) return;
+    if (sp.price != null && sp.price > 0) {
+      if (this.inventory.equippedSubweapon !== "K_CANDY") return;
+      if (this.player.stats.money < sp.price) return;
+      this.player.stats.money -= sp.price;
+      this.superSecretKCandyRefillCollected[this.currentRoomId] = true;
+      return;
+    }
+    this.acquireItem(sp.itemId);
+    this.itemPedestalItemCollected[this.currentRoomId] = true;
+    this.roomClearRewardPedestals[this.currentRoomId] = null;
+  }
+
+  spawnBossRoomClearPedestal(){
+    const rid = this.currentRoomId;
+    if (this.roomClearRewardPedestals[rid]) return;
+    const map = this.map;
+    const doorTxs = collectMapDoorColumns(map);
+    const ladderTx = this.currentGeneratedRoom()?.ladderColumnTx ?? -1;
+    const camCx = this.camera.centerX;
+    const px = this.player.x + this.player.w() * 0.5;
+    const halfView = WORLD_VIEWPORT_W * 0.5;
+    const towardEdge = halfView * 0.62;
+    let targetWorldX = px < camCx ? camCx + towardEdge : camCx - towardEdge;
+    const margin = TILE_SIZE * 2.5;
+    const rw = map.getWidth() * TILE_SIZE;
+    targetWorldX = clamp(targetWorldX, margin, rw - margin);
+    let tx = Math.floor(targetWorldX / TILE_SIZE);
+    tx = resolvePedestalTileX(map.getWidth(), tx, ladderTx, doorTxs);
+    const itemId =
+      this.pedestalDecks?.draw(PedestalSpawnKind.BOSS_CLEAR) ??
+      this.itemCatalog?.poolFallbackItem();
+    this.roomClearRewardPedestals[rid] = {
+      itemId,
+      x: tx * TILE_SIZE + TILE_SIZE * 0.5,
+      groundTop: map.groundTopWorldYAtColumn(tx),
+    };
+  }
+
+  trySubweapon(input){
+    if (!anyPressed(input, Keys.subweapon)) return;
+    if (this.subweaponCooldown > 0) return;
+    const eq = this.inventory.equippedSubweapon;
+    if (!eq || !this.itemCatalog) return;
+    const def = this.itemCatalog.get(eq);
+    if (!def?.subweapon) return;
+    const cd = def.subweaponCooldownSeconds ?? 1;
+    this.subweaponCooldown = cd;
+    if (eq === "FRISBEE") {
+      const facing = this.player.facing >= 0 ? 1 : -1;
+      const px = this.player.x + this.player.w() * 0.5 + facing * 8;
+      const py = this.player.y + 4;
+      this.subweaponProjectiles.push(new FrisbeeProjectile(px, py, facing * 220, facing));
+    }
+  }
+
+  updateSubweaponProjectiles(dt){
+    for (const p of this.subweaponProjectiles) {
+      if (!p.dead) p.update(dt, this.map);
+    }
+    const dmg =
+      this.player.stats.attackDamage *
+      (1 + (this.player.stats.damageMultiplierBonus ?? 0)) *
+      (this.player.swordProfile?.damageMult ?? 1);
+    for (const p of this.subweaponProjectiles) {
+      if (p.dead) continue;
+      const hb = p.hitbox();
+      for (const e of this.enemies) {
+        if (e.dead) continue;
+        const eb = e.hitbox();
+        if (rectsOverlap(hb, eb)) {
+          e.takeHit(dmg);
+          p.dead = true;
+          break;
+        }
+      }
+    }
+    this.subweaponProjectiles = this.subweaponProjectiles.filter((p) => !p.dead);
+    if (this.subweaponCooldown > 0) this.subweaponCooldown = Math.max(0, this.subweaponCooldown - dt);
   }
 
   resolveShopLayout(roomId){
@@ -5423,6 +6311,7 @@ class GameSim {
     this.map = gen.map;
     this.enemyProjectiles = [];
     this.brickChunks = [];
+    this.subweaponProjectiles = [];
     this.enemies = spawnEnemiesFromRoom(this.map, gen, this.player);
     this.roomSpawnEnemyCount = this.enemies.length;
     this.worldPickups = (this.roomPersistedPickups[roomId] ?? []).map((d) =>
@@ -5430,6 +6319,7 @@ class GameSim {
     );
     this.shopKeeper = null;
     this.activeShopPickups = [];
+    this.resolveDeferredPedestalsForRoom(roomId);
     const kind = this.layout.room(roomId).kind;
     if (kind === RoomKind.SHOP) {
       this.resolveShopLayout(roomId);
@@ -5480,7 +6370,10 @@ class GameSim {
     const bx = tx * TILE_SIZE;
     const by = ty * TILE_SIZE;
     const rnd = this.seamBrickRng(tx, ty);
-    this.brickChunks.push(...VernanBrickChunks.spawnBreakableChunks(bx, by, rnd));
+    const tileSnap = this.snapshotBreakableTerrainTile(tx, ty);
+    this.brickChunks.push(
+      ...VernanBrickChunks.spawnBreakableChunks(bx, by, rnd, tileSnap, 1)
+    );
   }
 
   horizontalOpenPanTargetX(seam, bounds){
@@ -5606,64 +6499,166 @@ class GameSim {
     this.cachedRooms[rid] = { ...this.cachedRooms[rid], decoTiles: newDeco.slice() };
   }
 
+  roomTileDrawOpts(){
+    const room = this.layout.room(this.currentRoomId);
+    const gen = this.currentGeneratedRoom();
+    return {
+      roomKind: room?.kind ?? "NORMAL",
+      displaySalt: room?.contentSeed ?? 0,
+      bridge: gen?.roomBridge ?? this.tilesetRuntime?.bridge,
+      decoTiles: gen?.decoTiles ?? null,
+      terrainAt: (tx, ty) => {
+        let t = this.map.tileAt(tx, ty);
+        if (t === TILE_BREAKABLE && this.isHiddenShellBreakable(tx, ty)) t = TILE_SOLID;
+        return t;
+      },
+    };
+  }
+
+  snapshotLegacyTerrainTile(tx, ty){
+    const canvas = document.createElement("canvas");
+    canvas.width = TILE_SIZE;
+    canvas.height = TILE_SIZE;
+    const ctx = canvas.getContext("2d");
+    if (!ctx) return null;
+    let t = this.map.tileAt(tx, ty);
+    if (t === TILE_BREAKABLE && this.isHiddenShellBreakable(tx, ty)) t = TILE_SOLID;
+    const forest = this.assetLoader?.get("tiles/forest tileset.png");
+    const underground = this.assetLoader?.get("tiles/underground tileset.png");
+    const sheet =
+      underground && imageDrawable(underground) ? underground : forest;
+    if (imageDrawable(sheet) && (t === TILE_SOLID || t === TILE_BREAKABLE)) {
+      const [col, row] = solidAutotileCell(this.map, tx, ty);
+      drawForestTile(ctx, sheet, col, row, 0, 0);
+      return canvas;
+    }
+    ctx.fillStyle = tileToColor(t);
+    ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+    return canvas;
+  }
+
+  snapshotBreakableTerrainTile(tx, ty){
+    let snapTx = tx;
+    let snapTy = ty;
+    if (this.map.tileAt(tx, ty) === TILE_BREAKABLE && this.isHiddenShellBreakable(tx, ty)) {
+      const inward = inwardSolidSampleCell(this.map, tx, ty, (x, y) =>
+        this.isHiddenShellBreakable(x, y)
+      );
+      if (inward) {
+        snapTx = inward[0];
+        snapTy = inward[1];
+      }
+    }
+    if (this.tilesetRuntime) {
+      return this.tilesetRuntime.snapshotTerrainTile(
+        this.map,
+        snapTx,
+        snapTy,
+        this.roomTileDrawOpts()
+      );
+    }
+    return this.snapshotLegacyTerrainTile(snapTx, snapTy);
+  }
+
+  snapshotDecoTileImage(deco){
+    const opts = this.roomTileDrawOpts();
+    if (this.tilesetRuntime) {
+      return this.tilesetRuntime.snapshotDecoTile(
+        deco.decoTileId,
+        this.map,
+        deco.tx,
+        deco.ty,
+        { ...opts, argb: deco.argb ?? 0 }
+      );
+    }
+    if (deco.argb && !deco.decoTileId) {
+      const canvas = document.createElement("canvas");
+      canvas.width = TILE_SIZE;
+      canvas.height = TILE_SIZE;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      const a = ((deco.argb >>> 24) & 255) / 255;
+      const r = (deco.argb >>> 16) & 255;
+      const g = (deco.argb >>> 8) & 255;
+      const b = deco.argb & 255;
+      ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+      ctx.fillRect(0, 0, TILE_SIZE, TILE_SIZE);
+      return canvas;
+    }
+    return this.snapshotLegacyTerrainTile(deco.tx, deco.ty);
+  }
+
+  applyBreakableDestroyEffects(bx, by, tileSnap, brickRnd, lootKind){
+    if (typeof VernanBrickChunks !== "undefined") {
+      this.brickChunks.push(
+        ...VernanBrickChunks.spawnBreakableChunks(bx, by, brickRnd, tileSnap, 1)
+      );
+    }
+    if (!lootKind) return;
+    this.worldPickups.push(
+      VernanPickups.WorldPickup.createFromCenter(
+        lootKind,
+        bx + TILE_SIZE * 0.5,
+        by + TILE_SIZE * 0.5,
+        VernanPickups.SpawnStyle.BREAKABLE,
+        brickRnd
+      )
+    );
+  }
+
   destroyBreakableDecoOverlay(deco){
     const tx = deco.tx;
     const ty = deco.ty;
+    if (this.map.isBreakableTile(tx, ty)) {
+      this.destroyBreakableTile(tx, ty);
+      return;
+    }
     const bx = tx * TILE_SIZE;
     const by = ty * TILE_SIZE;
+    const tileSnap = this.snapshotDecoTileImage(deco);
+    const brickRnd = VernanPickups.BreakableLootRoll.decoBrickRng(
+      this.seed,
+      this.currentRoomId,
+      deco,
+      javaRandom
+    );
     const lootKind = VernanPickups.BreakableLootRoll.decoLootKind(
       this.seed,
       this.currentRoomId,
       deco,
       javaRandom
     );
-    if (!lootKind) return;
-    const rnd = VernanPickups.BreakableLootRoll.decoBrickRng(
-      this.seed,
-      this.currentRoomId,
-      deco,
-      javaRandom
-    );
-    this.worldPickups.push(
-      VernanPickups.WorldPickup.createFromCenter(
-        lootKind,
-        bx + TILE_SIZE * 0.5,
-        by + TILE_SIZE * 0.5,
-        VernanPickups.SpawnStyle.BREAKABLE,
-        rnd
-      )
-    );
+    this.applyBreakableDestroyEffects(bx, by, tileSnap, brickRnd, lootKind);
   }
 
   destroyBreakableTile(tx, ty){
     this.evictDecoAtCell(tx, ty);
     const bx = tx * TILE_SIZE;
     const by = ty * TILE_SIZE;
-    this.map.setTile(tx, ty, TILE_EMPTY);
-    const lootKind = VernanPickups.BreakableLootRoll.terrainLootKind(
+    const tileSnap = this.snapshotBreakableTerrainTile(tx, ty);
+    const shellBreakable = this.isHiddenShellBreakable(tx, ty);
+    if (shellBreakable) {
+      if (this.tryBeginSeamOpenAnim(tx, ty)) return;
+    } else {
+      this.map.setTile(tx, ty, TILE_EMPTY);
+    }
+    const brickRnd = VernanPickups.BreakableLootRoll.terrainBrickRng(
       this.seed,
       this.currentRoomId,
       tx,
       ty,
       javaRandom
     );
-    if (!lootKind) return;
-    const rnd = VernanPickups.BreakableLootRoll.terrainBrickRng(
-      this.seed,
-      this.currentRoomId,
-      tx,
-      ty,
-      javaRandom
-    );
-    this.worldPickups.push(
-      VernanPickups.WorldPickup.createFromCenter(
-        lootKind,
-        bx + TILE_SIZE * 0.5,
-        by + TILE_SIZE * 0.5,
-        VernanPickups.SpawnStyle.BREAKABLE,
-        rnd
-      )
-    );
+    const lootKind = shellBreakable
+      ? null
+      : VernanPickups.BreakableLootRoll.terrainLootKind(
+          this.seed,
+          this.currentRoomId,
+          tx,
+          ty,
+          javaRandom
+        );
+    this.applyBreakableDestroyEffects(bx, by, tileSnap, brickRnd, lootKind);
   }
 
   persistRoomPickups(roomId){
@@ -5750,6 +6745,7 @@ class GameSim {
           );
         }
       }
+      this.spawnBossRoomClearPedestal();
     }
   }
 
@@ -5813,7 +6809,33 @@ class GameSim {
     return this.seed;
   }
 
+  syncRenderInterpolationState(){
+    this.player.prevX = this.player.x;
+    this.player.prevY = this.player.y;
+  }
+
+  handlePauseInput(input){
+    if (this.gameOver || this.itemPickupOverlay) return;
+    if (anyPressed(input, Keys.pause)) {
+      this.paused = !this.paused;
+      if (!this.paused) this.debugOverlay = false;
+      input.clearHardwareState();
+      return;
+    }
+    if (this.paused && anyPressed(input, Keys.debug)) {
+      this.debugOverlay = !this.debugOverlay;
+      input.clearHardwareState();
+    }
+  }
+
   update(dt, input){
+    this.handlePauseInput(input);
+
+    if (this.paused) {
+      this.syncRenderInterpolationState();
+      return;
+    }
+
     if (this.transitionFade > 0) {
       this.transitionFade = Math.max(0, this.transitionFade - dt * 2);
       return;
@@ -5864,10 +6886,9 @@ class GameSim {
       }
       if (p.hitsPlayer(this.player) && this.player.health.isAlive()) {
         if (this.player.health.tryDamage(p.damage, 1.125)) {
-          this.player.hurtTint = 0.35;
           const pcx = this.player.x + this.player.w() * 0.5;
           const sign = pcx < p.x ? -1 : 1;
-          this.player.applyContactKnockback(sign);
+          this.player.startHurtReaction(sign);
         }
         p.dead = true;
       }
@@ -5888,7 +6909,11 @@ class GameSim {
           hit.y < hb.y + hb.h &&
           hit.y + hit.h > hb.y
         ) {
-          e.takeHit(this.player.stats.attackDamage);
+          e.takeHit(
+            this.player.stats.attackDamage *
+              (1 + (this.player.stats.damageMultiplierBonus ?? 0)) *
+              (this.player.swordProfile?.damageMult ?? 1)
+          );
         }
       }
     }
@@ -5896,6 +6921,9 @@ class GameSim {
     this.processEnemyDeaths();
     this.updateWorldPickups(dt);
     this.collectWorldPickups();
+    this.trySubweapon(input);
+    this.updateSubweaponProjectiles(dt);
+    this.tryCollectFreePrimaryPedestal();
 
     // Room transitions (doors + ladder shafts)
     this.tryDoorTransition(input);
@@ -5974,16 +7002,8 @@ class GameSim {
       const def = this.itemCatalog.get(sp.itemId);
       if (!def) return;
       this.player.stats.money -= SHOP_PEDESTAL_PRICE;
-      if (def.subweapon) {
-        this.inventory.setEquippedSubweapon(sp.itemId);
-      } else {
-        this.inventory.add(sp.itemId, 1);
-      }
-      this.inventory.markAcquired(sp.itemId);
-      this.pedestalDecks?.purgeAcquired(sp.itemId);
-      this.itemCatalog.applyToPlayer(def, this.player);
+      this.acquireItem(sp.itemId);
       collected[i] = true;
-      this.beginItemPickupOverlay(sp.itemId, def);
       return;
     }
   }
@@ -6263,6 +7283,7 @@ class GameSim {
       })),
       transitionFade: this.transitionFade,
       debugOverlay: this.debugOverlay,
+      paused: this.paused,
       playerHurtTint: this.player.hurtTint,
       hp: this.player.health.getCurrent(),
       hpMax: this.player.health.getMax(),
@@ -6290,6 +7311,29 @@ class GameSim {
         itemId: p.itemId,
         collected: this.shopPedestalCollected[this.currentRoomId]?.[i] ?? false,
       })),
+      freePedestal: (() => {
+        const sp = this.currentFreePedestal();
+        if (!sp?.itemId) return null;
+        return { x: sp.x, groundTop: sp.groundTop, itemId: sp.itemId };
+      })(),
+      inventoryItems: this.inventory.ownedPassiveIds(this.itemCatalog).map((id) => ({
+        id,
+        count: this.inventory.count(id),
+      })),
+      equippedSubweapon: this.inventory.equippedSubweapon,
+      subweaponCooldown: this.subweaponCooldown,
+      subweaponProjectiles: this.subweaponProjectiles.map((p) => ({
+        x: p.x,
+        y: p.y,
+        w: p.w,
+        h: p.h,
+        spin: p.spin,
+        facing: p.facing,
+      })),
+      hasMap: this.inventory.count("MAP") > 0,
+      attackStat: this.player.stats.attackDamage,
+      luckStat: this.player.stats.luck ?? 0,
+      swordProfileId: this.player.swordProfile?.id ?? null,
       shopPickups: (this.activeShopPickups ?? []).map((p) => ({
         kind: p.kind,
         x: p.x,
@@ -6469,6 +7513,8 @@ class RenderPipeline {
     }
     this.drawShopPickups(ctx, snap, assets);
     this.drawShopPedestals(ctx, snap, assets, sim.itemCatalog);
+    this.drawFreePedestal(ctx, snap, assets, sim.itemCatalog);
+    this.drawSubweaponProjectiles(ctx, snap);
     this.drawShopKeeper(ctx, snap, assets);
     this.drawWorldPickups(ctx, snap, assets);
     this.drawEnemies(ctx, snap, assets);
@@ -6477,17 +7523,19 @@ class RenderPipeline {
     this.drawEntityHealthBars(ctx, snap);
     this.drawShopPriceLabels(ctx, snap);
 
-    if (snap.debugOverlay) {
-      this.drawDebugGrid(ctx, sim);
-    }
-
     ctx.restore();
 
     // HUD
-    this.drawHud(ctx, snap, assets);
+    this.drawHud(ctx, snap, assets, sim.itemCatalog);
 
     if (snap.itemPickupOverlay) {
       this.drawItemPickupOverlay(ctx, snap.itemPickupOverlay);
+    }
+
+    if (snap.paused) {
+      this.drawPauseOverlay(ctx);
+      this.drawPauseMenu(ctx, snap, assets, sim.itemCatalog, sim.inventory);
+      if (snap.debugOverlay) this.drawDebugGrid(ctx, sim);
     }
 
     // Fade
@@ -6969,12 +8017,23 @@ class RenderPipeline {
   }
 
   drawShopPedestals(ctx, snap, assets, itemCatalog){
+    this.drawItemPedestalSlots(ctx, snap.shopPedestals ?? [], snap, assets, itemCatalog, true);
+  }
+
+  drawFreePedestal(ctx, snap, assets, itemCatalog){
+    const sp = snap.freePedestal;
+    if (!sp?.itemId) return;
+    this.drawItemPedestalSlots(ctx, [sp], snap, assets, itemCatalog, false);
+  }
+
+  drawItemPedestalSlots(ctx, slots, snap, assets, itemCatalog, respectCollected){
     const pedestalImg = assets.get("sprites/items/item pedestal.png");
     const pedestalH = imageDrawable(pedestalImg) ? pedestalImg.height : 16;
     const pedestalW = imageDrawable(pedestalImg) ? pedestalImg.width : 16;
     const bob = Math.sin(snap.pedestalBobPhase ?? 0) * PEDESTAL_BOB_AMP;
 
-    for (const sp of snap.shopPedestals ?? []) {
+    for (const sp of slots) {
+      if (respectCollected && sp.collected) continue;
       const left = sp.x - pedestalW * 0.5;
       const top = sp.groundTop - pedestalH;
       if (imageDrawable(pedestalImg)) {
@@ -6983,7 +8042,7 @@ class RenderPipeline {
         ctx.fillStyle = "#6a5a4a";
         ctx.fillRect(left, top, pedestalW, pedestalH);
       }
-      if (sp.collected || !sp.itemId || !itemCatalog) continue;
+      if (!sp.itemId || !itemCatalog) continue;
       const def = itemCatalog.get(sp.itemId);
       const itemImg = def ? assets.get(itemSpritePath(def.spriteFileName)) : null;
       const itemH = imageDrawable(itemImg) ? itemImg.height : 14;
@@ -6999,6 +8058,17 @@ class RenderPipeline {
         ctx.font = "6px monospace";
         ctx.fillText((def?.displayName ?? sp.itemId).slice(0, 8), ix, iy + 8);
       }
+    }
+  }
+
+  drawSubweaponProjectiles(ctx, snap){
+    for (const p of snap.subweaponProjectiles ?? []) {
+      ctx.save();
+      ctx.translate(p.x + p.w * 0.5, p.y + p.h * 0.5);
+      ctx.rotate(p.spin ?? 0);
+      ctx.fillStyle = "#6cf";
+      ctx.fillRect(-p.w * 0.5, -p.h * 0.5, p.w, p.h);
+      ctx.restore();
     }
   }
 
@@ -7071,7 +8141,7 @@ class RenderPipeline {
     ctx.fillText(effect, cx - effectW / 2, y);
   }
 
-  drawHud(ctx, snap, assets){
+  drawHud(ctx, snap, assets, itemCatalog){
     const hudY = INTERNAL_HEIGHT - HUD_HEIGHT;
     ctx.fillStyle = "#111118";
     ctx.fillRect(0, hudY, INTERNAL_WIDTH, HUD_HEIGHT);
@@ -7107,10 +8177,61 @@ class RenderPipeline {
     ctx.fillStyle = "#aaa";
     ctx.font = "8px monospace";
     ctx.fillText(`Keys:${snap.keys} $:${snap.money}`, 8, hudY + 28);
+    const atk = snap.attackStat != null ? snap.attackStat.toFixed(1) : "1.0";
+    const luck = snap.luckStat != null ? snap.luckStat.toFixed(0) : "0";
+    ctx.fillText(`ATK:${atk} LCK:${luck}`, 8, hudY + 38);
+
     drawMinimap(ctx, snap, hudY);
+    this.drawInventoryHud(ctx, snap, assets, itemCatalog, hudY);
+
     const grid = snap.layout ? minimapGridMetrics(snap.layout) : null;
     const roomLabelX = grid ? Math.max(8, INTERNAL_WIDTH - grid.totalW - 90) : INTERNAL_WIDTH - 120;
     ctx.fillText(snap.roomKind, roomLabelX, hudY + 28);
+  }
+
+  drawInventoryHud(ctx, snap, assets, itemCatalog, hudY){
+    const items = snap.inventoryItems ?? [];
+    const slot = 12;
+    const gap = 2;
+    let x = INTERNAL_WIDTH - 80;
+    const y = hudY + 6;
+    if (snap.equippedSubweapon && itemCatalog) {
+      const def = itemCatalog.get(snap.equippedSubweapon);
+      const img = def ? assets.get(itemSpritePath(def.spriteFileName)) : null;
+      ctx.strokeStyle = "#888";
+      ctx.strokeRect(x - 1, y - 1, slot + 2, slot + 2);
+      if (imageDrawable(img)) {
+        ctx.drawImage(img, x, y, slot, slot);
+      } else {
+        ctx.fillStyle = "#69f";
+        ctx.fillRect(x, y, slot, slot);
+      }
+      if (snap.subweaponCooldown > 0) {
+        ctx.fillStyle = "rgba(0,0,0,0.55)";
+        ctx.fillRect(x, y, slot, slot);
+      }
+      x -= slot + gap + 4;
+    }
+    const maxShow = 6;
+    for (let i = 0; i < Math.min(maxShow, items.length); i++) {
+      const entry = items[i];
+      const def = itemCatalog?.get(entry.id);
+      const sprite = def ? assets.get(itemSpritePath(def.spriteFileName)) : null;
+      const ix = x - i * (slot + gap);
+      ctx.fillStyle = "rgba(255,255,255,0.08)";
+      ctx.fillRect(ix, y, slot, slot);
+      if (imageDrawable(sprite)) {
+        ctx.drawImage(sprite, ix, y, slot, slot);
+      } else {
+        ctx.fillStyle = "#666";
+        ctx.fillRect(ix + 2, y + 2, slot - 4, slot - 4);
+      }
+      if (entry.count > 1) {
+        ctx.fillStyle = "#fff";
+        ctx.font = "6px monospace";
+        ctx.fillText(String(entry.count), ix + slot - 5, y + slot - 2);
+      }
+    }
   }
 
   drawGameOverOverlay(ctx){
@@ -7172,6 +8293,61 @@ class RenderPipeline {
       for (let tx = 0; tx < map.getWidth(); tx++) {
         ctx.strokeRect(tx * TILE_SIZE, ty * TILE_SIZE, TILE_SIZE, TILE_SIZE);
       }
+    }
+  }
+
+  drawPauseOverlay(ctx){
+    ctx.fillStyle = "rgba(0,0,0,0.63)";
+    ctx.fillRect(0, 0, INTERNAL_WIDTH, INTERNAL_HEIGHT);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "bold 14px monospace";
+    ctx.textAlign = "center";
+    ctx.textBaseline = "middle";
+    ctx.fillText("PAUSE", INTERNAL_WIDTH / 2, INTERNAL_HEIGHT / 2);
+    ctx.textAlign = "left";
+    ctx.textBaseline = "alphabetic";
+  }
+
+  drawPauseMenu(ctx, snap, assets, itemCatalog, inventory){
+    const boxH = PAUSE_MENU_PADDING * 2 + 36;
+    ctx.fillStyle = "rgba(10,12,16,0.86)";
+    ctx.fillRect(PAUSE_MENU_X, PAUSE_MENU_Y, PAUSE_MENU_W, boxH);
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.strokeRect(PAUSE_MENU_X + 0.5, PAUSE_MENU_Y + 0.5, PAUSE_MENU_W - 1, boxH - 1);
+    ctx.fillStyle = "#ffffff";
+    ctx.font = "10px monospace";
+    const x = PAUSE_MENU_X + PAUSE_MENU_PADDING;
+    let y = PAUSE_MENU_Y + PAUSE_MENU_PADDING + 12;
+    ctx.fillText("Paused — Enter resume", x, y);
+    ctx.fillStyle = "rgb(200,210,230)";
+    ctx.fillText("Debug: ` or F3", x, y + 14);
+
+    const icons = collectPauseMenuIcons(inventory, itemCatalog, assets);
+    if (!icons.length) return;
+
+    const cols = Math.floor(PAUSE_MENU_W / PAUSE_ITEM_CELL);
+    if (cols <= 0) return;
+    const rows = Math.ceil(icons.length / cols);
+    const gridPad = 6;
+    const gridH = rows * PAUSE_ITEM_CELL + gridPad * 2;
+    const gridY = PAUSE_MENU_Y + boxH + 6;
+    ctx.fillStyle = "rgba(10,12,16,0.86)";
+    ctx.fillRect(PAUSE_MENU_X, gridY, PAUSE_MENU_W, gridH);
+    ctx.strokeStyle = "rgba(255,255,255,0.35)";
+    ctx.strokeRect(PAUSE_MENU_X + 0.5, gridY + 0.5, PAUSE_MENU_W - 1, gridH - 1);
+
+    ctx.imageSmoothingEnabled = false;
+    const x0 = PAUSE_MENU_X;
+    const y0 = gridY + gridPad;
+    for (let i = 0; i < icons.length; i++) {
+      const col = i % cols;
+      const row = Math.floor(i / cols);
+      const dx = x0 + col * PAUSE_ITEM_CELL;
+      const dy = y0 + row * PAUSE_ITEM_CELL;
+      const img = icons[i].img;
+      const iw = img.width || PAUSE_ITEM_CELL;
+      const ih = img.height || PAUSE_ITEM_CELL;
+      ctx.drawImage(img, 0, 0, iw, ih, dx, dy, PAUSE_ITEM_CELL, PAUSE_ITEM_CELL);
     }
   }
 }
@@ -7383,7 +8559,7 @@ async function mount(selector, options = {}){
         <button type="button" class="vernan-touch-btn" data-touch="attack">Attack</button>
         <button type="button" class="vernan-touch-btn" data-touch="down">↓</button>
       </div>
-      <p class="vernan-web-help">Move: WASD/Arrows · Jump: Z/Space · Attack: X · Subweapon: C · Debug: F3</p>
+      <p class="vernan-web-help">Move: WASD/Arrows · Jump: Z/Space · Attack: X · Subweapon: C · Pause: Enter · Debug (paused): F3/`</p>
     </div>
   `;
 
@@ -7405,7 +8581,7 @@ async function mount(selector, options = {}){
     progressEl.style.width = "92%";
     itemCatalog = await ItemCatalog.load(assetBase);
     for (const item of itemCatalog.all()) {
-      if (item.spawnShop && item.spriteFileName) {
+      if (item.spriteFileName) {
         loader.loadImage(itemSpritePath(item.spriteFileName)).catch(() => {});
       }
     }
@@ -7529,7 +8705,6 @@ async function mount(selector, options = {}){
   const loop = new GameLoop({
     update(dt) {
       injectTouch();
-      if (anyPressed(input, Keys.debug)) sim.debugOverlay = !sim.debugOverlay;
       sim.update(dt, input);
     },
     render(alpha) {

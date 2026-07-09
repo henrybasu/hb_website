@@ -1179,6 +1179,94 @@
       return new TilesetRuntime(root, sheets, images, bridge);
     }
 
+    snapshotTerrainTile(map, tx, ty, opts = {}) {
+      const {
+        roomKind = "NORMAL",
+        displaySalt = 0,
+        bridge: bridgeOverride = null,
+        decoTiles = null,
+        terrainAt = null,
+      } = opts;
+      const bridge = bridgeOverride || this.bridge;
+      const canvas = document.createElement("canvas");
+      canvas.width = 16;
+      canvas.height = 16;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      const tileAt = (x, y) => (terrainAt ? terrainAt(x, y) : map.tileAt(x, y));
+      const t = tileAt(tx, ty);
+      if (
+        t !== TILE_SOLID &&
+        t !== TILE_BREAKABLE &&
+        t !== TILE_PLATFORM &&
+        t !== TILE_LADDER &&
+        t !== TILE_DOOR
+      ) {
+        return null;
+      }
+      const tileDefById = (id) => this.tileById(id);
+      const decoByCell =
+        decoTiles && global.VernanProceduralDeco?.indexDecoByCell
+          ? global.VernanProceduralDeco.indexDecoByCell(decoTiles)
+          : null;
+      const tileId = resolveTerrainCell(
+        map,
+        tx,
+        ty,
+        t,
+        bridge,
+        displaySalt,
+        roomKind,
+        this.objects,
+        tileDefById,
+        decoByCell
+      );
+      if (tileId && this.drawTile(ctx, tileId, 0, 0)) return canvas;
+      ctx.fillStyle = "hsl(22, 28%, 42%)";
+      ctx.fillRect(0, 0, 16, 16);
+      return canvas;
+    }
+
+    snapshotDecoTile(decoTileId, map, tx, ty, opts = {}) {
+      const {
+        roomKind = "NORMAL",
+        displaySalt = 0,
+        bridge: bridgeOverride = null,
+        argb = 0,
+      } = opts;
+      const bridge = bridgeOverride || this.bridge;
+      const canvas = document.createElement("canvas");
+      canvas.width = 16;
+      canvas.height = 16;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return null;
+      if (decoTileId) {
+        const t = map.tileAt(tx, ty);
+        const tileId = resolvePaintedCell(
+          decoTileId,
+          map,
+          tx,
+          ty,
+          t,
+          bridge,
+          displaySalt,
+          roomKind,
+          this.objects,
+          (id) => this.tileById(id)
+        );
+        if (tileId && this.drawTile(ctx, tileId, 0, 0)) return canvas;
+      } else if (argb) {
+        const a = ((argb >>> 24) & 255) / 255;
+        const r = (argb >>> 16) & 255;
+        const g = (argb >>> 8) & 255;
+        const b = argb & 255;
+        ctx.fillStyle = `rgba(${r},${g},${b},${a})`;
+        ctx.fillRect(0, 0, 16, 16);
+        return canvas;
+      }
+      return null;
+    }
+
     drawTile(ctx, tileId, dstX, dstY) {
       const def = this.tileById(tileId);
       if (!def) return false;
